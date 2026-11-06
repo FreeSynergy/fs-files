@@ -29,6 +29,11 @@ pub use backend::{
     BackendConfig, BackendFactory, BackendRegistry, BlobBackend, BlobInfo, CHUNK, LocalFactory,
     LocalFolder, MAX_KEY, MAX_SEGMENT, check_backend, check_key, format_checksum,
 };
+#[cfg(feature = "s3")]
+pub use backend::{
+    MAX_PARTS, MIN_PART_SIZE, ObjectApi, ObjectEntry, ObjectStoreApi, S3Backend, S3Config,
+    S3Factory, S3Options,
+};
 pub use backends::Backends;
 pub use error::{Error, Result};
 pub use files::Files;

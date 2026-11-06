@@ -51,7 +51,11 @@ impl FileRepo {
         backend_id: impl Into<String>,
         backend: Arc<dyn BlobBackend>,
     ) -> Self {
-        let factories: Vec<Arc<dyn BackendFactory>> = vec![Arc::new(LocalFactory)];
+        let factories: Vec<Arc<dyn BackendFactory>> = vec![
+            Arc::new(LocalFactory),
+            #[cfg(feature = "s3")]
+            Arc::new(crate::backend::S3Factory),
+        ];
         Self {
             objects,
             reads,

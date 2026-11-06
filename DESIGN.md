@@ -7,7 +7,7 @@ see a path or a backend. Contract: `files.capnp` in `fs-interfaces` v0.3.0 (draf
 
 ## State
 
-Version 0.1.0 (stage 1: local folder). Built on fs-store 0.2.0 and fs-interfaces 0.3.0 (git tags).
+Version 0.2.0 (stage 1: local folder, stage 2: S3). Built on fs-store 0.2.0 and fs-interfaces 0.3.0 (git tags).
 
 | Area | State |
 |---|---|
@@ -20,9 +20,11 @@ Version 0.1.0 (stage 1: local folder). Built on fs-store 0.2.0 and fs-interfaces
 | `LocalFolder` backend: key validation, no symlink followed, pending file + fsync, atomic rename, directory fsync | done (stage 1) |
 | `BackendRegistry`: add (built, probed, then swapped atomically), remove (refused while files / uploads are on it, and for the active one), a file records its backend | done |
 | Sensitive categories (`classify`) go to the envelope (ADR 0029); the store refuses them without encryption (`EncryptionRequired`), tested | done |
-| S3 backend | stage 2, not yet |
+| `S3Backend` behind the same `BlobBackend` (feature `s3`, default on): multipart upload that survives a restart (state in the bucket), tail pieces so any chunk size works, plain put for files under one part; `S3Factory` for `backend.add`; credentials never in `Debug` or errors | done |
+| One behaviour suite as functions over `&dyn BlobBackend` (`tests/common/{suite,stream}.rs`), run on `LocalFolder`, `S3Backend` over a strict fake S3, `S3Backend` over the `object_store` in-memory store, and (ignored) a live server | done |
+| Live S3: official RustFS image 1.0.4 with podman, localhost only, throwaway credentials: both live tests passed; container removed | verified once (2026-11-06), not part of CI |
 | `sharing`, `file.subscribe`: `Unsupported` with the plain reason; versions, encryption, sync, WebDAV, previews: not built | as agreed |
-| Tests | 41 |
+| Tests | 55 run by default (41 without the `s3` feature) + 2 ignored live tests |
 
 ## Structure and pattern map (ADR 0043)
 
@@ -30,6 +32,10 @@ Version 0.1.0 (stage 1: local folder). Built on fs-store 0.2.0 and fs-interfaces
 |---|---|---|
 | `files.rs`, `transfer.rs`, `backends.rs` | Repository (interface) + Null Object | the public contract as traits with `Unsupported` defaults (ADR 0045); callers use `dyn Files` etc. |
 | `backend/provider.rs` | Strategy (interface) + Null Object | `BlobBackend`, the provider interface: where bytes are |
+| `backend/s3/{backend,flush}.rs` | Strategy / Template method | `S3Backend`; part, save list, then delete pieces: a fixed order that makes a crash harmless |
+| `backend/s3/api.rs`, `adapter.rs` | Adapter | the few S3 calls as a narrow trait; one adapter over `object_store`, a fake in the tests |
+| `backend/s3/state.rs` | Memento | multipart id, part etags and tail pieces live in the bucket and are rebuilt on load |
+| `backend/s3/{layout,config,factory}.rs` | Specification / Factory | object names; JSON config -> client; `kind: s3` for `backend.add` |
 | `backend/local/*` | Strategy | `LocalFolder`; `path.rs` is a Specification of the path rules, `io.rs` durable file helpers |
 | `backend/key.rs` | Specification | the one place that decides what a key may be |
 | `backend/digest.rs` | Strategy (hash) | running BLAKE3 per key, fallback streaming hash |
@@ -65,6 +71,19 @@ Version 0.1.0 (stage 1: local folder). Built on fs-store 0.2.0 and fs-interfaces
   writes them to the store or to an error).
 * **One process per store:** the "name is free" checks and writes run under one lock inside the process.
 
+## S3: parts, restart, limits
+
+S3 refuses every multipart part under 5 MiB except the last, and callers send chunks of any size. Handling: every chunk is first
+written as a small **tail piece** `pending/<key>/tail/<offset>` (durable on its own, so `put` keeps its promise). When the pieces add
+up to the part size (default 8 MiB, at least 5) they are read back, sent as one part, the part list is saved to `pending/<key>/state`,
+and only then the pieces are deleted. Memory is one part plus one chunk, never the file. A file smaller than one part is a plain `PUT`
+(no multipart, nothing to abort). The last part may be small (allowed by S3). After a restart the state is rebuilt from the bucket:
+`state` gives the multipart id and parts, tail pieces below what the parts hold are leftovers of a crash and are deleted.
+Limits: at most 10 000 parts, so a file can be `10 000 x part_size` (8 MiB: about 78 GiB; raise `part_size_mib` for bigger ones);
+cost: each byte is written twice (tail piece, then part). Orphan multipart uploads after a crash between `create` and the first
+`state` save are left to the bucket's lifecycle rule. `stat` returns the size only; the checksum comes from `commit`.
+The blake3 checksum is taken while streaming; after a restart (or a failed put) the finished object is streamed once through the hasher.
+
 ## Local folder: path safety
 
 A key is `/`-separated segments of `A-Za-z0-9._-`; a segment is never empty and never starts with `.`. That excludes `..`, absolute
@@ -78,5 +97,17 @@ the root and races between the check and the use; the root must not be writable 
 * `blake3` 1.8 (CC0-1.0 OR Apache-2.0): checksums, with the `pure` feature (no C / assembly). Fast enough for a first version.
 * `infer` 0.22 (MIT): media type from the first bytes when the caller gives none; pure Rust, no dependencies.
 * `tokio` (fs, io, sync), `async-trait`, `thiserror`, `serde`, `serde_json`, `chrono` (MIT or Apache-2.0, already used by fs-store / fs-people).
+* `object_store` 0.14 (MIT OR Apache-2.0, Apache Arrow project), feature `aws` only, optional (`s3`): the S3 client with a real `MultipartStore`
+  trait, which exposes the multipart id and the part etags. That is what a resumable upload needs (state is persisted, so a new process
+  can go on). It also gives us signing, retries and the in-memory store for tests. Its TLS comes via `reqwest` + `rustls` + `aws-lc-rs`, which
+  contains C code: not pure Rust. Hence the feature: `--no-default-features` is a pure-Rust build with the local folder only. `bytes` for its payloads.
 * Dev: `tempfile`.
-* Not taken: `opendal` (broad, many services we do not use; its writer hides the multipart id, so an upload could not be resumed after a restart).
+* Not taken: `opendal` (broad, many services we do not use; its writer hides the multipart id, so an upload could not be resumed after a restart). `rusty-s3` + an own HTTP layer would be pure sans-IO but means writing the client.
+
+## Contract problems found (files.capnp v0.3.0), not changed
+
+1. No way to **list the trash**: `Folders.list` and `Search.find` show live entries only, so a frontend cannot offer `restore`. The Rust `FileFilter` has an extra `trashed` flag.
+2. No **move folder**: `moveFile` exists, `moveFolder` does not. Rust has `move_folder` (capability id `folder.move`, ours).
+3. `BlobBackend` has no way to ask **how much of a pending key is held**; resuming after a restart needs it. Rust has `pending(key)`.
+4. `BlobInfo.checksum` from `stat`: a backend that only knows the size cannot fill it; ours returns "".
+5. `subscribe` takes a `ChangeListener`; the Rust placeholder takes none until it is built.

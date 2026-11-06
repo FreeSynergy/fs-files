@@ -6,6 +6,11 @@ edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 
+[features]
+default = ["s3"]
+# The S3 backend (RustFS and any S3 store).
+s3 = ["dep:object_store", "dep:bytes"]
+
 [dependencies]
 fs-store = { git = "https://github.com/FreeSynergy/fs-store", tag = "v0.2.0" }
 fs-interfaces = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.3.0" }
@@ -17,6 +22,9 @@ async-trait = "0.1"
 tokio = { version = "1", features = ["fs", "io-util", "sync", "rt"] }
 blake3 = { version = "1", default-features = false, features = ["std", "pure"] }
 infer = { version = "0.22", default-features = false, features = ["std"] }
+# S3 client with the low-level multipart API (MultipartStore). Optional: a build without S3 stays free of TLS and C code.
+object_store = { version = "0.14", default-features = false, features = ["aws"], optional = true }
+bytes = { version = "1", optional = true }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }

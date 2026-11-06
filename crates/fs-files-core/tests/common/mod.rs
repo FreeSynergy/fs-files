@@ -2,6 +2,8 @@
 
 #![allow(dead_code)] // each test file uses a different subset
 
+#[cfg(feature = "s3")]
+pub mod fake_s3;
 pub mod stream;
 pub mod suite;
 
