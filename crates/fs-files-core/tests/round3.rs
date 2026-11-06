@@ -78,9 +78,11 @@ async fn a_root_that_leaves_little_room_gives_invalid_name_not_io() {
 async fn a_folder_move_counts_the_root_of_the_disk_too() {
     let dir = tempfile::tempdir().unwrap();
     let mut deep = dir.path().join("blobs");
-    while deep.as_os_str().len() < 3600 {
+    // Exactly 3600 bytes, whatever the temp folder is: the moves below depend on it.
+    while deep.as_os_str().len() < 3350 {
         deep.push("d".repeat(200));
     }
+    deep.push("d".repeat(3599 - deep.as_os_str().len()));
     std::fs::create_dir_all(&deep).unwrap();
     let store: std::sync::Arc<dyn fs_store::Store> =
         std::sync::Arc::new(fs_store::TursoStore::open_in_memory().await.unwrap());
