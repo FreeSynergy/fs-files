@@ -34,7 +34,7 @@ Version 0.2.1 (stage 1: local folder, stage 2: S3, stage 3: real names). Built o
 | One behaviour suite as functions over `&dyn BlobBackend` (`tests/common/{suite,stream}.rs`), run on `LocalFolder`, `S3Backend` over a strict fake S3, `S3Backend` over the `object_store` in-memory store, and (ignored) a live server | done |
 | Live S3: official RustFS image 1.0.4 with podman, localhost only, throwaway credentials: both live tests passed; container removed | verified once (2026-11-06), not part of CI |
 | `sharing`, `file.subscribe`: `Unsupported` with the plain reason; versions, encryption, sync, WebDAV, previews: not built | as agreed |
-| Tests | 83 run by default (69 without the `s3` feature) + 2 ignored live tests |
+| Tests | 101 run by default (84 without the `s3` feature) + 2 ignored live tests |
 
 ## Structure and pattern map (ADR 0043)
 
