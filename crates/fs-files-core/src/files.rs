@@ -10,7 +10,7 @@ use fs_interfaces::{Capabilities, Unsupported};
 use fs_store::ObjectId;
 
 use crate::error::Result;
-use crate::model::{Cursor, File, FileFilter, Folder, OnConflict, Page, RescanReport};
+use crate::model::{Cursor, File, FileFilter, Folder, OnConflict, Page, RescanReport, Sort};
 
 const NO_RULE: &str = "this provider only knows the refuse rule";
 
@@ -31,6 +31,20 @@ pub trait Files: Send + Sync {
     async fn get_folder(&self, id: ObjectId) -> Result<Option<Folder>>;
     /// `folder.list`: the live entries of a folder (`None` = top level) in name order.
     async fn list(&self, folder: Option<ObjectId>, cursor: Option<Cursor>) -> Result<Page>;
+
+    /// `folder.list` with a sort order. The default order is by name; others may answer `Unsupported`.
+    async fn list_sorted(
+        &self,
+        folder: Option<ObjectId>,
+        cursor: Option<Cursor>,
+        sort: Sort,
+    ) -> Result<Page> {
+        if sort == Sort::default() {
+            self.list(folder, cursor).await
+        } else {
+            no("file.sort", "this provider only lists by name")
+        }
+    }
 
     /// `folder.create`: a folder inside `parent` (`None` = top level).
     async fn create_folder(&self, _parent: Option<ObjectId>, _name: &str) -> Result<Folder> {
@@ -130,6 +144,19 @@ pub trait Files: Send + Sync {
     /// `file.search`: files and folders that match all members of the filter.
     async fn find(&self, _filter: &FileFilter, _cursor: Option<Cursor>) -> Result<Page> {
         no("file.search", "this provider cannot search")
+    }
+    /// `file.search` with a sort order. The default order is by name.
+    async fn find_sorted(
+        &self,
+        filter: &FileFilter,
+        cursor: Option<Cursor>,
+        sort: Sort,
+    ) -> Result<Page> {
+        if sort == Sort::default() {
+            self.find(filter, cursor).await
+        } else {
+            no("file.sort", "this provider only searches by name")
+        }
     }
     /// `folder.rescan`: look at the disk below `folder` (`None` = the top) and bring the records in line with
     /// it: take over new files and folders, update size and checksum of changed files, and **report**

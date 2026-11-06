@@ -7,6 +7,7 @@ mod file;
 mod folder;
 mod page;
 mod rescan;
+mod sort;
 
 pub use conflict::OnConflict;
 pub use file::File;
@@ -15,3 +16,4 @@ pub use folder::Folder;
 pub(crate) use folder::FolderRecord;
 pub use page::{BackendInfo, Cursor, Entry, FileFilter, Page};
 pub use rescan::RescanReport;
+pub use sort::{Sort, SortBy};

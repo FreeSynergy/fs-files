@@ -3,7 +3,7 @@
 `fs-files` is the files program of FreeSynergy. This repo holds the **program core** (`crates/fs-files-core`, no GUI).
 **Metadata** (name, media type, size, checksum, folder, trash flag) is an object in `fs-store`; the **bytes** are in a
 backend behind `BlobBackend`. Other programs refer to a file by its object id and read through the `Blob` trait; they never
-see a path or a backend. Contract: `files.capnp` in `fs-interfaces` v0.9.0 (draft, consumers: 0 of 2).
+see a path or a backend. Contract: `files.capnp` in `fs-interfaces` v0.10.0 (draft, consumers: 0 of 2).
 
 ## State
 
@@ -22,6 +22,7 @@ Version 0.2.1 (stage 1: local folder, stage 2: S3, stage 3: real names). Built o
 | Disk and database in step: upload, rename, move, copy, folder create / rename / move / delete, trash, restore, purge; **disk first, then the database, undone if it fails** (`repo/steps.rs`) | done |
 | `rescan(folder)` (`folder.rescan`): takes over new files and folders, updates changed ones, reports vanished ones, deletes nothing; `open` refuses a file whose size no longer matches | done, provisional (see decisions) |
 | Conflict rule `OnConflict` (`Refuse` default, `KeepBoth`; **no replace**) for rename, move, copy, folder rename / move and upload: `*_as` methods; `KeepBoth` gives the incoming entry `name (2).ext` (a copy `name (copy).ext`), upload also looks at the disk | done |
+| Sorting for `list_sorted` / `find_sorted`: name, modified (= record changed, not disk mtime), size (folder = 0), type (ascending only); store orders by index fields `size_asc`, `size_desc`, `type_asc` | done |
 | `Error::problem()`: name clash, invalid name, changed outside map to the named problem types of the contract | done |
 | `BackendRegistry`: add (built, probed, then swapped atomically), remove (refused while files / uploads are on it, and for the active one), a file records its backend | done |
 | Sensitive categories (`classify`) go to the envelope (ADR 0029); the store refuses them without encryption (`EncryptionRequired`), tested | done |
@@ -29,7 +30,7 @@ Version 0.2.1 (stage 1: local folder, stage 2: S3, stage 3: real names). Built o
 | One behaviour suite as functions over `&dyn BlobBackend` (`tests/common/{suite,stream}.rs`), run on `LocalFolder`, `S3Backend` over a strict fake S3, `S3Backend` over the `object_store` in-memory store, and (ignored) a live server | done |
 | Live S3: official RustFS image 1.0.4 with podman, localhost only, throwaway credentials: both live tests passed; container removed | verified once (2026-11-06), not part of CI |
 | `sharing`, `file.subscribe`: `Unsupported` with the plain reason; versions, encryption, sync, WebDAV, previews: not built | as agreed |
-| Tests | 70 run by default (56 without the `s3` feature) + 2 ignored live tests |
+| Tests | 73 run by default (59 without the `s3` feature) + 2 ignored live tests |
 
 ## Structure and pattern map (ADR 0043)
 
@@ -125,7 +126,7 @@ renames on case-insensitive file systems are not special-cased.
 
 ## Crates
 
-* `fs-store` (v0.2.0), `fs-interfaces` (v0.9.0): git tags.
+* `fs-store` (v0.2.0), `fs-interfaces` (v0.10.0): git tags.
 * `rustix` 1 (MIT OR Apache-2.0, Linux only, features `std` + `fs`): `renameat2` with `RENAME_NOREPLACE`, the atomic no-replace rename that `std` lacks. No C code with its default backend, already in the lock file through other crates.
 * `blake3` 1.8 (CC0-1.0 OR Apache-2.0): checksums, with the `pure` feature (no C / assembly). Fast enough for a first version.
 * `infer` 0.22 (MIT): media type from the first bytes when the caller gives none; pure Rust, no dependencies.
@@ -139,9 +140,9 @@ renames on case-insensitive file systems are not special-cased.
 
 ## Contract
 
-`files.capnp` in `fs-interfaces` v0.9.0 (draft 0.2). Appended for real names: `Folders.rescan @13` and `RescanReport`; `BlobBackend`
+`files.capnp` in `fs-interfaces` v0.10.0 (draft 0.2). Appended for real names: `Folders.rescan @13` and `RescanReport`; `BlobBackend`
 `naming`, `publish`, `relocate`, `discard`, `makeDir`, `removeDir`, `scan` (@7 to @13) with `Spot`, `Scanned`, `ScanKind`; the problem types
 `nameConflictProblemType` (409), `invalidNameProblemType` (422), `changedOutsideProblemType` (409); and the statement that `Envelope.name` of a
 file and a folder IS its real name (not derived). In the core `Error::problem()` makes the mapping; a name clash is still `Error::Conflict`.
-`OnConflict` is a last parameter of rename, move, copy and `startUpload` (0 = refuse, so old callers keep working; the wire `copyFile` now refuses by default, the Rust `copy_file` without `_as` still keeps both). Capabilities: `file.conflictRule`, `folder.rescan` (Files), `blob.rename` and `blob.scan` (backend). `moveFolder`, `pending`, `FileFilter.trashed` exist since v0.5.0. The Rust
+`OnConflict` is a last parameter of rename, move, copy and `startUpload` (0 = refuse, so old callers keep working; the wire `copyFile` now refuses by default, the Rust `copy_file` without `_as` still keeps both). `Sort` is a last parameter of `list` and `find`. Capabilities: `file.sort`, `file.conflictRule`, `folder.rescan` (Files), `blob.rename` and `blob.scan` (backend). `moveFolder`, `pending`, `FileFilter.trashed` exist since v0.5.0. The Rust
 `subscribe` placeholder still takes no listener; it comes with the feed.

@@ -13,10 +13,12 @@ use super::handle::FileRepo;
 use crate::backends::Backends;
 use crate::error::Result;
 use crate::files::Files;
-use crate::model::{BackendInfo, Cursor, File, FileFilter, Folder, OnConflict, Page, RescanReport};
+use crate::model::{
+    BackendInfo, Cursor, File, FileFilter, Folder, OnConflict, Page, RescanReport, Sort,
+};
 use crate::transfer::{Blob, Transfer, Upload};
 
-const SUPPORTED: [&str; 21] = [
+const SUPPORTED: [&str; 22] = [
     "file.resolve",
     "folder.list",
     "folder.create",
@@ -25,6 +27,7 @@ const SUPPORTED: [&str; 21] = [
     "folder.delete",
     "folder.rescan",
     "file.conflictRule",
+    "file.sort",
     "file.move",
     "file.copy",
     "file.rename",
@@ -83,7 +86,15 @@ impl Files for FileRepo {
         }
     }
     async fn list(&self, folder: Option<ObjectId>, cursor: Option<Cursor>) -> Result<Page> {
-        self.do_list(folder, cursor).await
+        self.do_list(folder, cursor, Sort::default()).await
+    }
+    async fn list_sorted(
+        &self,
+        folder: Option<ObjectId>,
+        cursor: Option<Cursor>,
+        sort: Sort,
+    ) -> Result<Page> {
+        self.do_list(folder, cursor, sort).await
     }
     async fn create_folder(&self, parent: Option<ObjectId>, name: &str) -> Result<Folder> {
         self.do_create_folder(parent, name).await
@@ -149,7 +160,15 @@ impl Files for FileRepo {
         self.do_classify(id, categories).await
     }
     async fn find(&self, filter: &FileFilter, cursor: Option<Cursor>) -> Result<Page> {
-        self.do_find(filter, cursor).await
+        self.do_find(filter, cursor, Sort::default()).await
+    }
+    async fn find_sorted(
+        &self,
+        filter: &FileFilter,
+        cursor: Option<Cursor>,
+        sort: Sort,
+    ) -> Result<Page> {
+        self.do_find(filter, cursor, sort).await
     }
     async fn rescan(&self, folder: Option<ObjectId>) -> Result<RescanReport> {
         self.do_rescan(folder).await

@@ -9,7 +9,7 @@ use super::build::folder_key;
 use super::consts::{CONTEXT, FOLDER_TYPE};
 use super::handle::FileRepo;
 use crate::error::Result;
-use crate::model::{Cursor, Entry, File, FileFilter, Folder, Page};
+use crate::model::{Cursor, Entry, File, FileFilter, Folder, Page, Sort, SortBy};
 
 fn entry_of(o: &StoredObject) -> Result<Entry> {
     if o.envelope.object_type == FOLDER_TYPE {
@@ -19,20 +19,48 @@ fn entry_of(o: &StoredObject) -> Result<Entry> {
     }
 }
 
+/// Apply a sort order. Size and type use index fields that every record carries.
+fn ordered(q: Query, sort: Sort) -> Result<Query> {
+    let d = sort.descending;
+    Ok(match sort.by {
+        SortBy::Name => q.ordered(if d { Order::NameDesc } else { Order::NameAsc }),
+        SortBy::Modified => q.ordered(if d {
+            Order::UpdatedDesc
+        } else {
+            Order::UpdatedAsc
+        }),
+        SortBy::Size => q.order_by_index(if d { "size_desc" } else { "size_asc" }),
+        SortBy::Type if d => {
+            return Err(fs_interfaces::Unsupported::new(
+                "file.sort",
+                "sorting by type is ascending only",
+            )
+            .into());
+        }
+        SortBy::Type => q.order_by_index("type_asc"),
+    })
+}
+
 impl FileRepo {
     pub(super) async fn do_list(
         &self,
         folder: Option<fs_store::ObjectId>,
         cursor: Option<Cursor>,
+        sort: Sort,
     ) -> Result<Page> {
         let q = Query::new()
             .in_context(CONTEXT)
             .with_index("folder", folder_key(folder))
             .with_index("trashed", "false");
-        self.page_of(q, cursor).await
+        self.page_of(q, cursor, sort).await
     }
 
-    pub(super) async fn do_find(&self, f: &FileFilter, cursor: Option<Cursor>) -> Result<Page> {
+    pub(super) async fn do_find(
+        &self,
+        f: &FileFilter,
+        cursor: Option<Cursor>,
+        sort: Sort,
+    ) -> Result<Page> {
         let mut q = Query::new()
             .in_context(CONTEXT)
             .with_index("trashed", f.trashed.to_string());
@@ -45,12 +73,12 @@ impl FileRepo {
         if let Some(folder) = f.folder {
             q = q.with_index("folder", folder.to_string());
         }
-        self.page_of(q, cursor).await
+        self.page_of(q, cursor, sort).await
     }
 
-    async fn page_of(&self, q: Query, cursor: Option<Cursor>) -> Result<Page> {
+    async fn page_of(&self, q: Query, cursor: Option<Cursor>, sort: Sort) -> Result<Page> {
         let start = cursor.map_or(0, |c| c.0);
-        let mut q = q.ordered(Order::NameAsc).limit(self.page + 1);
+        let mut q = ordered(q, sort)?.limit(self.page + 1);
         q.offset = start;
         let mut rows = self.reads.query(&q).await?;
         let next = (rows.len() > self.page).then(|| Cursor(start + self.page));

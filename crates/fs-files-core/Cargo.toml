@@ -13,7 +13,7 @@ s3 = ["dep:object_store", "dep:bytes"]
 
 [dependencies]
 fs-store = { git = "https://github.com/FreeSynergy/fs-store", tag = "v0.2.0" }
-fs-interfaces = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.9.0" }
+fs-interfaces = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.10.0" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }

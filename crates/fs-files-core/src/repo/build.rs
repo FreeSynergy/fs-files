@@ -94,6 +94,14 @@ fn index_file(o: &mut StoredObject, r: &FileRecord) {
     o.index.insert("folder".into(), one(folder_key(r.folder)));
     o.index.insert("trashed".into(), one(r.trashed.to_string()));
     o.index.insert("backend".into(), one(r.backend.clone()));
+    // Sort keys (the store orders by an index field, ascending): zero-padded so text order is number order.
+    o.index
+        .insert("size_asc".into(), one(format!("{:020}", r.size)));
+    o.index.insert(
+        "size_desc".into(),
+        one(format!("{:020}", u64::MAX - r.size)),
+    );
+    o.index.insert("type_asc".into(), one(r.media_type.clone()));
 }
 
 fn index_folder(o: &mut StoredObject, parent: Option<ObjectId>) {
@@ -103,4 +111,9 @@ fn index_folder(o: &mut StoredObject, parent: Option<ObjectId>) {
         .insert("name_exact".into(), one(o.envelope.name.clone()));
     o.index.insert("folder".into(), one(folder_key(parent)));
     o.index.insert("trashed".into(), one("false".into()));
+    o.index.insert("size_asc".into(), one(format!("{:020}", 0)));
+    o.index
+        .insert("size_desc".into(), one(format!("{:020}", u64::MAX)));
+    o.index
+        .insert("type_asc".into(), one("inode/directory".into()));
 }
