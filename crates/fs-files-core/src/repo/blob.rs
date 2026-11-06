@@ -58,21 +58,9 @@ impl FileRepo {
         let key = self.key_of(&o, &r).await?;
         if r.named {
             // The folder can be changed from outside: never hand out bytes that are not the recorded ones.
-            match backend.stat(&key).await? {
-                None => {
-                    return Err(Error::NotFound(format!(
-                        "changed outside: the file {:?} is not on the disk any more; run rescan",
-                        o.envelope.name
-                    )));
-                }
-                Some(i) if i.size != r.size => {
-                    return Err(Error::Backend(format!(
-                        "changed outside: the file {:?} was changed outside the program (recorded {} bytes, on the disk {}); run rescan",
-                        o.envelope.name, r.size, i.size
-                    )));
-                }
-                Some(_) => {}
-            }
+            // Cheap check only (size, modification time); `rescan` brings the record up to date.
+            self.verify_bytes(&*backend, &key, &o.envelope.name, &r, false)
+                .await?;
         }
         Ok(Arc::new(FileBlob {
             backend,

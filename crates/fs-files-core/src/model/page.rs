@@ -53,8 +53,7 @@ pub struct FileFilter {
     pub created_after: Option<Timestamp>,
     /// Created before this time.
     pub created_before: Option<Timestamp>,
-    /// Look in the trash instead of the live files. Not in the contract (it has no way to see the
-    /// trash); reported to the owner.
+    /// Look in the trash instead of the live files (`FileFilter.trashed`).
     pub trashed: bool,
 }
 

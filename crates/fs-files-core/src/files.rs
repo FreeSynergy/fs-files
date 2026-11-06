@@ -56,7 +56,7 @@ pub trait Files: Send + Sync {
     async fn rename_folder(&self, _id: ObjectId, _name: &str) -> Result<Folder> {
         no("folder.rename", "this provider cannot rename folders")
     }
-    /// `folder.move`: move a folder; into itself or one of its descendants is refused. Not in the contract yet.
+    /// `folder.move`: move a folder; into itself or one of its descendants is refused.
     async fn move_folder(&self, _id: ObjectId, _parent: Option<ObjectId>) -> Result<Folder> {
         no("folder.move", "this provider cannot move folders")
     }
@@ -150,7 +150,7 @@ pub trait Files: Send + Sync {
         _on: OnConflict,
     ) -> Result<File> {
         no(
-            "file.restore",
+            "file.restoreTo",
             "this provider restores to the original folder only",
         )
     }

@@ -241,7 +241,12 @@ async fn a_symlink_planted_in_the_root_leads_nowhere() {
     assert!(r.rename_file(f.id, "c.txt").await.is_err());
     assert!(r.trash(f.id).await.is_err());
     assert!(r.create_folder(Some(d.id), "sub").await.is_err());
-    assert!(r.rescan(Some(d.id)).await.is_err());
+    // rescan reports the link and goes on; nothing outside is read
+    let report = r.rescan(Some(d.id)).await.unwrap();
+    assert!(
+        report.added.is_empty() && !report.skipped.is_empty(),
+        "{report:?}"
+    );
     let mut seen: Vec<_> = std::fs::read_dir(outside.path())
         .unwrap()
         .map(|x| x.unwrap().file_name())

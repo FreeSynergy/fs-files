@@ -77,9 +77,10 @@ impl BlobBackend for LocalFolder {
 
     async fn stat(&self, key: &str) -> Result<Option<BlobInfo>> {
         let p = path::final_path(&self.root, key)?;
-        Ok(io::len_of(&p).await?.map(|size| BlobInfo {
+        Ok(io::stat_of(&p).await?.map(|(size, modified)| BlobInfo {
             size,
             checksum: String::new(),
+            modified,
         }))
     }
 
@@ -118,7 +119,7 @@ impl BlobBackend for LocalFolder {
         let from = path::pending_path(&self.root, key)?;
         let to = path::final_path(&self.root, key)?;
         let _guard = self.locks.lock(key).await;
-        let size = io::len_of(&from)
+        let (size, modified) = io::stat_of(&from)
             .await?
             .ok_or_else(|| Error::NotFound(format!("nothing pending for {key}")))?;
         let checksum = match self.digests.finish(key, size) {
@@ -128,10 +129,15 @@ impl BlobBackend for LocalFolder {
         let dir = to.parent().ok_or_else(|| Error::InvalidKey(key.into()))?;
         io::make_all(dir).await?;
         path::final_path(&self.root, key)?; // re-check after creating directories
-        tokio::fs::rename(&from, &to).await?;
+        // Never replaces: a blob that is already there is a name clash, and the upload stays pending.
+        io::rename_new(&from, &to).map_err(|e| io::named(e, &format!("commit {key}")))?;
         io::sync_dir(dir).await?;
         io::sync_dir(&path::reserved_dir(&self.root, Reserved::Pending)).await?;
-        Ok(BlobInfo { size, checksum })
+        Ok(BlobInfo {
+            size,
+            checksum,
+            modified,
+        })
     }
 
     async fn publish(&self, pending: &str, key: &str) -> Result<BlobInfo> {
@@ -144,6 +150,14 @@ impl BlobBackend for LocalFolder {
 
     async fn discard(&self, spot: &Spot) -> Result<()> {
         self.do_discard(spot).await
+    }
+
+    async fn has(&self, spot: &Spot) -> Result<bool> {
+        self.do_has(spot)
+    }
+
+    async fn sweep_pending(&self, keep: &[String], older_than_secs: u64) -> Result<u32> {
+        self.do_sweep_pending(keep, older_than_secs).await
     }
 
     async fn make_dir(&self, path: &str, parents: bool) -> Result<()> {

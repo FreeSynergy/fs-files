@@ -86,6 +86,12 @@ impl Error {
                 409,
                 m.clone(),
             ),
+            Self::InvalidKey(m) if m.contains("symlink") => (
+                CHANGED_OUTSIDE_PROBLEM_TYPE,
+                "The file was changed outside the program",
+                409,
+                self.to_string(),
+            ),
             Self::InvalidName(_) | Self::InvalidKey(_) => (
                 INVALID_NAME_PROBLEM_TYPE,
                 "The name is not acceptable",
@@ -97,6 +103,12 @@ impl Error {
                 "The file was changed outside the program",
                 409,
                 m.clone(),
+            ),
+            Self::Io(e) if e.raw_os_error() == Some(36) => (
+                INVALID_NAME_PROBLEM_TYPE,
+                "The name is not acceptable",
+                422,
+                self.to_string(),
             ),
             _ => return None,
         };

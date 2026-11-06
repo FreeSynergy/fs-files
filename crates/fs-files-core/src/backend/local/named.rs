@@ -34,7 +34,7 @@ impl LocalFolder {
         let from = path::pending_path(&self.root, pending)?;
         let to = path::final_path(&self.root, key)?;
         let _guard = self.locks.lock(pending).await;
-        let size = io::len_of(&from)
+        let (size, modified) = io::stat_of(&from)
             .await?
             .ok_or_else(|| Error::NotFound(format!("nothing pending for {pending}")))?;
         let checksum = match self.digests.finish(pending, size) {
@@ -45,7 +45,11 @@ impl LocalFolder {
         io::rename_new(&from, &to).map_err(|e| io::named(e, &format!("publish {key}")))?;
         self.sync_parent(&to).await?;
         self.sync_parent(&from).await?;
-        Ok(BlobInfo { size, checksum })
+        Ok(BlobInfo {
+            size,
+            checksum,
+            modified,
+        })
     }
 
     pub(super) async fn do_relocate(&self, from: &Spot, to: &Spot) -> Result<()> {
@@ -92,6 +96,43 @@ impl LocalFolder {
         }
     }
 
+    pub(super) fn do_has(&self, spot: &Spot) -> Result<bool> {
+        Ok(path::spot_path(&self.root, spot)?
+            .symlink_metadata()
+            .is_ok())
+    }
+
+    pub(super) async fn do_sweep_pending(&self, keep: &[String], older: u64) -> Result<u32> {
+        let wanted: std::collections::HashSet<String> = keep
+            .iter()
+            .map(|k| format!("{}.part", blake3::hash(k.as_bytes()).to_hex()))
+            .collect();
+        let dir = path::reserved_dir(&self.root, Reserved::Pending);
+        path::refuse_symlinks(&self.root, &dir)?;
+        let mut reader = tokio::fs::read_dir(&dir).await?;
+        let (mut removed, limit) = (0, std::time::Duration::from_secs(older));
+        while let Some(entry) = reader.next_entry().await? {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            let meta = entry.metadata().await?;
+            let old = meta
+                .modified()
+                .ok()
+                .and_then(|t| t.elapsed().ok())
+                .is_some_and(|age| age >= limit);
+            if meta.is_file()
+                && std::path::Path::new(&name)
+                    .extension()
+                    .is_some_and(|e| e.eq_ignore_ascii_case("part"))
+                && !wanted.contains(&name)
+                && old
+            {
+                io::remove_quiet(&entry.path()).await?;
+                removed += 1;
+            }
+        }
+        Ok(removed)
+    }
+
     pub(super) async fn do_scan(&self, dir: &str) -> Result<Vec<Scanned>> {
         let p = if dir.is_empty() {
             self.root.clone()
@@ -131,11 +172,7 @@ impl LocalFolder {
             } else {
                 ScanKind::Skipped("not a regular file".into())
             };
-            let modified = meta
-                .modified()
-                .ok()
-                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-                .map_or(0, |d| i64::try_from(d.as_nanos()).unwrap_or(i64::MAX));
+            let modified = io::modified_ns(&meta);
             let size = if meta.is_file() { meta.len() } else { 0 };
             out.push(Scanned {
                 name,

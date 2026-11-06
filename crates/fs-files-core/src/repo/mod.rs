@@ -19,8 +19,10 @@ mod names;
 mod paths;
 mod provider;
 mod rescan;
+mod rescan_known;
 mod session;
 mod steps;
+mod verify;
 
 pub use consts::{CONTEXT, FOLDER_TYPE, UPLOAD_TYPE};
 pub use handle::FileRepo;

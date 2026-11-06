@@ -56,6 +56,9 @@ pub(crate) struct FileRecord {
     /// `rescan` compares it. `None` until the first rescan has looked at it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub modified: Option<i64>,
+    /// Id of the upload session this file was made from: tells a stale session (its file exists) from a live one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub upload: Option<String>,
 }
 
 impl FileRecord {

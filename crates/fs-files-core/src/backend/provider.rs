@@ -19,6 +19,8 @@ pub struct BlobInfo {
     /// `blake3:<hex>` as returned by `commit`; empty from `stat`, which only knows the size
     /// (hashing a whole blob to answer a size question would be wrong; see `checksum_of`).
     pub checksum: String,
+    /// Last change in nanoseconds since the epoch; 0 where the backend has no such thing (S3 here).
+    pub modified: i64,
 }
 
 /// A place that holds bytes under keys: a local folder, an S3 bucket, later `WebDAV`.
@@ -50,7 +52,7 @@ pub trait BlobBackend: Send + Sync {
         Err(Unsupported::new("blob.write", "this backend cannot be written").into())
     }
     /// `blob.write`: bytes held by the pending blob of `key` (0 if none). Needed to resume an
-    /// upload after a restart. Not in `files.capnp` yet (reported to the owner).
+    /// upload after a restart (`pending` in `files.capnp`).
     async fn pending(&self, _key: &str) -> Result<u64> {
         Err(Unsupported::new("blob.write", "this backend cannot be written").into())
     }
@@ -83,6 +85,15 @@ pub trait BlobBackend: Send + Sync {
             Spot::Path(key) | Spot::Pending(key) => self.delete(key).await,
             Spot::Trash(_) => no("blob.rename"),
         }
+    }
+    /// `blob.read`: is something at this spot? (Used to find bytes left in the trash by a crash.)
+    async fn has(&self, _spot: &Spot) -> Result<bool> {
+        Ok(false)
+    }
+    /// `blob.delete`: remove pending blobs that belong to no upload in `keep` and are older than
+    /// `older_than_secs` (leftovers of a crash, for example of a copy). Returns how many.
+    async fn sweep_pending(&self, _keep: &[String], _older_than_secs: u64) -> Result<u32> {
+        Ok(0)
     }
     /// `blob.rename`: create the folder `path`. With `parents` missing parents are created too and an
     /// existing folder is fine; without, an existing path is `Error::Conflict`.

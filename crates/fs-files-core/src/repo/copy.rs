@@ -53,7 +53,7 @@ impl FileRepo {
         backend: &dyn crate::backend::BlobBackend,
     ) -> Result<File> {
         let name = self
-            .resolve_name(folder, &src.envelope.name, None, on, true)
+            .resolve_name(folder, &src.envelope.name, None, on, true, None)
             .await?;
         let mut r = src_rec.clone();
         r.folder = folder;

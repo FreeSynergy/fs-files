@@ -10,7 +10,6 @@ use super::build::set_folder;
 use super::handle::FileRepo;
 use super::names::check_name;
 use super::steps::Disk;
-use crate::backend::Spot;
 use crate::error::{Error, Result};
 use crate::model::OnConflict;
 use crate::model::{Folder, FolderRecord};
@@ -43,7 +42,10 @@ impl FileRepo {
         let _w = self.lock.lock().await;
         let mut o = self.folder_obj(id).await?;
         let parent = FolderRecord::of(&o)?.parent;
-        let name = self.resolve_name(parent, name, Some(id), on, false).await?;
+        let old = o.envelope.name.clone();
+        let name = self
+            .resolve_name(parent, name, Some(id), on, false, Some(&old))
+            .await?;
         let steps = self
             .move_steps(parent, &o.envelope.name, parent, &name)
             .await?;
@@ -64,8 +66,9 @@ impl FileRepo {
         let mut o = self.folder_obj(id).await?;
         self.require_folder(parent).await?;
         self.require_not_inside(id, parent).await?;
+        let same = (FolderRecord::of(&o)?.parent == parent).then_some(o.envelope.name.as_str());
         let name = self
-            .resolve_name(parent, &o.envelope.name, Some(id), on, false)
+            .resolve_name(parent, &o.envelope.name, Some(id), on, false, same)
             .await?;
         let from = FolderRecord::of(&o)?.parent;
         let steps = self
@@ -112,7 +115,7 @@ impl FileRepo {
         if from == to {
             return Ok(Vec::new());
         }
-        let op = || Disk::Move(Spot::Path(from.clone()), Spot::Path(to.clone()));
-        Ok(self.named_steps(op, true))
+        let op = || Disk::MoveDir(from.clone(), to.clone());
+        Ok(self.named_steps(op, false))
     }
 }

@@ -40,7 +40,7 @@ pub use error::{Error, Problem, Result};
 pub use files::Files;
 pub use model::{
     BackendInfo, Cursor, Entry, File, FileFilter, Folder, OnConflict, Page, RescanReport, Sort,
-    SortBy,
+    SortBy, TrashReport, UploadInfo,
 };
 pub use repo::{CONTEXT, FOLDER_TYPE, FileRepo, MAX_NAME, UPLOAD_TYPE, check_name};
 pub use transfer::{Blob, Transfer, Upload};

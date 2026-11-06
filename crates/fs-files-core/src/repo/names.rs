@@ -19,7 +19,7 @@ pub fn check_name(name: &str) -> Result<()> {
     if name == "." || name == ".." {
         return bad("reserved");
     }
-    if name == crate::backend::RESERVED_NAME {
+    if name.eq_ignore_ascii_case(crate::backend::RESERVED_NAME) {
         return bad(
             "reserved: the program keeps its trash and unfinished uploads in a folder of this name",
         );

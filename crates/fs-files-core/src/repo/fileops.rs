@@ -36,8 +36,10 @@ impl FileRepo {
         let _w = self.lock.lock().await;
         let mut o = self.live_file_obj(id).await?;
         self.require_folder(folder).await?;
+        let own = FileRecord::of(&o)?.folder == folder;
+        let same = own.then_some(o.envelope.name.as_str());
         let name = self
-            .resolve_name(folder, &o.envelope.name, Some(id), on, false)
+            .resolve_name(folder, &o.envelope.name, Some(id), on, false, same)
             .await?;
         let mut r = FileRecord::of(&o)?;
         let steps = self.rename_steps(&o, &r, folder, &name).await?;
@@ -56,8 +58,9 @@ impl FileRepo {
         let _w = self.lock.lock().await;
         let mut o = self.live_file_obj(id).await?;
         let r = FileRecord::of(&o)?;
+        let old = o.envelope.name.clone();
         let name = self
-            .resolve_name(r.folder, name, Some(id), on, false)
+            .resolve_name(r.folder, name, Some(id), on, false, Some(&old))
             .await?;
         let steps = self.rename_steps(&o, &r, r.folder, &name).await?;
         o.envelope.name = name;
@@ -70,13 +73,18 @@ impl FileRepo {
         let mut r = FileRecord::of(&o)?;
         let mut steps = Vec::new();
         if r.named {
-            let from = Spot::Path(self.key_of(&o, &r).await?);
-            let to = Spot::Trash(id.to_string());
-            steps.push(Step::new(
-                self.backends.get(&r.backend)?,
-                Disk::Move(from, to),
-                true,
-            ));
+            let key = self.key_of(&o, &r).await?;
+            let backend = self.backends.get(&r.backend)?;
+            // Only the recorded bytes go to the trash (and later get purged). A file that is not there
+            // is only flagged; a different one is somebody else's and stays where it is.
+            if backend.stat(&key).await.is_ok_and(|i| i.is_none()) {
+                // nothing to move
+            } else {
+                self.verify_bytes(&*backend, &key, &o.envelope.name, &r, true)
+                    .await?;
+                let (from, to) = (Spot::Path(key), Spot::Trash(id.to_string()));
+                steps.push(Step::new(backend, Disk::Move(from, to), false));
+            }
         }
         r.trashed = true;
         self.store_with(steps, &mut o, &r).await.map(|_| ())
@@ -100,7 +108,7 @@ impl FileRepo {
         }
         self.require_folder(r.folder).await?;
         o.envelope.name = self
-            .resolve_name(r.folder, &o.envelope.name, Some(id), on, false)
+            .resolve_name(r.folder, &o.envelope.name, Some(id), on, false, None)
             .await?;
         if !r.named {
             r.trashed = false;
@@ -120,14 +128,19 @@ impl FileRepo {
             Ok(_) => Self::then_db(&[step], self.save(o)).await?,
             // The bytes are not in the trash. After a crash between the two steps of an earlier
             // restore they are already at their place: then only the record is missing.
+            // Only if they are the recorded bytes (the checksum decides): a stranger's file of the
+            // same size is not taken over.
             Err(Error::NotFound(_))
-                if backend.stat(&key).await?.is_some_and(|i| i.size == r.size) =>
+                if self
+                    .verify_bytes(&*backend, &key, &o.envelope.name, &r, true)
+                    .await
+                    .is_ok() =>
             {
                 self.save(o).await?;
             }
             Err(Error::NotFound(_)) => {
                 return Err(Error::NotFound(format!(
-                    "changed outside: the bytes of file {id} are neither in the trash nor at {key:?}; run rescan"
+                    "changed outside: the bytes of file {id} are neither in the trash nor at {key:?}, or other bytes are there; run rescan"
                 )));
             }
             Err(e) => return Err(e),
@@ -183,6 +196,8 @@ impl FileRepo {
             return Ok(Vec::new());
         }
         let backend = self.backends.get(&r.backend)?;
+        self.verify_bytes(&*backend, &from, &o.envelope.name, r, true)
+            .await?;
         Ok(vec![Step::new(
             backend,
             Disk::Move(Spot::Path(from), Spot::Path(to)),

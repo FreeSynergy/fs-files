@@ -6,54 +6,11 @@ use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use async_trait::async_trait;
 use common::disk::{on_disk, root};
+use common::flaky::Flaky;
 use common::{ME, env, read_all, upload};
 use fs_files_core::{BlobBackend, Entry, FileRepo, Files, LocalFolder, Spot, Transfer};
-use fs_store::traits::{ObjectQuery, ObjectRepository};
-use fs_store::{Activity, LogEntry, ObjectId, Query, Store, StoredObject, TursoStore};
-
-struct Flaky {
-    store: Arc<dyn Store>,
-    fail: Arc<AtomicBool>,
-}
-
-#[async_trait]
-impl ObjectRepository for Flaky {
-    async fn put(&self, o: StoredObject, actor: &str) -> fs_store::Result<Activity> {
-        if self.fail.load(Ordering::SeqCst) {
-            return Err(fs_store::Error::Backend("simulated failure".into()));
-        }
-        Store::put(&*self.store, o, actor).await
-    }
-    async fn put_and_log(
-        &self,
-        o: StoredObject,
-        actor: &str,
-        extra: Vec<LogEntry>,
-    ) -> fs_store::Result<Vec<Activity>> {
-        Store::put_and_log(&*self.store, o, actor, extra).await
-    }
-    async fn get(&self, id: ObjectId) -> fs_store::Result<Option<StoredObject>> {
-        Store::get(&*self.store, id).await
-    }
-    async fn delete(&self, id: ObjectId, actor: &str) -> fs_store::Result<Activity> {
-        if self.fail.load(Ordering::SeqCst) {
-            return Err(fs_store::Error::Backend("simulated failure".into()));
-        }
-        Store::delete(&*self.store, id, actor).await
-    }
-}
-
-#[async_trait]
-impl ObjectQuery for Flaky {
-    async fn query(&self, q: &Query) -> fs_store::Result<Vec<StoredObject>> {
-        Store::query(&*self.store, q).await
-    }
-    async fn count(&self, q: &Query) -> fs_store::Result<usize> {
-        Store::count(&*self.store, q).await
-    }
-}
+use fs_store::{Store, TursoStore};
 
 async fn flaky_repo(dir: &Path) -> (FileRepo, Arc<AtomicBool>, Arc<dyn Store>) {
     let store: Arc<dyn Store> = Arc::new(TursoStore::open_in_memory().await.unwrap());
@@ -61,6 +18,7 @@ async fn flaky_repo(dir: &Path) -> (FileRepo, Arc<AtomicBool>, Arc<dyn Store>) {
     let flaky = Arc::new(Flaky {
         store: store.clone(),
         fail: fail.clone(),
+        fail_delete: Arc::default(),
     });
     let backend = Arc::new(LocalFolder::open(dir.join("blobs")).await.unwrap());
     let repo = FileRepo::with_backend(flaky.clone(), flaky, ME, "main", backend);

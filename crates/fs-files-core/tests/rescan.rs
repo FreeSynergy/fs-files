@@ -4,7 +4,7 @@ mod common;
 
 use common::disk::root;
 use common::{env, read_all, upload};
-use fs_files_core::{BlobBackend, Entry, Error, Files, LocalFolder, Transfer};
+use fs_files_core::{BlobBackend, Entry, Files, LocalFolder, Transfer};
 use fs_store::ObjectId;
 
 #[tokio::test]
@@ -66,10 +66,11 @@ async fn rescan_takes_over_new_files_and_folders_and_updates_changed_ones() {
     assert_eq!(gone.missing.len(), 1);
     assert_eq!(gone.missing[0].name, "new.png");
     assert!(r.get(gone.missing[0].id).await.unwrap().is_some());
-    assert!(matches!(
-        r.open(gone.missing[0].id).await,
-        Err(Error::NotFound(_))
-    ));
+    let err = r.open(gone.missing[0].id).await.err().unwrap();
+    assert!(
+        err.problem().unwrap().kind.ends_with("changed-outside"),
+        "{err}"
+    );
 
     // odd entries are listed, not taken over
     #[cfg(unix)]

@@ -65,6 +65,8 @@ impl FileRepo {
         );
         o.index.insert("kind".into(), vec!["upload".into()]);
         o.index.insert("backend".into(), vec![r.backend.clone()]);
+        // An upload into a folder counts as content of that folder (it cannot be deleted under it).
+        o.index.insert("folder".into(), vec![folder_key(r.folder)]);
         o
     }
 }
@@ -94,6 +96,9 @@ fn index_file(o: &mut StoredObject, r: &FileRecord) {
     o.index.insert("folder".into(), one(folder_key(r.folder)));
     o.index.insert("trashed".into(), one(r.trashed.to_string()));
     o.index.insert("backend".into(), one(r.backend.clone()));
+    if let Some(u) = &r.upload {
+        o.index.insert("upload".into(), one(u.clone()));
+    }
     // Sort keys (the store orders by an index field, ascending): zero-padded so text order is number order.
     o.index
         .insert("size_asc".into(), one(format!("{:020}", r.size)));

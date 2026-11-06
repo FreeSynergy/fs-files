@@ -37,7 +37,7 @@ pub(super) fn check_path(key: &str) -> Result<Vec<&str>> {
             return bad("separator or control character in a name");
         }
     }
-    if segments[0] == RESERVED_NAME {
+    if segments[0].eq_ignore_ascii_case(RESERVED_NAME) {
         return bad("the name is reserved for the program");
     }
     Ok(segments)

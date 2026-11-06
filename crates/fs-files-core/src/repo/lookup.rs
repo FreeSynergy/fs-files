@@ -74,7 +74,9 @@ impl FileRepo {
     }
 
     /// Entries of any kind (live or trashed) directly in `folder`.
-    /// The name to use in `folder`: `name` if free, else by the rule `on`: refuse, or the first free numbered name.
+    /// The name to use in `folder`: `name` if free, else by the rule `on`. `Refuse` fails with a name clash;
+    /// `KeepBoth` takes the first numbered name that is free in the records **and on the disks that keep
+    /// real names**. `current` is the name the entry already has in this folder (its own path is no clash).
     pub(super) async fn resolve_name(
         &self,
         folder: Option<ObjectId>,
@@ -82,23 +84,44 @@ impl FileRepo {
         except: Option<ObjectId>,
         on: OnConflict,
         copy: bool,
+        current: Option<&str>,
     ) -> Result<String> {
-        let first = self.require_free(folder, name, except).await;
-        match first {
-            Err(Error::Conflict(_)) if on == OnConflict::KeepBoth => {}
-            other => return other.map(|()| name.to_string()),
+        if on == OnConflict::Refuse {
+            self.require_free(folder, name, except).await?;
+            return Ok(name.to_string());
         }
-        for n in 2..1000 {
-            let candidate = if copy {
-                copy_name(name, n - 1)
-            } else {
-                numbered_name(name, n)
+        for n in 1..1000 {
+            let candidate = match n {
+                1 => name.to_string(),
+                _ if copy => copy_name(name, n - 1),
+                _ => numbered_name(name, n),
             };
-            if self.require_free(folder, &candidate, except).await.is_ok() {
+            if self.require_free(folder, &candidate, except).await.is_err() {
+                continue;
+            }
+            if current == Some(candidate.as_str()) || self.free_on_disks(folder, &candidate).await {
                 return Ok(candidate);
             }
         }
-        Err(Error::Conflict("no free name to keep both".into()))
+        Err(Error::name_taken("no free name to keep both"))
+    }
+
+    async fn free_on_disks(&self, folder: Option<ObjectId>, name: &str) -> bool {
+        for (_, backend) in self.backends.named() {
+            if self.check_target(&*backend, folder, name).await.is_err() {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// The file made from the upload session `id`, if there is one (then the session is stale).
+    pub(super) async fn file_of_upload(&self, id: ObjectId) -> Result<Option<StoredObject>> {
+        let q = Query::new()
+            .in_context(CONTEXT)
+            .with_index("upload", id.to_string())
+            .limit(1);
+        Ok(self.reads.query(&q).await?.into_iter().next())
     }
 
     pub(super) async fn count_in(&self, folder: ObjectId) -> Result<usize> {

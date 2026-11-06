@@ -133,6 +133,7 @@ impl BlobBackend for S3Backend {
         Ok(size.map(|size| BlobInfo {
             size,
             checksum: String::new(),
+            modified: 0,
         }))
     }
 
@@ -217,7 +218,11 @@ impl BlobBackend for S3Backend {
             Some(c) => c,
             None => hash_chunks(size, |o, l| self.get(key, o, l)).await?,
         };
-        Ok(BlobInfo { size, checksum })
+        Ok(BlobInfo {
+            size,
+            checksum,
+            modified: 0,
+        })
     }
 
     async fn delete(&self, key: &str) -> Result<()> {

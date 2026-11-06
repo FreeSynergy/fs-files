@@ -101,6 +101,14 @@ async fn empty_and_overwrite(b: &dyn BlobBackend, key: &str) {
     let info = b.commit(key).await.unwrap();
     assert_eq!((info.size, info.checksum), (0, checksum(b"")));
     b.put(key, 0, b"second").await.unwrap();
+    if b.naming() == fs_files_core::Naming::ByName {
+        // a backend that keeps real names never replaces: the second blob is a name clash and stays pending
+        assert!(matches!(b.commit(key).await, Err(Error::Conflict(_))));
+        assert_eq!(b.get(key, 0, 99).await.unwrap(), b"");
+        assert_eq!(b.pending(key).await.unwrap(), 6);
+        b.delete(key).await.unwrap();
+        return;
+    }
     b.commit(key).await.unwrap();
     assert_eq!(b.get(key, 0, 99).await.unwrap(), b"second");
 }

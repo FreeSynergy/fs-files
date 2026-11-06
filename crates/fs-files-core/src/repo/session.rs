@@ -27,6 +27,9 @@ pub(super) struct SessionRecord {
     pub media_type: String,
     pub backend: String,
     pub key: String,
+    /// Keep both: if the name is taken when the upload finishes, take a free one instead of failing.
+    #[serde(default)]
+    pub keep_both: bool,
 }
 
 /// One running upload (`Upload` in the contract).
@@ -55,6 +58,7 @@ impl FileRepo {
             media_type: media_type.trim().to_ascii_lowercase(),
             backend: backend_id,
             key: new_key(probe),
+            keep_both: on == OnConflict::KeepBoth,
         };
         let o = self.session_object(name, &rec);
         let id = o.envelope.id;
@@ -111,7 +115,7 @@ impl FileRepo {
 
     /// Every upload that was started and not finished or aborted, oldest first.
     pub(super) async fn do_pending_uploads(&self) -> Result<Vec<UploadInfo>> {
-        let mut out = Vec::new();
+        let (mut out, mut stale) = (Vec::new(), Vec::new());
         loop {
             let mut q = Query::new()
                 .in_context(CONTEXT)
@@ -122,6 +126,11 @@ impl FileRepo {
             let rows = self.reads.query(&q).await?;
             let n = rows.len();
             for o in rows {
+                if self.file_of_upload(o.envelope.id).await?.is_some() {
+                    // stale: the file exists, only deleting the session failed; tidy up, bytes untouched
+                    stale.push(o.envelope.id);
+                    continue;
+                }
                 let rec: SessionRecord = serde_json::from_value(o.content.clone())?;
                 let received = match self.backends.get(&rec.backend) {
                     Ok(b) => b.pending(&rec.key).await.unwrap_or(0),
@@ -137,9 +146,26 @@ impl FileRepo {
                 });
             }
             if n < self.page {
+                for id in stale {
+                    let _ = self.objects.delete(id, &self.actor).await;
+                }
                 return Ok(out);
             }
         }
+    }
+
+    /// Keys of the pending blobs of every unfinished upload on `backend`.
+    pub(super) async fn session_keys(&self, backend: &str) -> Result<Vec<String>> {
+        let q = Query::new()
+            .in_context(CONTEXT)
+            .with_index("kind", "upload")
+            .with_index("backend", backend);
+        let mut keys = Vec::new();
+        for o in self.reads.query(&q).await? {
+            let rec: SessionRecord = serde_json::from_value(o.content)?;
+            keys.push(rec.key);
+        }
+        Ok(keys)
     }
 
     pub(super) async fn session_obj(&self, id: ObjectId) -> Result<StoredObject> {
@@ -171,14 +197,30 @@ impl Upload for UploadSession {
     }
 
     async fn abort(&self) -> Result<()> {
+        match self.repo.session_obj(self.id).await {
+            Ok(_) => {}
+            Err(Error::NotFound(_)) => return Ok(()), // finished or aborted already: nothing to abort
+            Err(e) => return Err(e),
+        }
+        // A session whose file exists is stale (finish wrote the record, deleting the session failed).
+        // Its bytes belong to the file now and must stay.
+        if self.repo.file_of_upload(self.id).await?.is_none() {
+            self.discard_bytes().await?;
+        }
+        match self.repo.objects.delete(self.id, &self.repo.actor).await {
+            Ok(_) | Err(fs_store::Error::NotFound(_)) => Ok(()),
+            Err(e) => Err(e.into()),
+        }
+    }
+}
+
+impl UploadSession {
+    async fn discard_bytes(&self) -> Result<()> {
         self.repo
             .backends
             .get(&self.rec.backend)?
             .discard(&crate::backend::Spot::Pending(self.rec.key.clone()))
             .await?;
-        match self.repo.objects.delete(self.id, &self.repo.actor).await {
-            Ok(_) | Err(fs_store::Error::NotFound(_)) => Ok(()),
-            Err(e) => Err(e.into()),
-        }
+        Ok(())
     }
 }

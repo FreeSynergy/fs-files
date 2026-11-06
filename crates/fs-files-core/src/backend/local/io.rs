@@ -30,6 +30,24 @@ pub(super) async fn len_of(path: &Path) -> Result<Option<u64>> {
     }
 }
 
+/// Size and modification time (ns since the epoch, 0 if unknown) of a file, `None` if it does not exist.
+pub(super) async fn stat_of(path: &Path) -> Result<Option<(u64, i64)>> {
+    match tokio::fs::metadata(path).await {
+        Ok(m) if m.is_file() => Ok(Some((m.len(), modified_ns(&m)))),
+        Ok(_) => Err(Error::Backend("not a regular file".into())),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(e) => Err(e.into()),
+    }
+}
+
+/// Modification time in nanoseconds since the epoch, 0 if unknown.
+pub(super) fn modified_ns(m: &std::fs::Metadata) -> i64 {
+    m.modified()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map_or(0, |d| i64::try_from(d.as_nanos()).unwrap_or(i64::MAX))
+}
+
 /// Read up to `length` bytes at `offset`.
 pub(super) async fn read_range(path: &Path, offset: u64, length: u32) -> Result<Vec<u8>> {
     let mut file = tokio::fs::File::open(path).await?;
@@ -49,10 +67,9 @@ pub(super) async fn remove_quiet(path: &Path) -> Result<()> {
 
 /// Move `from` to `to` (file or folder) and **never replace** what is at `to`.
 ///
-/// On Linux this is one atomic `renameat2(RENAME_NOREPLACE)`. Where the kernel or the file system
-/// lacks the flag, or on other systems, it falls back to "look, then rename": that is **not**
-/// atomic, and a rename onto an empty folder created in between would replace that empty folder
-/// (never a file, never a folder with content).
+/// On Linux this is one atomic `renameat2(RENAME_NOREPLACE)`. Without the flag (old kernel, a file system
+/// that lacks it, other systems) a file is moved by hard link + unlink, which is atomic and never replaces;
+/// a folder by "look, then rename", which is **not** atomic (see the comment in the body).
 pub(super) fn rename_new(from: &Path, to: &Path) -> std::io::Result<()> {
     #[cfg(target_os = "linux")]
     {
@@ -64,10 +81,18 @@ pub(super) fn rename_new(from: &Path, to: &Path) -> std::io::Result<()> {
             Err(e) => return Err(e.into()),
         }
     }
-    if to.symlink_metadata().is_ok() {
-        return Err(std::io::ErrorKind::AlreadyExists.into());
+    // Fallback. A file is moved by hard link + unlink, which refuses an existing target atomically
+    // (POSIX `link`). A folder cannot be linked: "look, then rename" is the best there is, and a folder
+    // created in between could be replaced if it is empty (never one with content).
+    let from_meta = from.symlink_metadata()?;
+    if from_meta.is_dir() {
+        if to.symlink_metadata().is_ok() {
+            return Err(std::io::ErrorKind::AlreadyExists.into());
+        }
+        return std::fs::rename(from, to);
     }
-    std::fs::rename(from, to)
+    std::fs::hard_link(from, to)?;
+    std::fs::remove_file(from)
 }
 
 /// Turn an IO error of a name-based operation into the error the caller should see.

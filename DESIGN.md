@@ -7,15 +7,15 @@ see a path or a backend. Contract: `files.capnp` in `fs-interfaces` v0.14.0 (dra
 
 ## State
 
-Version 0.2.1 (stage 1: local folder, stage 2: S3, stage 3: real names). Built on fs-store 0.2.0 and fs-interfaces 0.8.0 (git tags).
+Version 0.2.1 (stage 1: local folder, stage 2: S3, stage 3: real names). Built on fs-store 0.2.0 and fs-interfaces 0.28.0 (git tags).
 
 | Area | State |
 |---|---|
 | `Files` trait (folders, get, classify, trash, search), `Transfer` (resumable upload, `Blob`), `Backends`; store-backed `FileRepo`; provider rule (ADR 0045): defaults answer `Unsupported`, `capabilities()` reports | done |
-| File = AS2 `Document` / `Image` / `Video` / `Audio` by media type, `context=files`, IRI `https://<instance>/files/<id>`, derived name; folder = AS2 `Collection` | done |
+| File = AS2 `Document` / `Image` / `Video` / `Audio` by media type, `context=files`, IRI `https://<instance>/files/<id>`, the envelope name IS the real name; folder = AS2 `Collection` | done |
 | Index fields: `kind`, `name_exact`, `media_type`, `folder`, `trashed`, `backend` | done |
-| Trash (hide), restore, purge (bytes first, then metadata); move / copy / rename; folder move with cycle check; folder delete only when empty | done |
-| Resumable upload: temp key, position = what the backend holds (survives restart, tested by reopening store and backend), wrong offset is an error, `finish` verifies size + checksum before the object exists, `abort` cleans up | done |
+| Trash (named files: bytes move to the trash folder, after a check that they are the recorded ones), restore, purge (bytes first, then metadata); move / copy / rename; folder move with cycle check; folder delete only when empty | done |
+| Resumable upload: temp key, position = what the backend holds (survives restart, tested by reopening store and backend), wrong offset is an error, `finish` compares what the backend held with what it stored (two readings of the same bytes: it catches a short or doubled write, not a bad disk) and takes the checksum from the stream, before the object exists; the bytes stay until the record is written, and a retry goes on, `abort` cleans up | done |
 | Checksum `blake3:<hex>` computed while the bytes stream in; after a restart the pending bytes are streamed once through the hasher at commit | done |
 | `LocalFolder` backend: files under their **real names** (`<root>/Urlaub/Foto.jpg`), one reserved hidden folder `.fs-files/{pending,trash}`, no symlink followed, pending file + fsync, atomic no-replace rename, directory fsync | done (stage 3) |
 | `BlobBackend` naming strategy: `naming()` (`ById` S3, `ByName` local) and `publish`, `relocate`, `discard`, `make_dir`, `remove_dir`, `scan`; a record says per file whether it is `named`, so id-keyed files of the first version keep working | done |
@@ -76,21 +76,21 @@ Version 0.2.1 (stage 1: local folder, stage 2: S3, stage 3: real names). Built o
   system the disk reports the clash and that is a `Conflict` too, never an overwrite. A copy gets `name (copy).ext`. A name may not
   be empty, longer than 255 bytes, `.` / `..`, contain `/`, `\` or control characters, or be `.fs-files`.
 * **Never overwrite.** Every create is create-new, every move is a no-replace rename. Linux: one atomic `renameat2(RENAME_NOREPLACE)`
-  (crate `rustix`, no unsafe in our code). Where the kernel or file system lacks the flag, and on other systems, the fallback is
-  "look, then rename", which is **not atomic** (it could replace an *empty folder* created in between, never a file or a non-empty
-  folder). Atomic: publish of an upload, file rename / move, trash, restore, folder rename / move. Not atomic: the pair of disk step
+  (crate `rustix`, no unsafe in our code). Without the flag (old kernel, a file system that lacks it, other systems) a **file** is moved by hard link + unlink (atomic, never
+  replaces); a **folder** by "look, then rename", which is not atomic and could replace an *empty folder* created in between (never a
+  file, never a folder with content). `LocalFolder::commit` never replaces either. Atomic: publish of an upload, file rename / move, trash, restore, folder rename / move. Not atomic: the pair of disk step
   and database step (see next point), and the fallback above. Creating a folder is `mkdir` (atomic, fails if it exists).
 * **Order and crashes: disk first, then the database.** If the database step fails, the disk step is undone. If the process dies
   between the two (or the undo fails), no byte is lost: the file is where the disk says. `rescan` then takes an unknown file over as a
   new record and reports the old record as missing (kept). A trash move whose record was not written is put back by `rescan`; a
-  restore whose record was not written is finished by the next `restore`. A published upload whose record was not written is a normal
+  restore whose record was not written is finished by the next `restore` (only if the bytes at the place are the recorded ones: the checksum decides). A published upload whose record was not written is a normal
   unknown file for `rescan`. Nothing runs automatically at start (the core has no start hook); the program calls `rescan`.
 * **Trash and unfinished uploads** live in `<root>/.fs-files/{trash,pending}`, addressed by id or hash, never by a user name. The name
   `.fs-files` is refused for files and folders; `scan` never lists it. Restore into a taken name is `Conflict` and keeps the bytes in the trash.
 * **Changes from outside the program: PROVISIONAL, the owner may change this.** `rescan(folder)` (recursive): new files and folders
   are taken over (checksum read from the bytes, type from the first bytes); a file with a different size or modification time gets new
   size and checksum; a file without bytes is **reported and its record is kept**; symlinks and odd names are listed as skipped.
-  Opening a file whose size no longer matches is an error ("changed outside"), not wrong data. Nothing is detected live (no watcher),
+  Opening a file whose size or modification time no longer matches the record is an error ("changed outside"), not wrong data; before a file is moved, trashed or restored by a record, its bytes are checked (size, modification time, on doubt the checksum) and a mismatch changes nothing. A folder rename or move never merges into a path that exists on the disk (`Conflict`). Rescan reads all records once, walks with a work list (no recursion, depth limit 512), reports what it cannot handle and goes on, never rebinds a record to a stranger's file after a crash in the trash, and removes pending blobs of no upload older than an hour. The store's own filtered queries cost about a second per condition per 1000 records (fs-store), which makes `require_free` slow in big folders. Nothing is detected live (no watcher),
   and the whole rescan holds the program's write lock. Same-size edits inside one mtime tick are not seen.
 * **Records of the first version** (id-keyed `xx/<id>` files in the local root, no `named` flag, no `name_exact` index) keep working
   for reading; `rescan` skips them. They are not migrated: stage 1 never had a consumer. Their `xx` folders stay in the root.

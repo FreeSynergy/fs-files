@@ -9,6 +9,7 @@
 
 use std::future::Future;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use super::handle::FileRepo;
 use crate::backend::{BlobBackend, Spot};
@@ -22,14 +23,19 @@ pub(super) enum Disk {
     RemoveDir(String),
     /// Move a file or folder; never replaces.
     Move(Spot, Spot),
+    /// Move a folder (path to path). A source that is not there is fine, but then the target must not
+    /// exist either: it is created empty, so nothing unknown is merged into and nothing is skipped silently.
+    MoveDir(String, String),
 }
 
 /// A disk change on one backend.
 pub(super) struct Step {
     pub(super) backend: Arc<dyn BlobBackend>,
     pub(super) op: Disk,
-    /// A missing source is fine (the folder was never on this disk).
+    /// A missing source is fine (the file was never on this disk).
     pub(super) optional: bool,
+    /// `MoveDir` found no source and made the target instead.
+    made: AtomicBool,
 }
 
 impl Step {
@@ -38,6 +44,7 @@ impl Step {
             backend,
             op,
             optional,
+            made: AtomicBool::new(false),
         }
     }
 
@@ -52,11 +59,27 @@ impl Step {
             }
             Disk::RemoveDir(path) => self.backend.remove_dir(path).await,
             Disk::Move(from, to) => self.backend.relocate(from, to).await,
+            Disk::MoveDir(from, to) => self.move_dir(from, to).await,
         };
         match done {
             Ok(()) => Ok(true),
             Err(Error::NotFound(_)) if self.optional => Ok(false),
             Err(e) => Err(e),
+        }
+    }
+
+    async fn move_dir(&self, from: &str, to: &str) -> Result<()> {
+        let (src, dst) = (Spot::Path(from.to_string()), Spot::Path(to.to_string()));
+        match self.backend.relocate(&src, &dst).await {
+            Err(Error::NotFound(_)) => {
+                if let Some((parent, _)) = to.rsplit_once('/') {
+                    self.backend.make_dir(parent, true).await?;
+                }
+                self.backend.make_dir(to, false).await?; // a name clash if somebody else's folder is there
+                self.made.store(true, Ordering::SeqCst);
+                Ok(())
+            }
+            other => other,
         }
     }
 
@@ -66,6 +89,14 @@ impl Step {
             Disk::MakeDir(path) => self.backend.remove_dir(path).await,
             Disk::RemoveDir(path) => self.backend.make_dir(path, true).await,
             Disk::Move(from, to) => self.backend.relocate(to, from).await,
+            Disk::MoveDir(from, to) if self.made.load(Ordering::SeqCst) => {
+                self.backend.remove_dir(to).await
+            }
+            Disk::MoveDir(from, to) => {
+                self.backend
+                    .relocate(&Spot::Path(to.clone()), &Spot::Path(from.clone()))
+                    .await
+            }
         };
     }
 }

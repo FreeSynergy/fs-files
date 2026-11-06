@@ -5,6 +5,7 @@
 pub mod disk;
 #[cfg(feature = "s3")]
 pub mod fake_s3;
+pub mod flaky;
 pub mod stream;
 pub mod suite;
 
