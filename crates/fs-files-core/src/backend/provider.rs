@@ -86,6 +86,11 @@ pub trait BlobBackend: Send + Sync {
             Spot::Trash(_) => no("blob.rename"),
         }
     }
+    /// `blob.read`: size, checksum (read from the bytes) and modification time of the blob at a spot, `None`
+    /// if nothing is there. The only way to look into the trash folder; costs a read of the whole blob.
+    async fn inspect(&self, _spot: &Spot) -> Result<Option<BlobInfo>> {
+        Ok(None)
+    }
     /// `blob.read`: is something at this spot? (Used to find bytes left in the trash by a crash.)
     async fn has(&self, _spot: &Spot) -> Result<bool> {
         Ok(false)

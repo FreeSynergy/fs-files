@@ -85,6 +85,22 @@ pub(super) fn set_folder(o: &mut StoredObject, parent: Option<ObjectId>) {
     o.envelope.updated = chrono::Utc::now();
 }
 
+/// Two index fields that exist only for live entries, so a lookup needs one condition and nothing else:
+/// `live_in` (the folder, to list it) and `live_place` (folder and name together, to ask "is this name free").
+fn live_index(o: &mut StoredObject, folder: Option<ObjectId>, live: bool) {
+    if live {
+        let key = folder_key(folder);
+        o.index.insert(
+            "live_place".into(),
+            vec![format!("{key}/{}", o.envelope.name)],
+        );
+        o.index.insert("live_in".into(), vec![key]);
+    } else {
+        o.index.remove("live_place");
+        o.index.remove("live_in");
+    }
+}
+
 fn index_file(o: &mut StoredObject, r: &FileRecord) {
     o.envelope.object_type = as2_type(&r.media_type).into();
     let one = |v: String| vec![v];
@@ -95,6 +111,7 @@ fn index_file(o: &mut StoredObject, r: &FileRecord) {
         .insert("media_type".into(), one(r.media_type.clone()));
     o.index.insert("folder".into(), one(folder_key(r.folder)));
     o.index.insert("trashed".into(), one(r.trashed.to_string()));
+    live_index(o, r.folder, !r.trashed);
     o.index.insert("backend".into(), one(r.backend.clone()));
     if let Some(u) = &r.upload {
         o.index.insert("upload".into(), one(u.clone()));
@@ -116,6 +133,7 @@ fn index_folder(o: &mut StoredObject, parent: Option<ObjectId>) {
         .insert("name_exact".into(), one(o.envelope.name.clone()));
     o.index.insert("folder".into(), one(folder_key(parent)));
     o.index.insert("trashed".into(), one("false".into()));
+    live_index(o, parent, true);
     o.index.insert("size_asc".into(), one(format!("{:020}", 0)));
     o.index
         .insert("size_desc".into(), one(format!("{:020}", u64::MAX)));

@@ -26,8 +26,6 @@ use crate::model::{Entry, Folder, RescanReport};
 pub(super) const SNIFF: u32 = 8192;
 /// Folders nested deeper than this are not entered (reported as skipped).
 const MAX_DEPTH: usize = 512;
-/// Records are read this many at a time.
-const BATCH: usize = 1000;
 
 /// One backend being walked.
 pub(super) struct Walk {
@@ -88,24 +86,15 @@ impl FileRepo {
     /// walk reads everything once and filters here.)
     async fn load_tree(&self) -> Result<HashMap<String, Vec<StoredObject>>> {
         let mut tree: HashMap<String, Vec<StoredObject>> = HashMap::new();
-        let mut seen = 0;
-        loop {
-            let mut q = Query::new().in_context(CONTEXT).limit(BATCH);
-            q.offset = seen;
-            let rows = self.reads.query(&q).await?;
-            seen += rows.len();
-            let n = rows.len();
-            for o in rows {
-                let one = |k: &str| o.index.get(k).and_then(|v| v.first()).cloned();
-                let live = one("trashed").as_deref() == Some("false");
-                if let (true, Some(folder)) = (live, one("folder")) {
-                    tree.entry(folder).or_default().push(o);
-                }
-            }
-            if n < BATCH {
-                return Ok(tree);
+        // One query, no paging: records cannot move between pages while they are read (a page boundary
+        // plus a deleted or added record would skip or repeat one). The global lock is held anyway.
+        for o in self.reads.query(&Query::new().in_context(CONTEXT)).await? {
+            let one = |k: &str| o.index.get(k).and_then(|v| v.first()).cloned();
+            if let (Some("false"), Some(folder)) = (one("trashed").as_deref(), one("folder")) {
+                tree.entry(folder).or_default().push(o);
             }
         }
+        Ok(tree)
     }
 
     /// Look at one folder: its entries on the disk against its records. Folders found go on `todo`.

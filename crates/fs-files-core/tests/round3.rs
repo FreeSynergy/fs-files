@@ -44,15 +44,18 @@ async fn a_forged_modification_time_does_not_hide_a_strangers_file() {
 }
 
 #[tokio::test]
-async fn a_quiet_upload_survives_a_rescan_unless_the_limit_is_set_short() {
+async fn a_quiet_upload_survives_a_rescan_and_the_limit_has_a_floor() {
     let e = env().await;
     let b = LocalFolder::open(root(&e)).await.unwrap();
     b.put("someone-elses/upload", 0, b"quiet").await.unwrap();
     e.repo.rescan(None).await.unwrap(); // default limit: 30 days
     assert_eq!(b.pending("someone-elses/upload").await.unwrap(), 5);
+    // even "zero" keeps a young blob: the limit has a floor of one hour
     let short = e.repo.clone().with_orphan_after(Duration::ZERO);
     short.rescan(None).await.unwrap();
-    assert_eq!(b.pending("someone-elses/upload").await.unwrap(), 0);
+    assert_eq!(b.pending("someone-elses/upload").await.unwrap(), 5);
+    // the backend itself removes what is old enough
+    assert_eq!(b.sweep_pending(&[], 0).await.unwrap(), 1);
 }
 
 #[tokio::test]

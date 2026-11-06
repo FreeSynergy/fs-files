@@ -165,6 +165,10 @@ impl BlobBackend for LocalFolder {
         self.do_discard(spot).await
     }
 
+    async fn inspect(&self, spot: &Spot) -> Result<Option<BlobInfo>> {
+        self.do_inspect(spot).await
+    }
+
     async fn has(&self, spot: &Spot) -> Result<bool> {
         self.do_has(spot)
     }

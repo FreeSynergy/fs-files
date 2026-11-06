@@ -3,11 +3,11 @@
 `fs-files` is the files program of FreeSynergy. This repo holds the **program core** (`crates/fs-files-core`, no GUI).
 **Metadata** (name, media type, size, checksum, folder, trash flag) is an object in `fs-store`; the **bytes** are in a
 backend behind `BlobBackend`. Other programs refer to a file by its object id and read through the `Blob` trait; they never
-see a path or a backend. Contract: `files.capnp` in `fs-interfaces` v0.28.0 (draft, consumers: 0 of 2).
+see a path or a backend. Contract: `files.capnp` in `fs-interfaces` v0.33.0 (draft, consumers: 0 of 2).
 
 ## State
 
-Version 0.2.1 (stage 1: local folder, stage 2: S3, stage 3: real names). Built on fs-store 0.2.0 and fs-interfaces 0.28.0 (git tags).
+Version 0.2.1 (stage 1: local folder, stage 2: S3, stage 3: real names). Built on fs-store 0.2.0 and fs-interfaces 0.33.0 (git tags).
 
 | Area | State |
 |---|---|
@@ -34,7 +34,7 @@ Version 0.2.1 (stage 1: local folder, stage 2: S3, stage 3: real names). Built o
 | One behaviour suite as functions over `&dyn BlobBackend` (`tests/common/{suite,stream}.rs`), run on `LocalFolder`, `S3Backend` over a strict fake S3, `S3Backend` over the `object_store` in-memory store, and (ignored) a live server | done |
 | Live S3: official RustFS image 1.0.4 with podman, localhost only, throwaway credentials: both live tests passed; container removed | verified once (2026-11-06), not part of CI |
 | `sharing`, `file.subscribe`: `Unsupported` with the plain reason; versions, encryption, sync, WebDAV, previews: not built | as agreed |
-| Tests | 121 run by default (97 without the `s3` feature) + 2 ignored live tests |
+| Tests | 127 run by default (103 without the `s3` feature) + 2 ignored live tests |
 
 ## Structure and pattern map (ADR 0043)
 
@@ -90,7 +90,7 @@ Version 0.2.1 (stage 1: local folder, stage 2: S3, stage 3: real names). Built o
 * **Changes from outside the program: PROVISIONAL, the owner may change this.** `rescan(folder)` (recursive): new files and folders
   are taken over (checksum read from the bytes, type from the first bytes); a file with a different size or modification time gets new
   size and checksum; a file without bytes is **reported and its record is kept**; symlinks and odd names are listed as skipped.
-  Before a destructive step (trash, rename, move, restore) the checksum is always compared for files up to 256 MiB (so a stranger's file with a copied modification time does not pass); above that size the modification time is trusted. Opening a file checks only size and modification time. Opening a file whose size or modification time no longer matches the record is an error ("changed outside"), not wrong data; before a file is moved, trashed or restored by a record, its bytes are checked (size, modification time, on doubt the checksum) and a mismatch changes nothing. A folder rename or move never merges into a path that exists on the disk (`Conflict`), and is refused up front (`InvalidName`) when its deepest subfolder would pass 4096 bytes or 512 levels. Rescan reads all records once, walks with a work list (no recursion, depth limit 512), reports what it cannot handle and goes on, never rebinds a record to a stranger's file after a crash in the trash, and removes pending blobs of no upload only when they are older than 30 days (`FileRepo::with_orphan_after`; a quiet upload or one of another store on the same root must survive). The store's filtered queries cost grows with every index condition (about a second per condition per 1000 records in a debug build); `require_free` therefore asks with one condition (the exact name) and filters folder and trash flag itself. With 2000 records in a release build an upload takes about 5 ms and a rename about 1.5 ms. Not done: the folder-fit check counts folders only (a long file name in the deepest folder can still pass the limit; the disk then answers `InvalidName` at that file), and `purge` deletes the trash entry without reading it. Nothing is detected live (no watcher),
+  Before a destructive step (trash, rename, move, restore) the checksum is always compared for files up to 256 MiB (so a stranger's file with a copied modification time does not pass); above that size the modification time is trusted. Opening a file checks only size and modification time. Opening a file whose size or modification time no longer matches the record is an error ("changed outside"), not wrong data; before a file is moved, trashed or restored by a record, its bytes are checked (size, modification time, on doubt the checksum) and a mismatch changes nothing. A folder rename or move never merges into a path that exists on the disk (`Conflict`), and is refused up front (`InvalidName`) when its deepest subfolder would pass 4095 bytes or 512 levels. Rescan reads all records once, walks with a work list (no recursion, depth limit 512), reports what it cannot handle and goes on, never rebinds a record to a stranger's file after a crash in the trash, and removes pending blobs of no upload only when they are older than 30 days (`FileRepo::with_orphan_after`, floor one hour). The store's filtered queries cost grows with every index condition (about a second per condition per 1000 records in a debug build); `list` and `require_free` therefore ask with one condition each (see `live_in` / `live_place` below). With 2000 records in a release build an upload takes about 5 ms and a rename about 1.5 ms (measured before `live_place`; the debug-build times of lists of 5000 files in one folder and of 1000 folders with the same file name are not re-measured here). The trash folder is read (`BlobBackend::inspect`, size and checksum) before `restore`, `purge` and the rescan touch an entry: a stray file there is never moved or deleted for a record, and the rescan keeps a live record whose trash spot holds a stray. Records are read in one query, not in pages (a delete between two pages cannot skip or repeat a record); the session records are deleted under the global lock. `pending_uploads` is one query too. `live_in` and `live_place` (folder and name) are index fields that exist for live entries only, so `list` and `require_free` each need one condition (records of earlier versions lack them). `FileRepo::with_orphan_after` has a floor of one hour; stores that share a root must share the limit, an upload older than it is removed by whichever store rescans. On a local backend the upload key is not probed (a person's file may have that name). Not done: the folder-fit check counts folders only (a long file name in the deepest folder can still pass the limit; the disk then answers `InvalidName` at that file). Nothing is detected live (no watcher),
   and the whole rescan holds the program's write lock. Same-size edits inside one mtime tick are not seen.
 * **Records of the first version** (id-keyed `xx/<id>` files in the local root, no `named` flag, no `name_exact` index) keep working
   for reading; `rescan` skips them. They are not migrated: stage 1 never had a consumer. Their `xx` folders stay in the root.
@@ -143,7 +143,7 @@ renames on case-insensitive file systems are not special-cased.
 
 ## Crates
 
-* `fs-store` (v0.2.0), `fs-interfaces` (v0.28.0): git tags.
+* `fs-store` (v0.2.0), `fs-interfaces` (v0.33.0): git tags.
 * `rustix` 1 (MIT OR Apache-2.0, Linux only, features `std` + `fs`): `renameat2` with `RENAME_NOREPLACE`, the atomic no-replace rename that `std` lacks. No C code with its default backend, already in the lock file through other crates.
 * `blake3` 1.8 (CC0-1.0 OR Apache-2.0): checksums, with the `pure` feature (no C / assembly). Fast enough for a first version.
 * `infer` 0.22 (MIT): media type from the first bytes when the caller gives none; pure Rust, no dependencies.
@@ -157,7 +157,7 @@ renames on case-insensitive file systems are not special-cased.
 
 ## Contract
 
-`files.capnp` in `fs-interfaces` v0.28.0 (draft 0.2). Appended for real names: `Folders.rescan @13` and `RescanReport`; `BlobBackend`
+`files.capnp` in `fs-interfaces` v0.33.0 (draft 0.2). Appended for real names: `Folders.rescan @13` and `RescanReport`; `BlobBackend`
 `naming`, `publish`, `relocate`, `discard`, `makeDir`, `removeDir`, `scan` (@7 to @13) with `Spot`, `Scanned`, `ScanKind`; the problem types
 `nameConflictProblemType` (409), `invalidNameProblemType` (422), `changedOutsideProblemType` (409); and the statement that `Envelope.name` of a
 file and a folder IS its real name (not derived). In the core `Error::problem()` makes the mapping; a name clash is still `Error::Conflict`.

@@ -50,8 +50,7 @@ impl FileRepo {
     ) -> Result<Page> {
         let q = Query::new()
             .in_context(CONTEXT)
-            .with_index("folder", folder_key(folder))
-            .with_index("trashed", "false");
+            .with_index("live_in", folder_key(folder));
         self.page_of(q, cursor, sort).await
     }
 

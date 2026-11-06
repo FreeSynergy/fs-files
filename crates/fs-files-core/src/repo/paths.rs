@@ -16,7 +16,7 @@ use crate::model::{FileRecord, FolderRecord};
 /// Folders nested deeper than this are refused (also stops a damaged parent loop).
 const MAX_DEPTH: usize = 512;
 /// Longest path the local disk takes (`PATH_MAX`).
-const MAX_PATH: usize = 4096;
+const MAX_PATH: usize = 4095;
 const PAGE: usize = 500;
 
 impl FileRepo {

@@ -98,6 +98,19 @@ impl LocalFolder {
         }
     }
 
+    pub(super) async fn do_inspect(&self, spot: &Spot) -> Result<Option<BlobInfo>> {
+        let p = path::spot_path(&self.root, spot)?;
+        let Some((size, modified)) = io::stat_of(&p).await? else {
+            return Ok(None);
+        };
+        let checksum = hash_chunks(size, |o, l| io::read_range(&p, o, l)).await?;
+        Ok(Some(BlobInfo {
+            size,
+            checksum,
+            modified,
+        }))
+    }
+
     pub(super) fn do_has(&self, spot: &Spot) -> Result<bool> {
         Ok(path::spot_path(&self.root, spot)?
             .symlink_metadata()

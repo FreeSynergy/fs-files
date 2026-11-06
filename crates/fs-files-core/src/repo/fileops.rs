@@ -11,6 +11,7 @@ use super::build::set_file;
 use super::handle::FileRepo;
 use super::names::check_name;
 use super::steps::{Disk, Step};
+use super::verify::InTrash;
 use crate::backend::Spot;
 use crate::error::{Error, Result};
 use crate::model::{File, FileRecord, OnConflict, TrashReport};
@@ -116,6 +117,12 @@ impl FileRepo {
         }
         let backend = self.backends.get(&r.backend)?;
         let key = self.path_in(r.folder, &o.envelope.name).await?;
+        if matches!(self.in_trash(&*backend, id, &r).await?, InTrash::Stray) {
+            return Err(super::verify::changed(&format!(
+                "the trash entry of {:?} is not the recorded file, it is left alone",
+                o.envelope.name
+            )));
+        }
         let step = Step::new(
             backend.clone(),
             Disk::Move(Spot::Trash(id.to_string()), Spot::Path(key.clone())),
@@ -160,6 +167,12 @@ impl FileRepo {
         // Bytes first: deleting is repeatable, so a failure leaves a file that can be purged again.
         let backend = self.backends.get(&r.backend)?;
         if r.named {
+            if matches!(self.in_trash(&*backend, id, &r).await?, InTrash::Stray) {
+                return Err(super::verify::changed(&format!(
+                    "the trash entry of {:?} is not the recorded file, it is left alone",
+                    o.envelope.name
+                )));
+            }
             backend.discard(&Spot::Trash(id.to_string())).await?;
         } else {
             backend.delete(&r.key).await?;

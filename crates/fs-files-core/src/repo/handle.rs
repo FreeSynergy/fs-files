@@ -14,6 +14,9 @@ use super::backend::StoreAdapter;
 use super::consts::PAGE;
 use crate::backend::{BackendFactory, BackendRegistry, BlobBackend, LocalFactory};
 
+/// The shortest age at which `rescan` removes an unfinished blob without an upload (one hour).
+const MIN_ORPHAN_AFTER_SECS: u64 = 3600;
+
 /// Files over an object store and a set of backends. Cheap to clone.
 ///
 /// One `FileRepo` per store: checks like "name is free" and writes happen under one lock inside the
@@ -81,10 +84,10 @@ impl FileRepo {
     }
 
     /// Unfinished blobs that belong to no upload are removed by `rescan` only after this long (default 30
-    /// days): a quiet upload, or one of another store on the same root, must survive.
+    /// days, never less than an hour): a quiet upload must survive. An upload of another store on the same root that is older than the limit is removed too: stores that share a root must share the limit.
     #[must_use]
     pub fn with_orphan_after(mut self, age: std::time::Duration) -> Self {
-        self.orphan_after_secs = age.as_secs();
+        self.orphan_after_secs = age.as_secs().max(MIN_ORPHAN_AFTER_SECS);
         self
     }
 

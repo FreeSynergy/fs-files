@@ -58,24 +58,12 @@ impl FileRepo {
         name: &str,
         except: Option<ObjectId>,
     ) -> Result<()> {
-        // One index condition only (the store's cost grows with every condition); the folder and the
-        // trash flag are looked at here, on the few entries that have this name.
+        // One index condition: `live_place` holds folder and name together and exists for live entries only.
         let q = Query::new()
             .in_context(CONTEXT)
-            .with_index("name_exact", name);
-        let (folder, live) = (folder_key(folder), ["false".to_string()]);
-        let has = |o: &fs_store::StoredObject, k: &str, v: &[String]| {
-            o.index.get(k).is_some_and(|x| x.as_slice() == v)
-        };
+            .with_index("live_place", format!("{}/{name}", folder_key(folder)));
         let taken = self.reads.query(&q).await?;
-        let clash = |o: &&fs_store::StoredObject| {
-            has(o, "folder", std::slice::from_ref(&folder)) && has(o, "trashed", &live)
-        };
-        if taken
-            .iter()
-            .filter(clash)
-            .any(|o| Some(o.envelope.id) != except)
-        {
+        if taken.iter().any(|o| Some(o.envelope.id) != except) {
             return Err(Error::name_taken(format!(
                 "the name {name:?} is taken in this folder"
             )));
