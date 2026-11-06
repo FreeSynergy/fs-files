@@ -20,8 +20,9 @@ use crate::model::{
 };
 use crate::transfer::{Blob, Transfer, Upload};
 
-const SUPPORTED: [&str; 24] = [
+const SUPPORTED: [&str; 25] = [
     "file.resolve",
+    "folder.resolve",
     "folder.list",
     "folder.create",
     "folder.rename",

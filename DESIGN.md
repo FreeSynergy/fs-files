@@ -3,7 +3,7 @@
 `fs-files` is the files program of FreeSynergy. This repo holds the **program core** (`crates/fs-files-core`, no GUI).
 **Metadata** (name, media type, size, checksum, folder, trash flag) is an object in `fs-store`; the **bytes** are in a
 backend behind `BlobBackend`. Other programs refer to a file by its object id and read through the `Blob` trait; they never
-see a path or a backend. Contract: `files.capnp` in `fs-interfaces` v0.12.0 (draft, consumers: 0 of 2).
+see a path or a backend. Contract: `files.capnp` in `fs-interfaces` v0.13.0 (draft, consumers: 0 of 2).
 
 ## State
 
@@ -25,6 +25,7 @@ Version 0.2.1 (stage 1: local folder, stage 2: S3, stage 3: real names). Built o
 | Sorting for `list_sorted` / `find_sorted`: name, modified (= record changed, not disk mtime), size (folder = 0), type (ascending only); store orders by index fields `size_asc`, `size_desc`, `type_asc` | done |
 | Filters by size (`min_size`, `max_size`, a folder counts as 0) and date (`modified_*`, `created_*`; after inclusive, before exclusive) in `FileFilter`; no tags | done |
 | `empty_trash` (purges all, reports `failed`), `restore_to(id, folder, on)` (another folder; unset = top level), `restore_as(id, on)` (keep both instead of failing on a taken name) | done |
+| `get_folder` (`folder.resolve`, `Folders.getFolder @16`): resolve a folder by id | done |
 | `Error::problem()`: name clash, invalid name, changed outside map to the named problem types of the contract | done |
 | `BackendRegistry`: add (built, probed, then swapped atomically), remove (refused while files / uploads are on it, and for the active one), a file records its backend | done |
 | Sensitive categories (`classify`) go to the envelope (ADR 0029); the store refuses them without encryption (`EncryptionRequired`), tested | done |
@@ -128,7 +129,7 @@ renames on case-insensitive file systems are not special-cased.
 
 ## Crates
 
-* `fs-store` (v0.2.0), `fs-interfaces` (v0.12.0): git tags.
+* `fs-store` (v0.2.0), `fs-interfaces` (v0.13.0): git tags.
 * `rustix` 1 (MIT OR Apache-2.0, Linux only, features `std` + `fs`): `renameat2` with `RENAME_NOREPLACE`, the atomic no-replace rename that `std` lacks. No C code with its default backend, already in the lock file through other crates.
 * `blake3` 1.8 (CC0-1.0 OR Apache-2.0): checksums, with the `pure` feature (no C / assembly). Fast enough for a first version.
 * `infer` 0.22 (MIT): media type from the first bytes when the caller gives none; pure Rust, no dependencies.
@@ -142,7 +143,7 @@ renames on case-insensitive file systems are not special-cased.
 
 ## Contract
 
-`files.capnp` in `fs-interfaces` v0.12.0 (draft 0.2). Appended for real names: `Folders.rescan @13` and `RescanReport`; `BlobBackend`
+`files.capnp` in `fs-interfaces` v0.13.0 (draft 0.2). Appended for real names: `Folders.rescan @13` and `RescanReport`; `BlobBackend`
 `naming`, `publish`, `relocate`, `discard`, `makeDir`, `removeDir`, `scan` (@7 to @13) with `Spot`, `Scanned`, `ScanKind`; the problem types
 `nameConflictProblemType` (409), `invalidNameProblemType` (422), `changedOutsideProblemType` (409); and the statement that `Envelope.name` of a
 file and a folder IS its real name (not derived). In the core `Error::problem()` makes the mapping; a name clash is still `Error::Conflict`.
