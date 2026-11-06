@@ -18,3 +18,12 @@ pub struct RescanReport {
     /// Entries that were not taken over, with the reason (symlinks, odd names, a name taken elsewhere).
     pub skipped: Vec<String>,
 }
+
+/// What `empty_trash` did (`TrashReport` in the contract).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct TrashReport {
+    /// Files purged for good.
+    pub purged: u32,
+    /// Files that could not be purged (they stay in the trash; the rest was still purged).
+    pub failed: Vec<fs_store::ObjectId>,
+}

@@ -13,8 +13,18 @@ use super::names::check_name;
 use super::steps::{Disk, Step};
 use crate::backend::Spot;
 use crate::error::{Error, Result};
-use crate::model::{File, FileRecord, OnConflict};
-use fs_store::StoredObject;
+use crate::model::{File, FileRecord, OnConflict, TrashReport};
+use fs_store::{Query, StoredObject};
+
+use super::consts::CONTEXT;
+
+/// Where a restored file goes.
+pub(super) enum Target {
+    /// Where it was.
+    Original,
+    /// This folder (`None` = top level).
+    Folder(Option<ObjectId>),
+}
 
 impl FileRepo {
     pub(super) async fn do_move_file(
@@ -72,15 +82,25 @@ impl FileRepo {
         self.store_with(steps, &mut o, &r).await.map(|_| ())
     }
 
-    pub(super) async fn do_restore(&self, id: ObjectId) -> Result<File> {
+    /// Restore to the original folder or to another one.
+    pub(super) async fn do_restore(
+        &self,
+        id: ObjectId,
+        target: Target,
+        on: OnConflict,
+    ) -> Result<File> {
         let _w = self.lock.lock().await;
         let mut o = self.file_obj(id).await?;
         let mut r = FileRecord::of(&o)?;
         if !r.trashed {
             return Err(Error::Conflict(format!("file {id} is not in the trash")));
         }
+        if let Target::Folder(f) = target {
+            r.folder = f;
+        }
         self.require_folder(r.folder).await?;
-        self.require_free(r.folder, &o.envelope.name, Some(id))
+        o.envelope.name = self
+            .resolve_name(r.folder, &o.envelope.name, Some(id), on, false)
             .await?;
         if !r.named {
             r.trashed = false;
@@ -187,5 +207,34 @@ impl FileRepo {
         let file = File::of(o)?;
         self.save(o.clone()).await?;
         Ok(file)
+    }
+}
+
+impl FileRepo {
+    /// Purge every file in the trash. A file that cannot be purged is reported, the others are still purged.
+    pub(super) async fn do_empty_trash(&self) -> Result<TrashReport> {
+        let mut ids = Vec::new();
+        loop {
+            let mut q = Query::new()
+                .in_context(CONTEXT)
+                .with_index("kind", "file")
+                .with_index("trashed", "true")
+                .limit(self.page);
+            q.offset = ids.len();
+            let rows = self.reads.query(&q).await?;
+            let n = rows.len();
+            ids.extend(rows.iter().map(|o| o.envelope.id));
+            if n < self.page {
+                break;
+            }
+        }
+        let mut report = TrashReport::default();
+        for id in ids {
+            match self.do_purge(id).await {
+                Ok(()) => report.purged += 1,
+                Err(_) => report.failed.push(id),
+            }
+        }
+        Ok(report)
     }
 }

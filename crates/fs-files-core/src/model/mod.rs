@@ -15,5 +15,5 @@ pub(crate) use file::FileRecord;
 pub use folder::Folder;
 pub(crate) use folder::FolderRecord;
 pub use page::{BackendInfo, Cursor, Entry, FileFilter, Page};
-pub use rescan::RescanReport;
+pub use rescan::{RescanReport, TrashReport};
 pub use sort::{Sort, SortBy};

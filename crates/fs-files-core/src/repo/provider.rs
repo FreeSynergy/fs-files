@@ -9,16 +9,18 @@ use async_trait::async_trait;
 use fs_interfaces::Capabilities;
 use fs_store::ObjectId;
 
+use super::fileops::Target;
 use super::handle::FileRepo;
 use crate::backends::Backends;
 use crate::error::Result;
 use crate::files::Files;
 use crate::model::{
     BackendInfo, Cursor, File, FileFilter, Folder, OnConflict, Page, RescanReport, Sort,
+    TrashReport,
 };
 use crate::transfer::{Blob, Transfer, Upload};
 
-const SUPPORTED: [&str; 22] = [
+const SUPPORTED: [&str; 24] = [
     "file.resolve",
     "folder.list",
     "folder.create",
@@ -28,6 +30,8 @@ const SUPPORTED: [&str; 22] = [
     "folder.rescan",
     "file.conflictRule",
     "file.sort",
+    "file.restoreTo",
+    "file.emptyTrash",
     "file.move",
     "file.copy",
     "file.rename",
@@ -151,7 +155,22 @@ impl Files for FileRepo {
         self.do_trash(id).await
     }
     async fn restore(&self, id: ObjectId) -> Result<File> {
-        self.do_restore(id).await
+        self.do_restore(id, Target::Original, OnConflict::Refuse)
+            .await
+    }
+    async fn restore_as(&self, id: ObjectId, on: OnConflict) -> Result<File> {
+        self.do_restore(id, Target::Original, on).await
+    }
+    async fn restore_to(
+        &self,
+        id: ObjectId,
+        folder: Option<ObjectId>,
+        on: OnConflict,
+    ) -> Result<File> {
+        self.do_restore(id, Target::Folder(folder), on).await
+    }
+    async fn empty_trash(&self) -> Result<TrashReport> {
+        self.do_empty_trash().await
     }
     async fn purge(&self, id: ObjectId) -> Result<()> {
         self.do_purge(id).await

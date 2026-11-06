@@ -10,7 +10,9 @@ use fs_interfaces::{Capabilities, Unsupported};
 use fs_store::ObjectId;
 
 use crate::error::Result;
-use crate::model::{Cursor, File, FileFilter, Folder, OnConflict, Page, RescanReport, Sort};
+use crate::model::{
+    Cursor, File, FileFilter, Folder, OnConflict, Page, RescanReport, Sort, TrashReport,
+};
 
 const NO_RULE: &str = "this provider only knows the refuse rule";
 
@@ -132,6 +134,29 @@ pub trait Files: Send + Sync {
     /// `file.restore`: bring a file back from the trash.
     async fn restore(&self, _id: ObjectId) -> Result<File> {
         no("file.restore", "this provider cannot restore files")
+    }
+    /// `file.restore` with a rule for a taken name: `KeepBoth` restores as `name (2).ext` instead of failing.
+    async fn restore_as(&self, id: ObjectId, on: OnConflict) -> Result<File> {
+        match on {
+            OnConflict::Refuse => self.restore(id).await,
+            OnConflict::KeepBoth => no("file.conflictRule", NO_RULE),
+        }
+    }
+    /// `file.restore` to a folder of the caller's choice (`None` = top level) instead of the original one.
+    async fn restore_to(
+        &self,
+        _id: ObjectId,
+        _folder: Option<ObjectId>,
+        _on: OnConflict,
+    ) -> Result<File> {
+        no(
+            "file.restore",
+            "this provider restores to the original folder only",
+        )
+    }
+    /// `file.emptyTrash`: purge everything in the trash for good.
+    async fn empty_trash(&self) -> Result<TrashReport> {
+        no("file.emptyTrash", "this provider cannot empty the trash")
     }
     /// `file.purge`: delete bytes and metadata of a trashed file for good.
     async fn purge(&self, _id: ObjectId) -> Result<()> {
