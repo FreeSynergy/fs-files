@@ -29,6 +29,9 @@ pub struct Page {
     pub next: Option<Cursor>,
 }
 
+/// A point in time.
+pub type Timestamp = chrono::DateTime<chrono::Utc>;
+
 /// Search filter (`FileFilter`); all members optional, combined with AND.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct FileFilter {
@@ -38,6 +41,18 @@ pub struct FileFilter {
     pub media_type: Option<String>,
     /// Only entries of this folder.
     pub folder: Option<ObjectId>,
+    /// At least this many bytes (a folder counts as 0).
+    pub min_size: Option<u64>,
+    /// At most this many bytes (a folder counts as 0).
+    pub max_size: Option<u64>,
+    /// Changed at or after this time (the record's last change, see `SortBy::Modified`).
+    pub modified_after: Option<Timestamp>,
+    /// Changed before this time.
+    pub modified_before: Option<Timestamp>,
+    /// Created (or taken over by a rescan) at or after this time.
+    pub created_after: Option<Timestamp>,
+    /// Created before this time.
+    pub created_before: Option<Timestamp>,
     /// Look in the trash instead of the live files. Not in the contract (it has no way to see the
     /// trash); reported to the owner.
     pub trashed: bool,

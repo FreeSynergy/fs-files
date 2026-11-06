@@ -3,7 +3,7 @@
 //! Pattern: Repository (read side) + Iterator-style paging — builds backend-neutral `Query` values;
 //! filtering, ordering and paging are done by the store, one extra row tells whether a next page exists.
 
-use fs_store::{Op, Order, Query, StoredObject};
+use fs_store::{Op, Order, Query, StoredObject, TimeField};
 
 use super::build::folder_key;
 use super::consts::{CONTEXT, FOLDER_TYPE};
@@ -69,6 +69,23 @@ impl FileRepo {
         }
         if let Some(prefix) = &f.media_type {
             q = q.index_op("media_type", Op::Prefix, prefix.to_ascii_lowercase());
+        }
+        let pad = |n: u64| format!("{n:020}");
+        if let Some(min) = f.min_size {
+            q = q.index_op("size_asc", Op::Ge, pad(min));
+        }
+        if let Some(max) = f.max_size {
+            q = q.index_op("size_asc", Op::Le, pad(max));
+        }
+        for (field, op, at) in [
+            (TimeField::Updated, Op::Ge, f.modified_after),
+            (TimeField::Updated, Op::Lt, f.modified_before),
+            (TimeField::Published, Op::Ge, f.created_after),
+            (TimeField::Published, Op::Lt, f.created_before),
+        ] {
+            if let Some(t) = at {
+                q = q.time(field, op, t);
+            }
         }
         if let Some(folder) = f.folder {
             q = q.with_index("folder", folder.to_string());
