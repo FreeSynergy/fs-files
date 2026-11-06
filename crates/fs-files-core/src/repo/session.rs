@@ -7,14 +7,15 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use fs_store::{ObjectId, StoredObject};
+use fs_store::{ObjectId, Order, Query, StoredObject};
 use serde::{Deserialize, Serialize};
 
 use super::blob::new_key;
+use super::consts::CONTEXT;
 use super::handle::FileRepo;
 use super::names::{check_name, numbered_name};
 use crate::error::{Error, Result};
-use crate::model::OnConflict;
+use crate::model::{OnConflict, UploadInfo};
 use crate::transfer::Upload;
 
 /// What a session remembers.
@@ -106,6 +107,39 @@ impl FileRepo {
             id,
             rec,
         }))
+    }
+
+    /// Every upload that was started and not finished or aborted, oldest first.
+    pub(super) async fn do_pending_uploads(&self) -> Result<Vec<UploadInfo>> {
+        let mut out = Vec::new();
+        loop {
+            let mut q = Query::new()
+                .in_context(CONTEXT)
+                .with_index("kind", "upload")
+                .ordered(Order::PublishedAsc)
+                .limit(self.page);
+            q.offset = out.len();
+            let rows = self.reads.query(&q).await?;
+            let n = rows.len();
+            for o in rows {
+                let rec: SessionRecord = serde_json::from_value(o.content.clone())?;
+                let received = match self.backends.get(&rec.backend) {
+                    Ok(b) => b.pending(&rec.key).await.unwrap_or(0),
+                    Err(_) => 0, // the backend was removed: the upload cannot go on, but it is still listed
+                };
+                out.push(UploadInfo {
+                    id: o.envelope.id.to_string(),
+                    folder: rec.folder,
+                    name: rec.name,
+                    media_type: rec.media_type,
+                    received,
+                    started: o.envelope.published,
+                });
+            }
+            if n < self.page {
+                return Ok(out);
+            }
+        }
     }
 
     pub(super) async fn session_obj(&self, id: ObjectId) -> Result<StoredObject> {

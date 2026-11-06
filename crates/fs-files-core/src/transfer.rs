@@ -11,7 +11,7 @@ use fs_interfaces::Unsupported;
 use fs_store::ObjectId;
 
 use crate::error::Result;
-use crate::model::{File, OnConflict};
+use crate::model::{File, OnConflict, UploadInfo};
 
 /// Bytes behind a capability (`Blob` in `common.capnp`).
 #[async_trait]
@@ -69,6 +69,11 @@ pub trait Transfer: Send + Sync {
             )
             .into()),
         }
+    }
+    /// `file.upload`: the unfinished uploads, oldest first, so a frontend can offer to resume or drop them
+    /// (after a restart, or on another device).
+    async fn pending_uploads(&self) -> Result<Vec<UploadInfo>> {
+        Err(Unsupported::new("file.upload", "this provider cannot list uploads").into())
     }
     /// `file.upload`: take up a started upload again, also after a restart.
     async fn resume_upload(&self, _id: &str) -> Result<Arc<dyn Upload>> {

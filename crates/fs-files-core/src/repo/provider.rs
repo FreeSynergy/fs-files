@@ -16,11 +16,11 @@ use crate::error::Result;
 use crate::files::Files;
 use crate::model::{
     BackendInfo, Cursor, File, FileFilter, Folder, OnConflict, Page, RescanReport, Sort,
-    TrashReport,
+    TrashReport, UploadInfo,
 };
 use crate::transfer::{Blob, Transfer, Upload};
 
-const SUPPORTED: [&str; 25] = [
+const SUPPORTED: [&str; 26] = [
     "file.resolve",
     "folder.resolve",
     "folder.list",
@@ -31,6 +31,7 @@ const SUPPORTED: [&str; 25] = [
     "folder.rescan",
     "file.conflictRule",
     "file.sort",
+    "file.pendingUploads",
     "file.restoreTo",
     "file.emptyTrash",
     "file.move",
@@ -217,6 +218,9 @@ impl Transfer for FileRepo {
         on: OnConflict,
     ) -> Result<(Arc<dyn Upload>, String)> {
         self.do_start_upload(folder, name, media_type, on).await
+    }
+    async fn pending_uploads(&self) -> Result<Vec<UploadInfo>> {
+        self.do_pending_uploads().await
     }
     async fn resume_upload(&self, id: &str) -> Result<Arc<dyn Upload>> {
         self.do_resume_upload(id).await
