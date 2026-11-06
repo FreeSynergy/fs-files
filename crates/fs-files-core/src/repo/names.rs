@@ -35,6 +35,15 @@ pub fn check_name(name: &str) -> Result<()> {
 
 /// The comparison key of a name.
 /// `name` for the `n`-th copy: `a.txt` -> `a (copy).txt`, `a (copy 2).txt`.
+/// `name (n).ext` for a kept-both name (n >= 2).
+pub(super) fn numbered_name(name: &str, n: u32) -> String {
+    let tag = format!(" ({n})");
+    match name.rfind('.') {
+        Some(i) if i > 0 => format!("{}{tag}{}", &name[..i], &name[i..]),
+        _ => format!("{name}{tag}"),
+    }
+}
+
 pub(super) fn copy_name(name: &str, n: u32) -> String {
     let tag = if n <= 1 {
         " (copy)".to_string()

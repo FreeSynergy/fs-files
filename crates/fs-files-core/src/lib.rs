@@ -38,6 +38,8 @@ pub use backend::{
 pub use backends::Backends;
 pub use error::{Error, Problem, Result};
 pub use files::Files;
-pub use model::{BackendInfo, Cursor, Entry, File, FileFilter, Folder, Page, RescanReport};
+pub use model::{
+    BackendInfo, Cursor, Entry, File, FileFilter, Folder, OnConflict, Page, RescanReport,
+};
 pub use repo::{CONTEXT, FOLDER_TYPE, FileRepo, MAX_NAME, UPLOAD_TYPE, check_name};
 pub use transfer::{Blob, Transfer, Upload};

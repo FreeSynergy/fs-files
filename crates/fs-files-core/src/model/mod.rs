@@ -2,11 +2,13 @@
 //!
 //! Pattern: Value objects (declarations) — plain data, no behaviour beyond conversion from the store.
 
+mod conflict;
 mod file;
 mod folder;
 mod page;
 mod rescan;
 
+pub use conflict::OnConflict;
 pub use file::File;
 pub(crate) use file::FileRecord;
 pub use folder::Folder;

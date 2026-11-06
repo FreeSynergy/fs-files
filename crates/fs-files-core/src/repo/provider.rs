@@ -13,10 +13,10 @@ use super::handle::FileRepo;
 use crate::backends::Backends;
 use crate::error::Result;
 use crate::files::Files;
-use crate::model::{BackendInfo, Cursor, File, FileFilter, Folder, Page, RescanReport};
+use crate::model::{BackendInfo, Cursor, File, FileFilter, Folder, OnConflict, Page, RescanReport};
 use crate::transfer::{Blob, Transfer, Upload};
 
-const SUPPORTED: [&str; 20] = [
+const SUPPORTED: [&str; 21] = [
     "file.resolve",
     "folder.list",
     "folder.create",
@@ -24,6 +24,7 @@ const SUPPORTED: [&str; 20] = [
     "folder.move",
     "folder.delete",
     "folder.rescan",
+    "file.conflictRule",
     "file.move",
     "file.copy",
     "file.rename",
@@ -88,22 +89,52 @@ impl Files for FileRepo {
         self.do_create_folder(parent, name).await
     }
     async fn rename_folder(&self, id: ObjectId, name: &str) -> Result<Folder> {
-        self.do_rename_folder(id, name).await
+        self.do_rename_folder(id, name, OnConflict::Refuse).await
+    }
+    async fn rename_folder_as(&self, id: ObjectId, name: &str, on: OnConflict) -> Result<Folder> {
+        self.do_rename_folder(id, name, on).await
     }
     async fn move_folder(&self, id: ObjectId, parent: Option<ObjectId>) -> Result<Folder> {
-        self.do_move_folder(id, parent).await
+        self.do_move_folder(id, parent, OnConflict::Refuse).await
+    }
+    async fn move_folder_as(
+        &self,
+        id: ObjectId,
+        parent: Option<ObjectId>,
+        on: OnConflict,
+    ) -> Result<Folder> {
+        self.do_move_folder(id, parent, on).await
     }
     async fn delete_folder(&self, id: ObjectId) -> Result<()> {
         self.do_delete_folder(id).await
     }
     async fn move_file(&self, id: ObjectId, folder: Option<ObjectId>) -> Result<File> {
-        self.do_move_file(id, folder).await
+        self.do_move_file(id, folder, OnConflict::Refuse).await
+    }
+    async fn move_file_as(
+        &self,
+        id: ObjectId,
+        folder: Option<ObjectId>,
+        on: OnConflict,
+    ) -> Result<File> {
+        self.do_move_file(id, folder, on).await
     }
     async fn copy_file(&self, id: ObjectId, folder: Option<ObjectId>) -> Result<File> {
-        self.do_copy_file(id, folder).await
+        self.do_copy_file(id, folder, OnConflict::KeepBoth).await
+    }
+    async fn copy_file_as(
+        &self,
+        id: ObjectId,
+        folder: Option<ObjectId>,
+        on: OnConflict,
+    ) -> Result<File> {
+        self.do_copy_file(id, folder, on).await
     }
     async fn rename_file(&self, id: ObjectId, name: &str) -> Result<File> {
-        self.do_rename_file(id, name).await
+        self.do_rename_file(id, name, OnConflict::Refuse).await
+    }
+    async fn rename_file_as(&self, id: ObjectId, name: &str, on: OnConflict) -> Result<File> {
+        self.do_rename_file(id, name, on).await
     }
     async fn trash(&self, id: ObjectId) -> Result<()> {
         self.do_trash(id).await
@@ -136,7 +167,17 @@ impl Transfer for FileRepo {
         name: &str,
         media_type: &str,
     ) -> Result<(Arc<dyn Upload>, String)> {
-        self.do_start_upload(folder, name, media_type).await
+        self.do_start_upload(folder, name, media_type, OnConflict::Refuse)
+            .await
+    }
+    async fn start_upload_as(
+        &self,
+        folder: Option<ObjectId>,
+        name: &str,
+        media_type: &str,
+        on: OnConflict,
+    ) -> Result<(Arc<dyn Upload>, String)> {
+        self.do_start_upload(folder, name, media_type, on).await
     }
     async fn resume_upload(&self, id: &str) -> Result<Arc<dyn Upload>> {
         self.do_resume_upload(id).await

@@ -12,6 +12,7 @@ use super::names::check_name;
 use super::steps::Disk;
 use crate::backend::Spot;
 use crate::error::{Error, Result};
+use crate::model::OnConflict;
 use crate::model::{Folder, FolderRecord};
 
 impl FileRepo {
@@ -32,16 +33,21 @@ impl FileRepo {
         Ok(folder)
     }
 
-    pub(super) async fn do_rename_folder(&self, id: ObjectId, name: &str) -> Result<Folder> {
+    pub(super) async fn do_rename_folder(
+        &self,
+        id: ObjectId,
+        name: &str,
+        on: OnConflict,
+    ) -> Result<Folder> {
         check_name(name)?;
         let _w = self.lock.lock().await;
         let mut o = self.folder_obj(id).await?;
         let parent = FolderRecord::of(&o)?.parent;
-        self.require_free(parent, name, Some(id)).await?;
+        let name = self.resolve_name(parent, name, Some(id), on, false).await?;
         let steps = self
-            .move_steps(parent, &o.envelope.name, parent, name)
+            .move_steps(parent, &o.envelope.name, parent, &name)
             .await?;
-        o.envelope.name = name.to_string();
+        o.envelope.name = name;
         set_folder(&mut o, parent);
         let folder = Folder::of(&o)?;
         self.transact(steps, self.save(o)).await?;
@@ -52,17 +58,20 @@ impl FileRepo {
         &self,
         id: ObjectId,
         parent: Option<ObjectId>,
+        on: OnConflict,
     ) -> Result<Folder> {
         let _w = self.lock.lock().await;
         let mut o = self.folder_obj(id).await?;
         self.require_folder(parent).await?;
         self.require_not_inside(id, parent).await?;
-        self.require_free(parent, &o.envelope.name, Some(id))
+        let name = self
+            .resolve_name(parent, &o.envelope.name, Some(id), on, false)
             .await?;
         let from = FolderRecord::of(&o)?.parent;
         let steps = self
-            .move_steps(from, &o.envelope.name, parent, &o.envelope.name)
+            .move_steps(from, &o.envelope.name, parent, &name)
             .await?;
+        o.envelope.name = name;
         set_folder(&mut o, parent);
         let folder = Folder::of(&o)?;
         self.transact(steps, self.save(o)).await?;

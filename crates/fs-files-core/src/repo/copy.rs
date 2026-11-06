@@ -7,17 +7,17 @@
 use fs_store::{ObjectId, StoredObject};
 
 use super::handle::FileRepo;
-use super::names::copy_name;
 use super::steps::{Disk, Step};
 use crate::backend::{BlobInfo, Spot};
 use crate::error::{Error, Result};
-use crate::model::{File, FileRecord};
+use crate::model::{File, FileRecord, OnConflict};
 
 impl FileRepo {
     pub(super) async fn do_copy_file(
         &self,
         id: ObjectId,
         folder: Option<ObjectId>,
+        on: OnConflict,
     ) -> Result<File> {
         let src = self.live_file_obj(id).await?;
         self.require_folder(folder).await?;
@@ -32,7 +32,7 @@ impl FileRepo {
         }
         let _w = self.lock.lock().await;
         let outcome = self
-            .register_copy(&src, &src_rec, folder, &tmp, &*backend)
+            .register_copy(&src, &src_rec, folder, &tmp, on, &*backend)
             .await;
         if outcome.is_err() && committed {
             let _ = backend.delete(&tmp).await;
@@ -49,9 +49,12 @@ impl FileRepo {
         src_rec: &FileRecord,
         folder: Option<ObjectId>,
         tmp: &str,
+        on: OnConflict,
         backend: &dyn crate::backend::BlobBackend,
     ) -> Result<File> {
-        let name = self.free_copy_name(folder, &src.envelope.name).await?;
+        let name = self
+            .resolve_name(folder, &src.envelope.name, None, on, true)
+            .await?;
         let mut r = src_rec.clone();
         r.folder = folder;
         r.modified = None;
@@ -89,18 +92,5 @@ impl FileRepo {
         } else {
             Err(Error::Backend("the copy does not match its source".into()))
         }
-    }
-
-    async fn free_copy_name(&self, folder: Option<ObjectId>, name: &str) -> Result<String> {
-        if self.require_free(folder, name, None).await.is_ok() {
-            return Ok(name.to_string());
-        }
-        for n in 1..1000 {
-            let candidate = copy_name(name, n);
-            if self.require_free(folder, &candidate, None).await.is_ok() {
-                return Ok(candidate);
-            }
-        }
-        Err(Error::Conflict("no free name for the copy".into()))
     }
 }

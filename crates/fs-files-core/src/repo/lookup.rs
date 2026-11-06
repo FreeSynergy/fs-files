@@ -7,8 +7,9 @@ use fs_store::{ObjectId, Query, StoredObject};
 use super::build::folder_key;
 use super::consts::CONTEXT;
 use super::handle::FileRepo;
+use super::names::{copy_name, numbered_name};
 use crate::error::{Error, Result};
-use crate::model::FolderRecord;
+use crate::model::{FolderRecord, OnConflict};
 
 fn is_kind(o: &StoredObject, kind: &str) -> bool {
     o.index
@@ -73,6 +74,33 @@ impl FileRepo {
     }
 
     /// Entries of any kind (live or trashed) directly in `folder`.
+    /// The name to use in `folder`: `name` if free, else by the rule `on`: refuse, or the first free numbered name.
+    pub(super) async fn resolve_name(
+        &self,
+        folder: Option<ObjectId>,
+        name: &str,
+        except: Option<ObjectId>,
+        on: OnConflict,
+        copy: bool,
+    ) -> Result<String> {
+        let first = self.require_free(folder, name, except).await;
+        match first {
+            Err(Error::Conflict(_)) if on == OnConflict::KeepBoth => {}
+            other => return other.map(|()| name.to_string()),
+        }
+        for n in 2..1000 {
+            let candidate = if copy {
+                copy_name(name, n - 1)
+            } else {
+                numbered_name(name, n)
+            };
+            if self.require_free(folder, &candidate, except).await.is_ok() {
+                return Ok(candidate);
+            }
+        }
+        Err(Error::Conflict("no free name to keep both".into()))
+    }
+
     pub(super) async fn count_in(&self, folder: ObjectId) -> Result<usize> {
         let q = Query::new()
             .in_context(CONTEXT)

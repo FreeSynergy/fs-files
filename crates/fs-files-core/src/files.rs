@@ -10,7 +10,9 @@ use fs_interfaces::{Capabilities, Unsupported};
 use fs_store::ObjectId;
 
 use crate::error::Result;
-use crate::model::{Cursor, File, FileFilter, Folder, Page, RescanReport};
+use crate::model::{Cursor, File, FileFilter, Folder, OnConflict, Page, RescanReport};
+
+const NO_RULE: &str = "this provider only knows the refuse rule";
 
 fn no<T>(capability: &str, why: &str) -> Result<T> {
     Err(Unsupported::new(capability, why).into())
@@ -42,6 +44,25 @@ pub trait Files: Send + Sync {
     async fn move_folder(&self, _id: ObjectId, _parent: Option<ObjectId>) -> Result<Folder> {
         no("folder.move", "this provider cannot move folders")
     }
+    /// `folder.rename` with a rule for a taken name (`onConflict` in the contract). The default refuses.
+    async fn rename_folder_as(&self, id: ObjectId, name: &str, on: OnConflict) -> Result<Folder> {
+        match on {
+            OnConflict::Refuse => self.rename_folder(id, name).await,
+            OnConflict::KeepBoth => no("file.conflictRule", NO_RULE),
+        }
+    }
+    /// `folder.move` with a rule for a taken name. The default refuses.
+    async fn move_folder_as(
+        &self,
+        id: ObjectId,
+        parent: Option<ObjectId>,
+        on: OnConflict,
+    ) -> Result<Folder> {
+        match on {
+            OnConflict::Refuse => self.move_folder(id, parent).await,
+            OnConflict::KeepBoth => no("file.conflictRule", NO_RULE),
+        }
+    }
     /// `folder.delete`: only an empty folder (nothing live, nothing in the trash).
     async fn delete_folder(&self, _id: ObjectId) -> Result<()> {
         no("folder.delete", "this provider cannot delete folders")
@@ -57,6 +78,38 @@ pub trait Files: Send + Sync {
     /// `file.rename`.
     async fn rename_file(&self, _id: ObjectId, _name: &str) -> Result<File> {
         no("file.rename", "this provider cannot rename files")
+    }
+    /// `file.move` with a rule for a taken name. The default refuses.
+    async fn move_file_as(
+        &self,
+        id: ObjectId,
+        folder: Option<ObjectId>,
+        on: OnConflict,
+    ) -> Result<File> {
+        match on {
+            OnConflict::Refuse => self.move_file(id, folder).await,
+            OnConflict::KeepBoth => no("file.conflictRule", NO_RULE),
+        }
+    }
+    /// `file.copy` with a rule for a taken name. Unlike `copy_file`, the default is to refuse: a
+    /// frontend that duplicates a file sends `KeepBoth`.
+    async fn copy_file_as(
+        &self,
+        id: ObjectId,
+        folder: Option<ObjectId>,
+        on: OnConflict,
+    ) -> Result<File> {
+        match on {
+            OnConflict::KeepBoth => self.copy_file(id, folder).await,
+            OnConflict::Refuse => no("file.conflictRule", NO_RULE),
+        }
+    }
+    /// `file.rename` with a rule for a taken name. The default refuses.
+    async fn rename_file_as(&self, id: ObjectId, name: &str, on: OnConflict) -> Result<File> {
+        match on {
+            OnConflict::Refuse => self.rename_file(id, name).await,
+            OnConflict::KeepBoth => no("file.conflictRule", NO_RULE),
+        }
     }
     /// `file.delete`: put a file in the trash; it is hidden, nothing is deleted.
     async fn trash(&self, _id: ObjectId) -> Result<()> {

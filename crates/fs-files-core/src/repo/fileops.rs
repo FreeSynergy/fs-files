@@ -13,7 +13,7 @@ use super::names::check_name;
 use super::steps::{Disk, Step};
 use crate::backend::Spot;
 use crate::error::{Error, Result};
-use crate::model::{File, FileRecord};
+use crate::model::{File, FileRecord, OnConflict};
 use fs_store::StoredObject;
 
 impl FileRepo {
@@ -21,26 +21,36 @@ impl FileRepo {
         &self,
         id: ObjectId,
         folder: Option<ObjectId>,
+        on: OnConflict,
     ) -> Result<File> {
         let _w = self.lock.lock().await;
         let mut o = self.live_file_obj(id).await?;
         self.require_folder(folder).await?;
-        self.require_free(folder, &o.envelope.name, Some(id))
+        let name = self
+            .resolve_name(folder, &o.envelope.name, Some(id), on, false)
             .await?;
         let mut r = FileRecord::of(&o)?;
-        let steps = self.rename_steps(&o, &r, folder, &o.envelope.name).await?;
+        let steps = self.rename_steps(&o, &r, folder, &name).await?;
+        o.envelope.name = name;
         r.folder = folder;
         self.store_with(steps, &mut o, &r).await
     }
 
-    pub(super) async fn do_rename_file(&self, id: ObjectId, name: &str) -> Result<File> {
+    pub(super) async fn do_rename_file(
+        &self,
+        id: ObjectId,
+        name: &str,
+        on: OnConflict,
+    ) -> Result<File> {
         check_name(name)?;
         let _w = self.lock.lock().await;
         let mut o = self.live_file_obj(id).await?;
         let r = FileRecord::of(&o)?;
-        self.require_free(r.folder, name, Some(id)).await?;
-        let steps = self.rename_steps(&o, &r, r.folder, name).await?;
-        o.envelope.name = name.to_string();
+        let name = self
+            .resolve_name(r.folder, name, Some(id), on, false)
+            .await?;
+        let steps = self.rename_steps(&o, &r, r.folder, &name).await?;
+        o.envelope.name = name;
         self.store_with(steps, &mut o, &r).await
     }
 

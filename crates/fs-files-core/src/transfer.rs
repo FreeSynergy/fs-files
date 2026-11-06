@@ -11,7 +11,7 @@ use fs_interfaces::Unsupported;
 use fs_store::ObjectId;
 
 use crate::error::Result;
-use crate::model::File;
+use crate::model::{File, OnConflict};
 
 /// Bytes behind a capability (`Blob` in `common.capnp`).
 #[async_trait]
@@ -51,6 +51,24 @@ pub trait Transfer: Send + Sync {
         _media_type: &str,
     ) -> Result<(Arc<dyn Upload>, String)> {
         Err(Unsupported::new("file.upload", "this provider cannot take uploads").into())
+    }
+    /// `file.upload` with a rule for a taken name: `Refuse` fails at the start, `KeepBoth` starts an upload
+    /// that will get a free name (`name (2).ext`). The default refuses.
+    async fn start_upload_as(
+        &self,
+        folder: Option<ObjectId>,
+        name: &str,
+        media_type: &str,
+        on: OnConflict,
+    ) -> Result<(Arc<dyn Upload>, String)> {
+        match on {
+            OnConflict::Refuse => self.start_upload(folder, name, media_type).await,
+            OnConflict::KeepBoth => Err(Unsupported::new(
+                "file.conflictRule",
+                "this provider only knows the refuse rule",
+            )
+            .into()),
+        }
     }
     /// `file.upload`: take up a started upload again, also after a restart.
     async fn resume_upload(&self, _id: &str) -> Result<Arc<dyn Upload>> {

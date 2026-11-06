@@ -12,8 +12,9 @@ use serde::{Deserialize, Serialize};
 
 use super::blob::new_key;
 use super::handle::FileRepo;
-use super::names::check_name;
+use super::names::{check_name, numbered_name};
 use crate::error::{Error, Result};
+use crate::model::OnConflict;
 use crate::transfer::Upload;
 
 /// What a session remembers.
@@ -40,16 +41,16 @@ impl FileRepo {
         folder: Option<ObjectId>,
         name: &str,
         media_type: &str,
+        on: OnConflict,
     ) -> Result<(Arc<dyn Upload>, String)> {
         check_name(name)?;
         self.require_folder(folder).await?;
-        self.require_free(folder, name, None).await?;
         let (backend_id, backend) = self.backends.active();
-        self.check_target(&*backend, folder, name).await?; // a name the disk refuses fails now, nothing created
+        let name = &self.upload_name(&*backend, folder, name, on).await?;
         let probe = ObjectId::new();
         let rec = SessionRecord {
             folder,
-            name: name.to_string(),
+            name: name.clone(),
             media_type: media_type.trim().to_ascii_lowercase(),
             backend: backend_id,
             key: new_key(probe),
@@ -67,6 +68,31 @@ impl FileRepo {
             rec,
         };
         Ok((Arc::new(session), id.to_string()))
+    }
+
+    /// The name the upload will have: the given one, or by `on` the first free one (in the records and on the disk).
+    /// A name the disk refuses fails here, with nothing created.
+    async fn upload_name(
+        &self,
+        backend: &dyn crate::backend::BlobBackend,
+        folder: Option<ObjectId>,
+        name: &str,
+        on: OnConflict,
+    ) -> Result<String> {
+        let mut chosen = name.to_string();
+        for n in 2..1000 {
+            let free = async {
+                self.require_free(folder, &chosen, None).await?;
+                self.check_target(backend, folder, &chosen).await
+            };
+            match free.await {
+                Err(Error::Conflict(_)) if on == OnConflict::KeepBoth => {
+                    chosen = numbered_name(name, n);
+                }
+                other => return other.map(|()| chosen),
+            }
+        }
+        Err(Error::Conflict("no free name to keep both".into()))
     }
 
     pub(super) async fn do_resume_upload(&self, id: &str) -> Result<Arc<dyn Upload>> {
