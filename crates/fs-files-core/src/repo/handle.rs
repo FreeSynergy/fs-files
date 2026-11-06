@@ -28,6 +28,8 @@ pub struct FileRepo {
     pub(super) instance: String,
     pub(super) page: usize,
     pub(super) lock: Arc<Mutex<()>>,
+    /// One lock per upload: finishing the same upload twice at once is serialised, the second gets the first's file.
+    pub(super) uploads: Arc<crate::backend::lock::KeyLocks>,
 }
 
 impl FileRepo {
@@ -65,6 +67,7 @@ impl FileRepo {
             instance: "local.invalid".into(),
             page: PAGE,
             lock: Arc::new(Mutex::new(())),
+            uploads: Arc::default(),
         }
     }
 

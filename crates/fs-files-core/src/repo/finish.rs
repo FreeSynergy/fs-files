@@ -22,13 +22,15 @@ const SNIFF: u32 = 8192;
 
 impl FileRepo {
     pub(super) async fn finish_upload(&self, id: ObjectId, s: &SessionRecord) -> Result<File> {
-        self.session_obj(id).await?;
-        // Finish ran before and only deleting the session failed: hand out the file, drop the session.
+        // One finish per upload at a time. Whoever comes second finds the file of the first.
+        let _one = self.uploads.lock(&id.to_string()).await;
+        // Finish ran before (or its session deletion failed): hand out the file, drop the session.
         if let Some(o) = self.file_of_upload(id).await? {
             let file = File::of(&o)?;
             self.drop_session(id).await?;
             return Ok(file);
         }
+        self.session_obj(id).await?;
         let backend = self.backends.get(&s.backend)?;
         // Cheap checks first: a taken name leaves the upload intact (unless the upload said keep both).
         self.require_folder(s.folder).await?;

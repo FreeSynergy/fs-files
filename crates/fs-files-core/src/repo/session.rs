@@ -197,6 +197,9 @@ impl Upload for UploadSession {
     }
 
     async fn abort(&self) -> Result<()> {
+        // Same order as finish (upload, then the global lock), and never in the middle of a rescan.
+        let _one = self.repo.uploads.lock(&self.id.to_string()).await;
+        let _all = self.repo.lock.lock().await;
         match self.repo.session_obj(self.id).await {
             Ok(_) => {}
             Err(Error::NotFound(_)) => return Ok(()), // finished or aborted already: nothing to abort

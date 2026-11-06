@@ -7,7 +7,7 @@ mod digest;
 mod factory;
 mod key;
 mod local;
-mod lock;
+pub(crate) mod lock;
 mod place;
 mod provider;
 mod registry;

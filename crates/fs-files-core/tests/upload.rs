@@ -121,9 +121,10 @@ async fn a_finished_upload_takes_no_more_bytes() {
         .await
         .unwrap();
     up.write(0, b"x").await.unwrap();
-    up.finish().await.unwrap();
+    let file = up.finish().await.unwrap();
     assert!(up.write(1, b"y").await.is_err());
-    assert!(up.finish().await.is_err());
+    // finishing again hands out the same file (never a second one)
+    assert_eq!(up.finish().await.unwrap().id, file.id);
 }
 
 #[tokio::test]
