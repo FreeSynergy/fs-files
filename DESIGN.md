@@ -34,7 +34,7 @@ Version 0.2.1 (stage 1: local folder, stage 2: S3, stage 3: real names). Built o
 | One behaviour suite as functions over `&dyn BlobBackend` (`tests/common/{suite,stream}.rs`), run on `LocalFolder`, `S3Backend` over a strict fake S3, `S3Backend` over the `object_store` in-memory store, and (ignored) a live server | done |
 | Live S3: official RustFS image 1.0.4 with podman, localhost only, throwaway credentials: both live tests passed; container removed | verified once (2026-11-06), not part of CI |
 | `sharing`, `file.subscribe`: `Unsupported` with the plain reason; versions, encryption, sync, WebDAV, previews: not built | as agreed |
-| Tests | 101 run by default (84 without the `s3` feature) + 2 ignored live tests |
+| Tests | 109 run by default (88 without the `s3` feature) + 2 ignored live tests |
 
 ## Structure and pattern map (ADR 0043)
 
@@ -77,7 +77,7 @@ Version 0.2.1 (stage 1: local folder, stage 2: S3, stage 3: real names). Built o
   be empty, longer than 255 bytes, `.` / `..`, contain `/`, `\` or control characters, or be `.fs-files`.
 * **Never overwrite.** Every create is create-new, every move is a no-replace rename. Linux: one atomic `renameat2(RENAME_NOREPLACE)`
   (crate `rustix`, no unsafe in our code). Without the flag (old kernel, a file system that lacks it, other systems) a **file** is moved by hard link + unlink (atomic, never
-  replaces); a **folder** by "look, then rename", which is not atomic and could replace an *empty folder* created in between (never a
+  replaces; tested by switching the native call off with `LocalFolder::without_native_rename`); a **folder** by "look, then rename", which is not atomic and could replace an *empty folder* created in between (never a
   file, never a folder with content). `LocalFolder::commit` never replaces either. Atomic: publish of an upload, file rename / move, trash, restore, folder rename / move. Not atomic: the pair of disk step
   and database step (see next point), and the fallback above. Creating a folder is `mkdir` (atomic, fails if it exists).
 * **Order and crashes: disk first, then the database.** If the database step fails, the disk step is undone. If the process dies
@@ -90,7 +90,7 @@ Version 0.2.1 (stage 1: local folder, stage 2: S3, stage 3: real names). Built o
 * **Changes from outside the program: PROVISIONAL, the owner may change this.** `rescan(folder)` (recursive): new files and folders
   are taken over (checksum read from the bytes, type from the first bytes); a file with a different size or modification time gets new
   size and checksum; a file without bytes is **reported and its record is kept**; symlinks and odd names are listed as skipped.
-  Opening a file whose size or modification time no longer matches the record is an error ("changed outside"), not wrong data; before a file is moved, trashed or restored by a record, its bytes are checked (size, modification time, on doubt the checksum) and a mismatch changes nothing. A folder rename or move never merges into a path that exists on the disk (`Conflict`). Rescan reads all records once, walks with a work list (no recursion, depth limit 512), reports what it cannot handle and goes on, never rebinds a record to a stranger's file after a crash in the trash, and removes pending blobs of no upload older than an hour. The store's own filtered queries cost about a second per condition per 1000 records (fs-store), which makes `require_free` slow in big folders. Nothing is detected live (no watcher),
+  Opening a file whose size or modification time no longer matches the record is an error ("changed outside"), not wrong data; before a file is moved, trashed or restored by a record, its bytes are checked (size, modification time, on doubt the checksum) and a mismatch changes nothing. A folder rename or move never merges into a path that exists on the disk (`Conflict`), and is refused up front (`InvalidName`) when its deepest subfolder would pass 4096 bytes or 512 levels. Rescan reads all records once, walks with a work list (no recursion, depth limit 512), reports what it cannot handle and goes on, never rebinds a record to a stranger's file after a crash in the trash, and removes pending blobs of no upload older than an hour. The store's own filtered queries cost about a second per condition per 1000 records (fs-store), which makes `require_free` slow in big folders. Nothing is detected live (no watcher),
   and the whole rescan holds the program's write lock. Same-size edits inside one mtime tick are not seen.
 * **Records of the first version** (id-keyed `xx/<id>` files in the local root, no `named` flag, no `name_exact` index) keep working
   for reading; `rescan` skips them. They are not migrated: stage 1 never had a consumer. Their `xx` folders stay in the root.
@@ -116,6 +116,17 @@ Limits: at most 10 000 parts, so a file can be `10 000 x part_size` (8 MiB: abou
 cost: each byte is written twice (tail piece, then part). Orphan multipart uploads after a crash between `create` and the first
 `state` save are left to the bucket's lifecycle rule. `stat` returns the size only; the checksum comes from `commit`.
 The blake3 checksum is taken while streaming; after a restart (or a failed put) the finished object is streamed once through the hasher.
+
+## S3: commit crash safety
+
+`commit` saves a completion marker (with the object's size) in the state before it makes the object, and first removes an older
+object of the same key, so from the marker on an object of that size can only be this upload's. A retry after a crash at any step
+sees the marker and the object and only cleans up; before the object exists it makes it again (the pieces are not deleted until the
+object is there). Dropping a pending upload (`discard(Pending)`) removes parts, pieces and state but **never the finished object**; it
+aborts the multipart upload only if the object does not exist yet. Tested on the fake S3 with a crash at every call of `commit`, for
+the multipart and the plain-put path, then retrying and then dropping. Residual: a dropped upload whose object was already made
+leaves that object in the bucket without a record (safe, but garbage). A real S3 may answer a second `complete` differently from the
+fake; the marker avoids the call.
 
 ## Local folder: path safety
 

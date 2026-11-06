@@ -25,6 +25,8 @@ pub struct LocalFolder {
     pub(super) root: PathBuf,
     pub(super) locks: KeyLocks,
     pub(super) digests: Digests,
+    /// Use the kernel's no-replace rename where there is one (always, except in tests of the fallback).
+    pub(super) native: bool,
 }
 
 impl LocalFolder {
@@ -39,7 +41,17 @@ impl LocalFolder {
             root,
             locks: KeyLocks::default(),
             digests: Digests::default(),
+            native: true,
         })
+    }
+
+    /// Never use the kernel's no-replace rename, only the fallback (hard link + unlink for files). For
+    /// tests: on Linux the fallback would otherwise never run.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn without_native_rename(mut self) -> Self {
+        self.native = false;
+        self
     }
 
     /// The resolved root folder.
@@ -130,7 +142,8 @@ impl BlobBackend for LocalFolder {
         io::make_all(dir).await?;
         path::final_path(&self.root, key)?; // re-check after creating directories
         // Never replaces: a blob that is already there is a name clash, and the upload stays pending.
-        io::rename_new(&from, &to).map_err(|e| io::named(e, &format!("commit {key}")))?;
+        io::rename_new(&from, &to, self.native)
+            .map_err(|e| io::named(e, &format!("commit {key}")))?;
         io::sync_dir(dir).await?;
         io::sync_dir(&path::reserved_dir(&self.root, Reserved::Pending)).await?;
         Ok(BlobInfo {

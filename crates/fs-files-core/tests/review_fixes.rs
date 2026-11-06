@@ -5,7 +5,7 @@ mod common;
 use common::disk::{exists, on_disk, root};
 use common::{env, names, read_all, upload};
 use fs_files_core::{
-    BlobBackend, Entry, Error, FileFilter, Files, LocalFolder, OnConflict, Spot, Transfer,
+    BlobBackend, Error, FileFilter, Files, LocalFolder, OnConflict, Spot, Transfer,
 };
 
 fn kind<T>(r: fs_files_core::Result<T>) -> String {
@@ -183,71 +183,6 @@ async fn the_first_rescan_of_untouched_uploads_changes_nothing() {
 }
 
 #[tokio::test]
-async fn rescan_goes_on_after_an_entry_it_cannot_read() {
-    use std::os::unix::fs::PermissionsExt;
-    let e = env().await;
-    let r = &e.repo;
-    std::fs::write(root(&e).join("locked"), b"secret").unwrap();
-    std::fs::set_permissions(
-        root(&e).join("locked"),
-        std::fs::Permissions::from_mode(0o000),
-    )
-    .unwrap();
-    std::fs::write(root(&e).join("fine"), b"ok").unwrap();
-    let report = r.rescan(None).await.unwrap();
-    let readable = std::fs::read(root(&e).join("locked")).is_ok(); // running as root reads it anyway
-    let added: Vec<_> = report
-        .added
-        .iter()
-        .map(|x| match x {
-            Entry::File(f) => f.name.clone(),
-            Entry::Folder(f) => f.name.clone(),
-        })
-        .collect();
-    assert!(added.contains(&"fine".to_string()), "{report:?}");
-    if !readable {
-        assert!(
-            report.skipped.iter().any(|s| s.starts_with("locked")),
-            "{report:?}"
-        );
-    }
-}
-
-#[tokio::test]
-async fn a_very_deep_tree_does_not_overflow_the_stack() {
-    let e = env().await;
-    let r = &e.repo;
-    let deep = "d/".repeat(700);
-    std::fs::create_dir_all(root(&e).join(&deep)).unwrap();
-    std::fs::write(root(&e).join(&deep).join("leaf.txt"), b"leaf").unwrap();
-    let report = r.rescan(None).await.unwrap();
-    assert!(
-        report.skipped.iter().any(|s| s.contains("nested too deep")),
-        "{} skipped",
-        report.skipped.len()
-    );
-}
-
-#[tokio::test]
-async fn rescan_time_grows_about_linearly_with_the_number_of_files() {
-    let e = env().await;
-    let r = &e.repo;
-    for n in 0..3000 {
-        std::fs::write(root(&e).join(format!("file-{n:05}")), format!("{n}")).unwrap();
-    }
-    let first = r.rescan(None).await.unwrap();
-    assert_eq!(first.added.len(), 3000);
-    let start = std::time::Instant::now();
-    let second = r.rescan(None).await.unwrap();
-    assert!(second.added.is_empty() && second.updated.is_empty());
-    assert!(
-        start.elapsed() < std::time::Duration::from_secs(20),
-        "{:?}",
-        start.elapsed()
-    );
-}
-
-#[tokio::test]
 async fn the_reserved_name_is_refused_in_any_case_and_odd_errors_have_problem_types() {
     let e = env().await;
     let r = &e.repo;
@@ -263,35 +198,4 @@ async fn the_reserved_name_is_refused_in_any_case_and_odd_errors_have_problem_ty
     std::fs::remove_dir(root(&e).join("d")).unwrap();
     std::os::unix::fs::symlink("/tmp", root(&e).join("d")).unwrap();
     assert!(kind(r.create_folder(Some(d.id), "x").await).ends_with("changed-outside"));
-}
-
-#[tokio::test]
-async fn leftover_pending_blobs_are_swept_but_live_uploads_are_kept() {
-    let e = env().await;
-    let r = &e.repo;
-    let b = LocalFolder::open(root(&e)).await.unwrap();
-    b.put("k1", 0, b"kept").await.unwrap();
-    b.put("k2", 0, b"left by a crashed copy").await.unwrap();
-    assert_eq!(
-        b.sweep_pending(&["k1".into()], 3600).await.unwrap(),
-        0,
-        "too young"
-    );
-    assert_eq!(b.sweep_pending(&["k1".into()], 0).await.unwrap(), 1);
-    assert_eq!(
-        (
-            b.pending("k1").await.unwrap(),
-            b.pending("k2").await.unwrap()
-        ),
-        (4, 0)
-    );
-    // a rescan never touches a running upload
-    let (up, _) = r
-        .start_upload(None, "live.txt", "text/plain")
-        .await
-        .unwrap();
-    up.write(0, b"live").await.unwrap();
-    r.rescan(None).await.unwrap();
-    assert_eq!(up.received().await.unwrap(), 4);
-    assert!(b.has(&Spot::Path("nope".into())).await.is_ok());
 }

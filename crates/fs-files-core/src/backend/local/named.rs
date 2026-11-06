@@ -42,7 +42,8 @@ impl LocalFolder {
             None => hash_chunks(size, |o, l| io::read_range(&from, o, l)).await?,
         };
         self.prepare_target(&to).await?;
-        io::rename_new(&from, &to).map_err(|e| io::named(e, &format!("publish {key}")))?;
+        io::rename_new(&from, &to, self.native)
+            .map_err(|e| io::named(e, &format!("publish {key}")))?;
         self.sync_parent(&to).await?;
         self.sync_parent(&from).await?;
         Ok(BlobInfo {
@@ -56,7 +57,8 @@ impl LocalFolder {
         let source = path::spot_path(&self.root, from)?;
         let target = path::spot_path(&self.root, to)?;
         self.prepare_target(&target).await?;
-        io::rename_new(&source, &target).map_err(|e| io::named(e, &describe(from, to)))?;
+        io::rename_new(&source, &target, self.native)
+            .map_err(|e| io::named(e, &describe(from, to)))?;
         self.sync_parent(&target).await?;
         self.sync_parent(&source).await
     }

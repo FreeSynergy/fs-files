@@ -14,6 +14,9 @@ pub struct Fake {
     uploads: Mutex<HashMap<String, BTreeMap<usize, Vec<u8>>>>,
     pub multiparts_started: AtomicUsize,
     pub fail_deletes: AtomicBool,
+    limit: AtomicUsize,
+    calls: AtomicUsize,
+    dead: AtomicBool,
 }
 
 fn err(m: &str) -> Error {
@@ -21,6 +24,35 @@ fn err(m: &str) -> Error {
 }
 
 impl Fake {
+    /// The process "crashes" at the n-th API call from now (1-based): that call and every later one fail without effect.
+    pub fn crash_at(&self, n: usize) {
+        self.calls.store(0, Ordering::SeqCst);
+        self.dead.store(false, Ordering::SeqCst);
+        self.limit.store(n, Ordering::SeqCst);
+    }
+    /// The "restart": calls work again. Returns how many calls were made since `crash_at`.
+    pub fn restart(&self) -> usize {
+        self.limit.store(0, Ordering::SeqCst);
+        self.dead.store(false, Ordering::SeqCst);
+        self.calls.load(Ordering::SeqCst)
+    }
+    pub fn crashed(&self) -> bool {
+        self.dead.load(Ordering::SeqCst)
+    }
+    fn gate(&self) -> Result<()> {
+        if self.dead.load(Ordering::SeqCst) {
+            return Err(err("crashed"));
+        }
+        let limit = self.limit.load(Ordering::SeqCst);
+        if limit > 0 && self.calls.fetch_add(1, Ordering::SeqCst) + 1 >= limit {
+            self.dead.store(true, Ordering::SeqCst);
+            return Err(err("crashed"));
+        }
+        Ok(())
+    }
+    pub fn object(&self, key: &str) -> Option<Vec<u8>> {
+        self.objects.lock().unwrap().get(key).cloned()
+    }
     pub fn keys(&self) -> Vec<String> {
         let mut k: Vec<_> = self.objects.lock().unwrap().keys().cloned().collect();
         k.sort();
@@ -34,10 +66,12 @@ impl Fake {
 #[async_trait]
 impl ObjectApi for Fake {
     async fn put(&self, key: &str, data: Vec<u8>) -> Result<()> {
+        self.gate()?;
         self.objects.lock().unwrap().insert(key.into(), data);
         Ok(())
     }
     async fn head(&self, key: &str) -> Result<Option<u64>> {
+        self.gate()?;
         Ok(self
             .objects
             .lock()
@@ -46,6 +80,7 @@ impl ObjectApi for Fake {
             .map(|v| v.len() as u64))
     }
     async fn get_range(&self, key: &str, start: u64, end: u64) -> Result<Option<Vec<u8>>> {
+        self.gate()?;
         let objects = self.objects.lock().unwrap();
         let Some(v) = objects.get(key) else {
             return Ok(None);
@@ -56,6 +91,7 @@ impl ObjectApi for Fake {
         Ok(Some(v[start as usize..end as usize].to_vec()))
     }
     async fn delete(&self, key: &str) -> Result<()> {
+        self.gate()?;
         if self.fail_deletes.load(Ordering::SeqCst) {
             return Err(err("injected delete failure"));
         }
@@ -63,6 +99,7 @@ impl ObjectApi for Fake {
         Ok(())
     }
     async fn list(&self, prefix: &str) -> Result<Vec<ObjectEntry>> {
+        self.gate()?;
         let objects = self.objects.lock().unwrap();
         let mut found: Vec<_> = objects
             .iter()
@@ -76,6 +113,7 @@ impl ObjectApi for Fake {
         Ok(found)
     }
     async fn create_multipart(&self, key: &str) -> Result<String> {
+        self.gate()?;
         let n = self.multiparts_started.fetch_add(1, Ordering::SeqCst);
         let id = format!("upload-{n}");
         self.uploads
@@ -85,6 +123,7 @@ impl ObjectApi for Fake {
         Ok(id)
     }
     async fn put_part(&self, key: &str, id: &str, index: usize, data: Vec<u8>) -> Result<String> {
+        self.gate()?;
         if index >= 10_000 {
             return Err(err("InvalidPart: more than 10000 parts"));
         }
@@ -97,6 +136,7 @@ impl ObjectApi for Fake {
         Ok(etag)
     }
     async fn complete(&self, key: &str, id: &str, etags: Vec<String>) -> Result<()> {
+        self.gate()?;
         let mut uploads = self.uploads.lock().unwrap();
         let parts = uploads
             .remove(&format!("{key}#{id}"))
@@ -117,6 +157,7 @@ impl ObjectApi for Fake {
         Ok(())
     }
     async fn abort(&self, key: &str, id: &str) -> Result<()> {
+        self.gate()?;
         self.uploads.lock().unwrap().remove(&format!("{key}#{id}"));
         Ok(())
     }

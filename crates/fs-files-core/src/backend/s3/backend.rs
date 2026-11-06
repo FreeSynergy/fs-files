@@ -14,6 +14,7 @@ use fs_interfaces::Capabilities;
 use super::api::ObjectApi;
 use super::layout::Layout;
 use super::state::{self, Pending, Piece, Saved};
+use crate::backend::Spot;
 use crate::backend::digest::{Digests, hash_chunks};
 use crate::backend::key::check_key;
 use crate::backend::lock::KeyLocks;
@@ -54,6 +55,19 @@ pub struct S3Backend {
 }
 
 impl S3Backend {
+    /// Abort the multipart upload of `p` unless it is already completed (then the object exists with
+    /// the saved size and there is nothing to abort; S3 would answer "no such upload").
+    async fn abort_open_upload(&self, key: &str, p: &Pending) -> Result<()> {
+        let Some(id) = &p.saved.id else {
+            return Ok(());
+        };
+        let target = self.layout.data(key);
+        if p.saved.completing && self.api.head(&target).await? == Some(p.saved.size) {
+            return Ok(());
+        }
+        self.api.abort(&target, id).await
+    }
+
     /// A backend over `api` (see [`ObjectStoreApi`](super::ObjectStoreApi) for a real bucket).
     pub fn new(api: Arc<dyn ObjectApi>, options: &S3Options) -> Result<Self> {
         if options.part_size < MIN_PART_SIZE {
@@ -194,24 +208,40 @@ impl BlobBackend for S3Backend {
             .take(key)
             .await?
             .ok_or_else(|| Error::NotFound(format!("nothing pending for {key}")))?;
-        let size = p.received();
-        let target = self.layout.data(key);
-        if let Some(id) = p.saved.id.clone() {
-            self.flush(key, &mut p, true).await?; // the last part may be small
-            let etags = p.saved.parts.iter().map(|x| x.etag.clone()).collect();
-            self.api.complete(&target, &id, etags).await?;
+        let size = if p.saved.completing {
+            p.saved.size
         } else {
-            let mut data = Vec::new(); // a file under one part: a plain put, no multipart at all
-            for piece in &p.tail {
-                let name = self.layout.tail(key, piece.offset);
-                data.extend(
-                    self.api
-                        .get_range(&name, 0, piece.size)
-                        .await?
-                        .unwrap_or_default(),
-                );
+            p.received()
+        };
+        let target = self.layout.data(key);
+        let done = p.saved.completing && self.api.head(&target).await? == Some(size);
+        if !done {
+            // Make room: an older object of that key goes (a commit replaces), so that from the marker
+            // on, an object of the right size can only be this upload's.
+            if self.api.head(&target).await?.is_some() {
+                self.api.delete(&target).await?;
             }
-            self.api.put(&target, data).await?;
+            if let Some(id) = p.saved.id.clone() {
+                self.flush(key, &mut p, true).await?; // the last part may be small
+                p.saved.completing = true;
+                p.saved.size = size;
+                state::save(&*self.api, &self.layout, key, &p.saved).await?;
+                let etags = p.saved.parts.iter().map(|x| x.etag.clone()).collect();
+                self.api.complete(&target, &id, etags).await?;
+            } else {
+                let mut data = Vec::new(); // a file under one part: a plain put, no multipart at all
+                for piece in &p.tail {
+                    let name = self.layout.tail(key, piece.offset);
+                    let got = self.api.get_range(&name, 0, piece.size).await?;
+                    data.extend(
+                        got.ok_or_else(|| Error::Backend("a tail piece is missing".into()))?,
+                    );
+                }
+                p.saved.completing = true;
+                p.saved.size = size;
+                state::save(&*self.api, &self.layout, key, &p.saved).await?;
+                self.api.put(&target, data).await?;
+            }
         }
         self.clear(key).await?;
         let checksum = match self.digests.finish(key, size) {
@@ -225,12 +255,35 @@ impl BlobBackend for S3Backend {
         })
     }
 
+    /// Dropping an unfinished upload (`Pending`) removes its parts, pieces and state, **never the finished
+    /// object**: after a crash between "object made" and "state cleared" the object may already be a
+    /// file's. Deleting the object is `Path` (or `delete`).
+    async fn discard(&self, spot: &Spot) -> Result<()> {
+        match spot {
+            Spot::Path(key) => self.delete(key).await,
+            Spot::Pending(key) => {
+                check_key(key)?;
+                let _guard = self.locks.lock(key).await;
+                self.digests.forget(key);
+                if let Some(p) = self.take(key).await? {
+                    self.abort_open_upload(key, &p).await?;
+                }
+                self.clear(key).await
+            }
+            Spot::Trash(_) => Err(fs_interfaces::Unsupported::new(
+                "blob.rename",
+                "this backend keeps its bytes by id, not under real names",
+            )
+            .into()),
+        }
+    }
+
     async fn delete(&self, key: &str) -> Result<()> {
         check_key(key)?;
         let _guard = self.locks.lock(key).await;
         self.digests.forget(key);
-        if let Some(id) = self.take(key).await?.and_then(|p| p.saved.id) {
-            self.api.abort(&self.layout.data(key), &id).await?;
+        if let Some(p) = self.take(key).await? {
+            self.abort_open_upload(key, &p).await?;
         }
         self.clear(key).await?;
         self.api.delete(&self.layout.data(key)).await

@@ -70,9 +70,9 @@ pub(super) async fn remove_quiet(path: &Path) -> Result<()> {
 /// On Linux this is one atomic `renameat2(RENAME_NOREPLACE)`. Without the flag (old kernel, a file system
 /// that lacks it, other systems) a file is moved by hard link + unlink, which is atomic and never replaces;
 /// a folder by "look, then rename", which is **not** atomic (see the comment in the body).
-pub(super) fn rename_new(from: &Path, to: &Path) -> std::io::Result<()> {
+pub(super) fn rename_new(from: &Path, to: &Path, native: bool) -> std::io::Result<()> {
     #[cfg(target_os = "linux")]
-    {
+    if native {
         use rustix::fs::{CWD, RenameFlags, renameat_with};
         use rustix::io::Errno;
         match renameat_with(CWD, from, CWD, to, RenameFlags::NOREPLACE) {
@@ -81,6 +81,8 @@ pub(super) fn rename_new(from: &Path, to: &Path) -> std::io::Result<()> {
             Err(e) => return Err(e.into()),
         }
     }
+    #[cfg(not(target_os = "linux"))]
+    let _ = native;
     // Fallback. A file is moved by hard link + unlink, which refuses an existing target atomically
     // (POSIX `link`). A folder cannot be linked: "look, then rename" is the best there is, and a folder
     // created in between could be replaced if it is empty (never one with content).

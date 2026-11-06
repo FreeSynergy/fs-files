@@ -46,6 +46,7 @@ impl FileRepo {
         let name = self
             .resolve_name(parent, name, Some(id), on, false, Some(&old))
             .await?;
+        self.check_folder_fits(id, parent, &name).await?;
         let steps = self
             .move_steps(parent, &o.envelope.name, parent, &name)
             .await?;
@@ -70,6 +71,7 @@ impl FileRepo {
         let name = self
             .resolve_name(parent, &o.envelope.name, Some(id), on, false, same)
             .await?;
+        self.check_folder_fits(id, parent, &name).await?;
         let from = FolderRecord::of(&o)?.parent;
         let steps = self
             .move_steps(from, &o.envelope.name, parent, &name)

@@ -4,7 +4,9 @@
 //! the folder names and the file name when needed. So renaming or moving a folder is one directory
 //! rename on the disk and one record in the database, and the files below follow by themselves.
 
-use fs_store::{ObjectId, StoredObject};
+use fs_store::{ObjectId, Query, StoredObject};
+
+use super::consts::CONTEXT;
 
 use super::handle::FileRepo;
 use crate::backend::{BlobBackend, Naming};
@@ -13,6 +15,9 @@ use crate::model::{FileRecord, FolderRecord};
 
 /// Folders nested deeper than this are refused (also stops a damaged parent loop).
 const MAX_DEPTH: usize = 512;
+/// Longest path the local disk takes (`PATH_MAX`).
+const MAX_PATH: usize = 4096;
+const PAGE: usize = 500;
 
 impl FileRepo {
     /// Names from the top down to `folder` (empty for the top level).
@@ -24,7 +29,7 @@ impl FileRepo {
             names.push(o.envelope.name.clone());
             at = FolderRecord::of(&o)?.parent;
             if names.len() > MAX_DEPTH {
-                return Err(Error::Conflict("folders are nested too deep".into()));
+                return Err(Error::InvalidName("folders are nested too deep".into()));
             }
         }
         names.reverse();
@@ -45,6 +50,50 @@ impl FileRepo {
         } else {
             Ok(r.key.clone())
         }
+    }
+
+    /// Before a folder is moved or renamed: its deepest subfolder must still have a path the disk takes
+    /// (at most `MAX_PATH` bytes and `MAX_DEPTH` levels). Otherwise `InvalidName` and nothing is changed.
+    pub(super) async fn check_folder_fits(
+        &self,
+        id: ObjectId,
+        parent: Option<ObjectId>,
+        name: &str,
+    ) -> Result<()> {
+        if self.backends.named().is_empty() {
+            return Ok(());
+        }
+        let base = self.path_in(parent, name).await?;
+        let depth = base.split('/').count();
+        let too_long = || {
+            Error::InvalidName(format!(
+                "moving {name:?} here would make paths longer than the disk takes ({MAX_PATH} bytes, {MAX_DEPTH} levels)"
+            ))
+        };
+        let mut level = vec![(id, base.len(), depth)];
+        while let Some((folder, len, levels)) = level.pop() {
+            if len > MAX_PATH || levels > MAX_DEPTH {
+                return Err(too_long());
+            }
+            let mut seen = 0;
+            loop {
+                let mut q = Query::new()
+                    .in_context(CONTEXT)
+                    .with_index("kind", "folder")
+                    .with_index("folder", folder.to_string())
+                    .limit(PAGE);
+                q.offset = seen;
+                let rows = self.reads.query(&q).await?;
+                seen += rows.len();
+                for o in &rows {
+                    level.push((o.envelope.id, len + 1 + o.envelope.name.len(), levels + 1));
+                }
+                if rows.len() < PAGE {
+                    break;
+                }
+            }
+        }
+        Ok(())
     }
 
     /// True if new files on this backend go under their real names.

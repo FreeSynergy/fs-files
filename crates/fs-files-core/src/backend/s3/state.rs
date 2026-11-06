@@ -23,6 +23,14 @@ pub(super) struct Saved {
     /// Multipart id; `None` until the first part is due (small files never need one).
     pub id: Option<String>,
     pub parts: Vec<PartRec>,
+    /// Set (and saved) right before the object is made. From then on "the object exists with the
+    /// expected size" means the upload is done and only the clean-up is left, so a retried commit
+    /// does not try to complete a multipart upload that is already completed.
+    #[serde(default)]
+    pub completing: bool,
+    /// Size of the finished object, saved with the marker (the pieces may be half deleted by then).
+    #[serde(default)]
+    pub size: u64,
 }
 
 /// A small piece of the upload that is not in a part yet.
