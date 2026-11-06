@@ -167,6 +167,12 @@ impl BlobBackend for S3Backend {
                 Pending::default()
             }
         };
+        if p.saved.completing {
+            self.keep(key, p);
+            return Err(Error::Conflict(
+                "this upload is being finished; call finish again instead of writing".into(),
+            ));
+        }
         if p.received() != offset {
             let expected = p.received();
             self.keep(key, p);
@@ -221,11 +227,15 @@ impl BlobBackend for S3Backend {
             if self.api.head(&target).await?.is_some() {
                 self.api.delete(&target).await?;
             }
-            if let Some(id) = p.saved.id.clone() {
-                self.flush(key, &mut p, true).await?; // the last part may be small
+            if !p.saved.completing {
+                // The marker comes first: from here on no more bytes are taken (`put` refuses), so a
+                // finish that was cut short can only be finished, never extended into a broken object.
                 p.saved.completing = true;
                 p.saved.size = size;
                 state::save(&*self.api, &self.layout, key, &p.saved).await?;
+            }
+            if let Some(id) = p.saved.id.clone() {
+                self.flush(key, &mut p, true).await?; // the last part may be small
                 let etags = p.saved.parts.iter().map(|x| x.etag.clone()).collect();
                 self.api.complete(&target, &id, etags).await?;
             } else {
@@ -237,9 +247,6 @@ impl BlobBackend for S3Backend {
                         got.ok_or_else(|| Error::Backend("a tail piece is missing".into()))?,
                     );
                 }
-                p.saved.completing = true;
-                p.saved.size = size;
-                state::save(&*self.api, &self.layout, key, &p.saved).await?;
                 self.api.put(&target, data).await?;
             }
         }

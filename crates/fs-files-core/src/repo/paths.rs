@@ -70,11 +70,13 @@ impl FileRepo {
                 "moving {name:?} here would make paths longer than the disk takes ({MAX_PATH} bytes, {MAX_DEPTH} levels)"
             ))
         };
+        let mut longest = base.len();
         let mut level = vec![(id, base.len(), depth)];
         while let Some((folder, len, levels)) = level.pop() {
             if len > MAX_PATH || levels > MAX_DEPTH {
                 return Err(too_long());
             }
+            longest = longest.max(len);
             let mut seen = 0;
             loop {
                 let mut q = Query::new()
@@ -91,6 +93,21 @@ impl FileRepo {
                 if rows.len() < PAGE {
                     break;
                 }
+            }
+        }
+        // The disk's own limit counts its root too: ask each backend about a path as long as the longest.
+        let mut probe: String = vec!["p".repeat(100); longest / 101 + 1]
+            .join("/")
+            .chars()
+            .take(longest)
+            .collect();
+        if probe.ends_with('/') {
+            probe.pop();
+            probe.push('p');
+        }
+        for (_, backend) in self.backends.named() {
+            if matches!(backend.stat(&probe).await, Err(Error::InvalidKey(_))) {
+                return Err(too_long());
             }
         }
         Ok(())

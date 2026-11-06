@@ -28,8 +28,6 @@ pub(super) const SNIFF: u32 = 8192;
 const MAX_DEPTH: usize = 512;
 /// Records are read this many at a time.
 const BATCH: usize = 1000;
-/// Unfinished blobs older than this that belong to no upload are leftovers of a crash.
-pub(super) const ORPHAN_AFTER_SECS: u64 = 3600;
 
 /// One backend being walked.
 pub(super) struct Walk {

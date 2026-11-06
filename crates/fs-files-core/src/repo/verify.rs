@@ -11,6 +11,8 @@ use crate::error::{Error, Result};
 use crate::model::FileRecord;
 
 const READ: u32 = 1 << 20;
+/// Files up to this size are always checked by checksum before a destructive step (256 MiB).
+pub(super) const ALWAYS_HASH: u64 = 256 << 20;
 
 /// The error for bytes that are not the recorded ones.
 pub(super) fn changed(why: &str) -> Error {
@@ -48,8 +50,12 @@ impl FileRepo {
                 info.size, r.size
             )));
         }
-        let same_time = r.modified == Some(info.modified);
-        if same_time || info.modified == 0 {
+        // Before anything is moved or deleted (`deep`) the checksum always decides, up to `ALWAYS_HASH`
+        // bytes: a stranger's file of the same size whose modification time was copied (`touch -r`) must
+        // not pass. Above that size the time is trusted (reading a file of that size on every trash
+        // would be too slow); DESIGN states the limit.
+        let same_time = r.modified == Some(info.modified) || info.modified == 0;
+        if same_time && !(deep && info.size <= ALWAYS_HASH) {
             return Ok(());
         }
         if !deep {

@@ -181,15 +181,22 @@ impl Upload for UploadSession {
     async fn write(&self, offset: u64, data: &[u8]) -> Result<()> {
         self.repo.session_obj(self.id).await?; // finished or aborted sessions take nothing
         let backend = self.repo.backends.get(&self.rec.backend)?;
+        if offset == 0 && self.committed_size(&*backend).await?.is_some() {
+            return Err(Error::Conflict(
+                "all bytes of this upload are in place; call finish".into(),
+            ));
+        }
         backend.put(&self.rec.key, offset, data).await
     }
 
     async fn received(&self) -> Result<u64> {
-        self.repo
-            .backends
-            .get(&self.rec.backend)?
-            .pending(&self.rec.key)
-            .await
+        let backend = self.repo.backends.get(&self.rec.backend)?;
+        // After a commit whose record could not be written, the bytes are no longer pending but
+        // committed: report their size, so a client does not start over on top of them.
+        if let Some(size) = self.committed_size(&*backend).await? {
+            return Ok(size);
+        }
+        backend.pending(&self.rec.key).await
     }
 
     async fn finish(&self) -> Result<crate::model::File> {
@@ -218,6 +225,17 @@ impl Upload for UploadSession {
 }
 
 impl UploadSession {
+    /// Size of the blob if it was committed already (and nothing is pending any more).
+    async fn committed_size(
+        &self,
+        backend: &dyn crate::backend::BlobBackend,
+    ) -> Result<Option<u64>> {
+        if backend.pending(&self.rec.key).await? != 0 {
+            return Ok(None);
+        }
+        Ok(backend.stat(&self.rec.key).await?.map(|i| i.size))
+    }
+
     async fn discard_bytes(&self) -> Result<()> {
         self.repo
             .backends

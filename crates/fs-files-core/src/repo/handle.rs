@@ -29,6 +29,7 @@ pub struct FileRepo {
     pub(super) page: usize,
     pub(super) lock: Arc<Mutex<()>>,
     /// One lock per upload: finishing the same upload twice at once is serialised, the second gets the first's file.
+    pub(super) orphan_after_secs: u64,
     pub(super) uploads: Arc<crate::backend::lock::KeyLocks>,
 }
 
@@ -67,6 +68,7 @@ impl FileRepo {
             instance: "local.invalid".into(),
             page: PAGE,
             lock: Arc::new(Mutex::new(())),
+            orphan_after_secs: 30 * 24 * 3600,
             uploads: Arc::default(),
         }
     }
@@ -75,6 +77,14 @@ impl FileRepo {
     #[must_use]
     pub fn with_instance(mut self, instance: impl Into<String>) -> Self {
         self.instance = instance.into();
+        self
+    }
+
+    /// Unfinished blobs that belong to no upload are removed by `rescan` only after this long (default 30
+    /// days): a quiet upload, or one of another store on the same root, must survive.
+    #[must_use]
+    pub fn with_orphan_after(mut self, age: std::time::Duration) -> Self {
+        self.orphan_after_secs = age.as_secs();
         self
     }
 

@@ -58,14 +58,24 @@ impl FileRepo {
         name: &str,
         except: Option<ObjectId>,
     ) -> Result<()> {
+        // One index condition only (the store's cost grows with every condition); the folder and the
+        // trash flag are looked at here, on the few entries that have this name.
         let q = Query::new()
             .in_context(CONTEXT)
-            .with_index("folder", folder_key(folder))
-            .with_index("trashed", "false")
-            .with_index("name_exact", name)
-            .limit(2);
+            .with_index("name_exact", name);
+        let (folder, live) = (folder_key(folder), ["false".to_string()]);
+        let has = |o: &fs_store::StoredObject, k: &str, v: &[String]| {
+            o.index.get(k).is_some_and(|x| x.as_slice() == v)
+        };
         let taken = self.reads.query(&q).await?;
-        if taken.iter().any(|o| Some(o.envelope.id) != except) {
+        let clash = |o: &&fs_store::StoredObject| {
+            has(o, "folder", std::slice::from_ref(&folder)) && has(o, "trashed", &live)
+        };
+        if taken
+            .iter()
+            .filter(clash)
+            .any(|o| Some(o.envelope.id) != except)
+        {
             return Err(Error::name_taken(format!(
                 "the name {name:?} is taken in this folder"
             )));
@@ -73,7 +83,6 @@ impl FileRepo {
         Ok(())
     }
 
-    /// Entries of any kind (live or trashed) directly in `folder`.
     /// The name to use in `folder`: `name` if free, else by the rule `on`. `Refuse` fails with a name clash;
     /// `KeepBoth` takes the first numbered name that is free in the records **and on the disks that keep
     /// real names**. `current` is the name the entry already has in this folder (its own path is no clash).

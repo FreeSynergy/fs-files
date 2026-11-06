@@ -51,6 +51,12 @@ pub(super) fn name_ok(name: &str) -> bool {
 /// Path of the committed blob or folder `key`.
 pub(super) fn final_path(root: &Path, key: &str) -> Result<PathBuf> {
     let segments = check_path(key)?;
+    // The limit is on the whole path, root included: the file system would answer "name too long".
+    if root.as_os_str().len() + 1 + key.len() > MAX_PATH {
+        return Err(Error::InvalidKey(format!(
+            "path too long for this file system ({MAX_PATH} bytes with the root): {key:?}"
+        )));
+    }
     let mut path = root.to_path_buf();
     path.extend(&segments);
     refuse_symlinks(root, &path)?;

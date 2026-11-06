@@ -57,12 +57,14 @@ impl FileRepo {
             .await?;
         let mut r = src_rec.clone();
         r.folder = folder;
-        r.modified = None;
+        r.modified = None; // set below from what the backend reports
+        r.upload = None; // the copy is not the result of the source's upload
         let mut undo = None;
         if Self::is_named(backend) {
             let key = self.path_in(folder, &name).await?;
             let info = backend.publish(tmp, &key).await?;
             r.named = true;
+            r.modified = (info.modified != 0).then_some(info.modified);
             r.key = String::new();
             // what publish did; its undo moves the copy back to pending
             let published = Disk::Move(Spot::Pending(tmp.to_string()), Spot::Path(key));

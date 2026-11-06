@@ -3,7 +3,7 @@
 `fs-files` is the files program of FreeSynergy. This repo holds the **program core** (`crates/fs-files-core`, no GUI).
 **Metadata** (name, media type, size, checksum, folder, trash flag) is an object in `fs-store`; the **bytes** are in a
 backend behind `BlobBackend`. Other programs refer to a file by its object id and read through the `Blob` trait; they never
-see a path or a backend. Contract: `files.capnp` in `fs-interfaces` v0.14.0 (draft, consumers: 0 of 2).
+see a path or a backend. Contract: `files.capnp` in `fs-interfaces` v0.28.0 (draft, consumers: 0 of 2).
 
 ## State
 
@@ -34,7 +34,7 @@ Version 0.2.1 (stage 1: local folder, stage 2: S3, stage 3: real names). Built o
 | One behaviour suite as functions over `&dyn BlobBackend` (`tests/common/{suite,stream}.rs`), run on `LocalFolder`, `S3Backend` over a strict fake S3, `S3Backend` over the `object_store` in-memory store, and (ignored) a live server | done |
 | Live S3: official RustFS image 1.0.4 with podman, localhost only, throwaway credentials: both live tests passed; container removed | verified once (2026-11-06), not part of CI |
 | `sharing`, `file.subscribe`: `Unsupported` with the plain reason; versions, encryption, sync, WebDAV, previews: not built | as agreed |
-| Tests | 109 run by default (88 without the `s3` feature) + 2 ignored live tests |
+| Tests | 121 run by default (97 without the `s3` feature) + 2 ignored live tests |
 
 ## Structure and pattern map (ADR 0043)
 
@@ -76,8 +76,8 @@ Version 0.2.1 (stage 1: local folder, stage 2: S3, stage 3: real names). Built o
   system the disk reports the clash and that is a `Conflict` too, never an overwrite. A copy gets `name (copy).ext`. A name may not
   be empty, longer than 255 bytes, `.` / `..`, contain `/`, `\` or control characters, or be `.fs-files`.
 * **Never overwrite.** Every create is create-new, every move is a no-replace rename. Linux: one atomic `renameat2(RENAME_NOREPLACE)`
-  (crate `rustix`, no unsafe in our code). Without the flag (old kernel, a file system that lacks it, other systems) a **file** is moved by hard link + unlink (atomic, never
-  replaces; tested by switching the native call off with `LocalFolder::without_native_rename`); a **folder** by "look, then rename", which is not atomic and could replace an *empty folder* created in between (never a
+  (crate `rustix`, no unsafe in our code). Without the flag (old kernel, a file system that lacks it, other systems) a **file** is moved by hard link + unlink (never replaces; both names exist for an instant, and after a crash
+  in that instant two names stay, which `rescan` shows as a new file; tested by switching the native call off with `LocalFolder::without_native_rename`); a **folder** by "look, then rename", which is not atomic and could replace an *empty folder* created in between (never a
   file, never a folder with content). `LocalFolder::commit` never replaces either. Atomic: publish of an upload, file rename / move, trash, restore, folder rename / move. Not atomic: the pair of disk step
   and database step (see next point), and the fallback above. Creating a folder is `mkdir` (atomic, fails if it exists).
 * **Order and crashes: disk first, then the database.** If the database step fails, the disk step is undone. If the process dies
@@ -90,7 +90,7 @@ Version 0.2.1 (stage 1: local folder, stage 2: S3, stage 3: real names). Built o
 * **Changes from outside the program: PROVISIONAL, the owner may change this.** `rescan(folder)` (recursive): new files and folders
   are taken over (checksum read from the bytes, type from the first bytes); a file with a different size or modification time gets new
   size and checksum; a file without bytes is **reported and its record is kept**; symlinks and odd names are listed as skipped.
-  Opening a file whose size or modification time no longer matches the record is an error ("changed outside"), not wrong data; before a file is moved, trashed or restored by a record, its bytes are checked (size, modification time, on doubt the checksum) and a mismatch changes nothing. A folder rename or move never merges into a path that exists on the disk (`Conflict`), and is refused up front (`InvalidName`) when its deepest subfolder would pass 4096 bytes or 512 levels. Rescan reads all records once, walks with a work list (no recursion, depth limit 512), reports what it cannot handle and goes on, never rebinds a record to a stranger's file after a crash in the trash, and removes pending blobs of no upload older than an hour. The store's own filtered queries cost about a second per condition per 1000 records (fs-store), which makes `require_free` slow in big folders. Nothing is detected live (no watcher),
+  Before a destructive step (trash, rename, move, restore) the checksum is always compared for files up to 256 MiB (so a stranger's file with a copied modification time does not pass); above that size the modification time is trusted. Opening a file checks only size and modification time. Opening a file whose size or modification time no longer matches the record is an error ("changed outside"), not wrong data; before a file is moved, trashed or restored by a record, its bytes are checked (size, modification time, on doubt the checksum) and a mismatch changes nothing. A folder rename or move never merges into a path that exists on the disk (`Conflict`), and is refused up front (`InvalidName`) when its deepest subfolder would pass 4096 bytes or 512 levels. Rescan reads all records once, walks with a work list (no recursion, depth limit 512), reports what it cannot handle and goes on, never rebinds a record to a stranger's file after a crash in the trash, and removes pending blobs of no upload only when they are older than 30 days (`FileRepo::with_orphan_after`; a quiet upload or one of another store on the same root must survive). The store's filtered queries cost grows with every index condition (about a second per condition per 1000 records in a debug build); `require_free` therefore asks with one condition (the exact name) and filters folder and trash flag itself. With 2000 records in a release build an upload takes about 5 ms and a rename about 1.5 ms. Not done: the folder-fit check counts folders only (a long file name in the deepest folder can still pass the limit; the disk then answers `InvalidName` at that file), and `purge` deletes the trash entry without reading it. Nothing is detected live (no watcher),
   and the whole rescan holds the program's write lock. Same-size edits inside one mtime tick are not seen.
 * **Records of the first version** (id-keyed `xx/<id>` files in the local root, no `named` flag, no `name_exact` index) keep working
   for reading; `rescan` skips them. They are not migrated: stage 1 never had a consumer. Their `xx` folders stay in the root.
@@ -119,6 +119,8 @@ The blake3 checksum is taken while streaming; after a restart (or a failed put) 
 
 ## S3: commit crash safety
 
+One finish per upload at a time (a per-upload lock); a second finish returns the first's file, and `abort` takes the same locks. The marker below is saved before anything else in `commit`, and `put` refuses once it is set, so a cut-short finish can only be finished. After a commit whose record could not be written, `received` reports the committed size and a `write` at 0 is refused.
+
 `commit` saves a completion marker (with the object's size) in the state before it makes the object, and first removes an older
 object of the same key, so from the marker on an object of that size can only be this upload's. A retry after a crash at any step
 sees the marker and the object and only cleans up; before the object exists it makes it again (the pieces are not deleted until the
@@ -141,7 +143,7 @@ renames on case-insensitive file systems are not special-cased.
 
 ## Crates
 
-* `fs-store` (v0.2.0), `fs-interfaces` (v0.14.0): git tags.
+* `fs-store` (v0.2.0), `fs-interfaces` (v0.28.0): git tags.
 * `rustix` 1 (MIT OR Apache-2.0, Linux only, features `std` + `fs`): `renameat2` with `RENAME_NOREPLACE`, the atomic no-replace rename that `std` lacks. No C code with its default backend, already in the lock file through other crates.
 * `blake3` 1.8 (CC0-1.0 OR Apache-2.0): checksums, with the `pure` feature (no C / assembly). Fast enough for a first version.
 * `infer` 0.22 (MIT): media type from the first bytes when the caller gives none; pure Rust, no dependencies.
@@ -155,7 +157,7 @@ renames on case-insensitive file systems are not special-cased.
 
 ## Contract
 
-`files.capnp` in `fs-interfaces` v0.14.0 (draft 0.2). Appended for real names: `Folders.rescan @13` and `RescanReport`; `BlobBackend`
+`files.capnp` in `fs-interfaces` v0.28.0 (draft 0.2). Appended for real names: `Folders.rescan @13` and `RescanReport`; `BlobBackend`
 `naming`, `publish`, `relocate`, `discard`, `makeDir`, `removeDir`, `scan` (@7 to @13) with `Spot`, `Scanned`, `ScanKind`; the problem types
 `nameConflictProblemType` (409), `invalidNameProblemType` (422), `changedOutsideProblemType` (409); and the statement that `Envelope.name` of a
 file and a folder IS its real name (not derived). In the core `Error::problem()` makes the mapping; a name clash is still `Error::Conflict`.

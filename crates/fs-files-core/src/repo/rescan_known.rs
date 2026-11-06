@@ -6,7 +6,7 @@
 use fs_store::{ObjectId, StoredObject};
 
 use super::handle::FileRepo;
-use super::rescan::{Item, ORPHAN_AFTER_SECS, SNIFF, Walk};
+use super::rescan::{Item, SNIFF, Walk};
 use super::steps::{Disk, Step};
 use super::verify::checksum_at;
 use crate::backend::{ScanKind, Scanned, Spot};
@@ -120,7 +120,18 @@ impl FileRepo {
             ),
             false,
         );
-        if matches!(back.apply().await, Ok(true)) {
+        // Put it back only if what comes out of the trash folder is the recorded file; a stray file in
+        // that spot (not ours) goes back and the record stays reported as missing.
+        let restored = matches!(back.apply().await, Ok(true));
+        let ours = restored
+            && self
+                .verify_bytes(&*walk.backend, at, &o.envelope.name, &r, true)
+                .await
+                .is_ok();
+        if restored && !ours {
+            back.undo().await;
+        }
+        if ours {
             report.updated.push(File::of(o)?);
         } else {
             report.missing.push(File::of(o)?);
@@ -131,7 +142,10 @@ impl FileRepo {
     /// Remove unfinished blobs that belong to no upload (a copy that crashed), if they are old enough.
     pub(super) async fn sweep_leftovers(&self, walk: &Walk) {
         if let Ok(keys) = self.session_keys(&walk.id).await {
-            let _ = walk.backend.sweep_pending(&keys, ORPHAN_AFTER_SECS).await;
+            let _ = walk
+                .backend
+                .sweep_pending(&keys, self.orphan_after_secs)
+                .await;
         }
     }
 
