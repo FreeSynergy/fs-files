@@ -3,7 +3,7 @@
 `fs-files` is the files program of FreeSynergy. This repo holds the **program core** (`crates/fs-files-core`, no GUI).
 **Metadata** (name, media type, size, checksum, folder, trash flag) is an object in `fs-store`; the **bytes** are in a
 backend behind `BlobBackend`. Other programs refer to a file by its object id and read through the `Blob` trait; they never
-see a path or a backend. Contract: `files.capnp` in `fs-interfaces` v0.3.0 (draft, consumers: 0 of 2).
+see a path or a backend. Contract: `files.capnp` in `fs-interfaces` v0.5.0 (draft, consumers: 0 of 2).
 
 ## State
 
@@ -104,10 +104,7 @@ the root and races between the check and the use; the root must not be writable 
 * Dev: `tempfile`.
 * Not taken: `opendal` (broad, many services we do not use; its writer hides the multipart id, so an upload could not be resumed after a restart). `rusty-s3` + an own HTTP layer would be pure sans-IO but means writing the client.
 
-## Contract problems found (files.capnp v0.3.0), not changed
+## Contract
 
-1. No way to **list the trash**: `Folders.list` and `Search.find` show live entries only, so a frontend cannot offer `restore`. The Rust `FileFilter` has an extra `trashed` flag.
-2. No **move folder**: `moveFile` exists, `moveFolder` does not. Rust has `move_folder` (capability id `folder.move`, ours).
-3. `BlobBackend` has no way to ask **how much of a pending key is held**; resuming after a restart needs it. Rust has `pending(key)`.
-4. `BlobInfo.checksum` from `stat`: a backend that only knows the size cannot fill it; ours returns "".
-5. `subscribe` takes a `ChangeListener`; the Rust placeholder takes none until it is built.
+The gaps the first version of the contract had are closed in `fs-interfaces` v0.5.0: `moveFolder`, `pending`, `FileFilter.trashed`, and `stat` may leave the checksum empty. The Rust `subscribe` placeholder still takes no listener; it comes with the feed.
+

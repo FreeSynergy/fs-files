@@ -696,7 +696,7 @@ dependencies = [
 
 [[package]]
 name = "fs-files-core"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "async-trait",
  "blake3",
@@ -715,8 +715,8 @@ dependencies = [
 
 [[package]]
 name = "fs-interfaces"
-version = "0.3.0"
-source = "git+https://github.com/FreeSynergy/fs-interfaces?tag=v0.3.0#485ceafe5bffe17999eec4908ad9795dcd9df65e"
+version = "0.5.0"
+source = "git+https://github.com/FreeSynergy/fs-interfaces?tag=v0.5.0#a3573feb6e858423d2ad93bacd21b73c57355b4a"
 dependencies = [
  "capnp",
 ]
