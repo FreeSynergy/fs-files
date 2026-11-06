@@ -13,7 +13,7 @@ s3 = ["dep:object_store", "dep:bytes"]
 
 [dependencies]
 fs-store = { git = "https://github.com/FreeSynergy/fs-store", tag = "v0.2.0" }
-fs-interfaces = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.5.0" }
+fs-interfaces = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.8.0" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
@@ -25,6 +25,10 @@ infer = { version = "0.22", default-features = false, features = ["std"] }
 # S3 client with the low-level multipart API (MultipartStore). Optional: a build without S3 stays free of TLS and C code.
 object_store = { version = "0.14", default-features = false, features = ["aws"], optional = true }
 bytes = { version = "1", optional = true }
+
+# Atomic "rename, but never replace" (renameat2 NOREPLACE): `std::fs::rename` replaces its target.
+[target.'cfg(target_os = "linux")'.dependencies]
+rustix = { version = "1", default-features = false, features = ["std", "fs"] }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }

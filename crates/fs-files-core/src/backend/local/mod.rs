@@ -5,6 +5,7 @@
 
 mod folder;
 mod io;
+mod named;
 mod path;
 
 pub use folder::LocalFolder;

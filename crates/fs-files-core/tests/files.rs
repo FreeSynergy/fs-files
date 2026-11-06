@@ -78,7 +78,7 @@ async fn move_rename_and_copy() {
 
     let other = upload(&e, Some(dir.id), "c.txt", "text/plain", b"c").await;
     assert!(matches!(
-        e.rename_file(other.id, "B (COPY).txt").await,
+        e.rename_file(other.id, "b (copy).txt").await,
         Err(Error::Conflict(_))
     ));
     assert!(matches!(

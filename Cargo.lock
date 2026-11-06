@@ -706,6 +706,7 @@ dependencies = [
  "fs-store",
  "infer",
  "object_store",
+ "rustix 1.1.6",
  "serde",
  "serde_json",
  "tempfile",
@@ -715,8 +716,8 @@ dependencies = [
 
 [[package]]
 name = "fs-interfaces"
-version = "0.5.0"
-source = "git+https://github.com/FreeSynergy/fs-interfaces?tag=v0.5.0#a3573feb6e858423d2ad93bacd21b73c57355b4a"
+version = "0.8.0"
+source = "git+https://github.com/FreeSynergy/fs-interfaces?tag=v0.8.0#1920df331f979bf1289cf1945ecf392f5e0ea061"
 dependencies = [
  "capnp",
 ]

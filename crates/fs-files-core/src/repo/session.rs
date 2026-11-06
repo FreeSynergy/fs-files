@@ -45,6 +45,7 @@ impl FileRepo {
         self.require_folder(folder).await?;
         self.require_free(folder, name, None).await?;
         let (backend_id, backend) = self.backends.active();
+        self.check_target(&*backend, folder, name).await?; // a name the disk refuses fails now, nothing created
         let probe = ObjectId::new();
         let rec = SessionRecord {
             folder,
@@ -113,7 +114,7 @@ impl Upload for UploadSession {
         self.repo
             .backends
             .get(&self.rec.backend)?
-            .delete(&self.rec.key)
+            .discard(&crate::backend::Spot::Pending(self.rec.key.clone()))
             .await?;
         match self.repo.objects.delete(self.id, &self.repo.actor).await {
             Ok(_) | Err(fs_store::Error::NotFound(_)) => Ok(()),

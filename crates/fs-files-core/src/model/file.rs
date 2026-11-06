@@ -44,8 +44,18 @@ pub(crate) struct FileRecord {
     pub trashed: bool,
     /// Id of the backend that holds the bytes.
     pub backend: String,
-    /// Key of the bytes in that backend.
+    /// Key of the bytes in that backend. Empty when `named`: the key is then derived from folder
+    /// and name at the moment it is needed, so renaming a folder changes nothing in its files.
+    #[serde(default)]
     pub key: String,
+    /// The bytes are under the file's real name (path of folder names + name), not under `key`.
+    /// Records without this flag keep their id-based key and keep working.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub named: bool,
+    /// Last change of the file on the disk (ns since the epoch) when size and checksum were taken;
+    /// `rescan` compares it. `None` until the first rescan has looked at it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub modified: Option<i64>,
 }
 
 impl FileRecord {

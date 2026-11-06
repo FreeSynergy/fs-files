@@ -1,7 +1,7 @@
 //! Creating, renaming, moving and deleting folders.
 //!
 //! Pattern: Repository (write side) — a folder is an AS2 `Collection`. Rules: names are unique per
-//! folder (case-insensitive); a folder never moves into itself or below itself; only an empty
+//! folder (exact); a folder never moves into itself or below itself; only an empty
 //! folder (nothing live, nothing in the trash) can be deleted.
 
 use fs_store::ObjectId;
@@ -9,6 +9,8 @@ use fs_store::ObjectId;
 use super::build::set_folder;
 use super::handle::FileRepo;
 use super::names::check_name;
+use super::steps::Disk;
+use crate::backend::Spot;
 use crate::error::{Error, Result};
 use crate::model::{Folder, FolderRecord};
 
@@ -22,9 +24,11 @@ impl FileRepo {
         let _w = self.lock.lock().await;
         self.require_folder(parent).await?;
         self.require_free(parent, name, None).await?;
+        let path = self.path_in(parent, name).await?;
+        let steps = self.named_steps(|| Disk::MakeDir(path.clone()), false);
         let o = self.folder_object(name, parent);
         let folder = Folder::of(&o)?;
-        self.save(o).await?;
+        self.transact(steps, self.save(o)).await?;
         Ok(folder)
     }
 
@@ -34,10 +38,13 @@ impl FileRepo {
         let mut o = self.folder_obj(id).await?;
         let parent = FolderRecord::of(&o)?.parent;
         self.require_free(parent, name, Some(id)).await?;
+        let steps = self
+            .move_steps(parent, &o.envelope.name, parent, name)
+            .await?;
         o.envelope.name = name.to_string();
         set_folder(&mut o, parent);
         let folder = Folder::of(&o)?;
-        self.save(o).await?;
+        self.transact(steps, self.save(o)).await?;
         Ok(folder)
     }
 
@@ -52,21 +59,51 @@ impl FileRepo {
         self.require_not_inside(id, parent).await?;
         self.require_free(parent, &o.envelope.name, Some(id))
             .await?;
+        let from = FolderRecord::of(&o)?.parent;
+        let steps = self
+            .move_steps(from, &o.envelope.name, parent, &o.envelope.name)
+            .await?;
         set_folder(&mut o, parent);
         let folder = Folder::of(&o)?;
-        self.save(o).await?;
+        self.transact(steps, self.save(o)).await?;
         Ok(folder)
     }
 
     pub(super) async fn do_delete_folder(&self, id: ObjectId) -> Result<()> {
         let _w = self.lock.lock().await;
-        self.folder_obj(id).await?;
+        let o = self.folder_obj(id).await?;
         if self.count_in(id).await? > 0 {
             return Err(Error::Conflict(
                 "the folder is not empty (files in the trash count; purge them or move them out first)".into(),
             ));
         }
-        self.objects.delete(id, &self.actor).await?;
-        Ok(())
+        let parent = FolderRecord::of(&o)?.parent;
+        let path = self.path_in(parent, &o.envelope.name).await?;
+        let steps = self.named_steps(|| Disk::RemoveDir(path.clone()), true);
+        let db = async {
+            self.objects.delete(id, &self.actor).await?;
+            Ok(())
+        };
+        self.transact(steps, db).await
+    }
+
+    /// The directory renames that go with moving or renaming a folder (one per disk that keeps real names).
+    async fn move_steps(
+        &self,
+        from_parent: Option<fs_store::ObjectId>,
+        from_name: &str,
+        to_parent: Option<fs_store::ObjectId>,
+        to_name: &str,
+    ) -> Result<Vec<super::steps::Step>> {
+        if self.backends.named().is_empty() {
+            return Ok(Vec::new());
+        }
+        let from = self.path_in(from_parent, from_name).await?;
+        let to = self.path_in(to_parent, to_name).await?;
+        if from == to {
+            return Ok(Vec::new());
+        }
+        let op = || Disk::Move(Spot::Path(from.clone()), Spot::Path(to.clone()));
+        Ok(self.named_steps(op, true))
     }
 }

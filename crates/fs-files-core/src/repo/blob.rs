@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use fs_store::ObjectId;
 
 use super::handle::FileRepo;
-use crate::backend::{BlobBackend, CHUNK};
+use crate::backend::{BlobBackend, CHUNK, Spot};
 use crate::error::{Error, Result};
 use crate::model::FileRecord;
 use crate::transfer::Blob;
@@ -40,7 +40,13 @@ impl Blob for FileBlob {
         }
         let left = self.size - offset;
         let length = u32::try_from(left.min(u64::from(length))).unwrap_or(length);
-        self.backend.get(&self.key, offset, length).await
+        let data = self.backend.get(&self.key, offset, length).await?;
+        if data.len() < length as usize {
+            return Err(Error::Backend(
+                "changed outside: the file is shorter than recorded; it was changed outside the program (run rescan)".into(),
+            ));
+        }
+        Ok(data)
     }
 }
 
@@ -48,42 +54,81 @@ impl FileRepo {
     pub(super) async fn do_open(&self, id: ObjectId) -> Result<Arc<dyn Blob>> {
         let o = self.live_file_obj(id).await?;
         let r = FileRecord::of(&o)?;
+        let backend = self.backends.get(&r.backend)?;
+        let key = self.key_of(&o, &r).await?;
+        if r.named {
+            // The folder can be changed from outside: never hand out bytes that are not the recorded ones.
+            match backend.stat(&key).await? {
+                None => {
+                    return Err(Error::NotFound(format!(
+                        "changed outside: the file {:?} is not on the disk any more; run rescan",
+                        o.envelope.name
+                    )));
+                }
+                Some(i) if i.size != r.size => {
+                    return Err(Error::Backend(format!(
+                        "changed outside: the file {:?} was changed outside the program (recorded {} bytes, on the disk {}); run rescan",
+                        o.envelope.name, r.size, i.size
+                    )));
+                }
+                Some(_) => {}
+            }
+        }
         Ok(Arc::new(FileBlob {
-            backend: self.backends.get(&r.backend)?,
-            key: r.key,
+            backend,
+            key,
             size: r.size,
             media_type: r.media_type,
         }))
     }
 
     /// Copy the bytes of `r` to a fresh key on the same backend; verifies the checksum.
-    pub(super) async fn copy_bytes(&self, r: &FileRecord) -> Result<String> {
-        let backend = self.backends.get(&r.backend)?;
+    /// Stream the bytes of `src_key` into a new pending blob and return its key. Memory stays one chunk.
+    /// The caller publishes or commits it; on failure here the pending blob is removed.
+    pub(super) async fn copy_bytes(
+        &self,
+        backend: &dyn BlobBackend,
+        src_key: &str,
+        r: &FileRecord,
+    ) -> Result<String> {
         let key = new_key(ObjectId::new());
         let run = async {
             let chunk = u32::try_from(CHUNK).unwrap_or(u32::MAX);
             backend.put(&key, 0, &[]).await?;
             let mut offset = 0u64;
             while offset < r.size {
-                let data = backend.get(&r.key, offset, chunk).await?;
+                let data = backend.get(src_key, offset, chunk).await?;
                 if data.is_empty() {
                     return Err(Error::Backend("source is shorter than recorded".into()));
                 }
                 backend.put(&key, offset, &data).await?;
                 offset += data.len() as u64;
             }
-            let info = backend.commit(&key).await?;
-            if info.size != r.size || info.checksum != r.checksum {
-                return Err(Error::Backend("the copy does not match its source".into()));
-            }
             Ok(())
         };
         match run.await {
             Ok(()) => Ok(key),
             Err(e) => {
-                let _ = backend.delete(&key).await;
+                let _ = backend.discard(&Spot::Pending(key)).await;
                 Err(e)
             }
         }
+    }
+
+    /// Make a copy readable by id (backends that name by id) and check it against its source.
+    pub(super) async fn commit_copy(
+        &self,
+        backend: &dyn BlobBackend,
+        key: &str,
+        r: &FileRecord,
+    ) -> Result<()> {
+        let checked = match backend.commit(key).await {
+            Ok(info) => Self::same_bytes(&info, r),
+            Err(e) => Err(e),
+        };
+        if checked.is_err() {
+            let _ = backend.delete(key).await;
+        }
+        checked
     }
 }

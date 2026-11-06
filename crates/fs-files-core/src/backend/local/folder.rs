@@ -1,8 +1,9 @@
-//! `LocalFolder`: the default backend, bytes as ordinary files under a root folder.
+//! `LocalFolder`: the default backend, bytes as ordinary files under a root folder, **under their real names**.
 //!
-//! Pattern: Strategy (a `BlobBackend`) — stage 1 provider. Safety first: keys are validated, no
-//! symlink is followed, writes go to a pending file (fsync after every chunk) and `commit`
-//! renames it into place (atomic) and syncs the directory.
+//! Pattern: Strategy (a `BlobBackend`, `Naming::ByName`) — safety first: keys are validated, no
+//! symlink is followed, writes go to a pending file in the reserved folder (fsync after every
+//! chunk), and `publish` moves it to its real path with an atomic no-replace rename. The
+//! name-based operations (move, trash, scan) are in `named.rs`.
 
 use std::path::{Path, PathBuf};
 
@@ -10,18 +11,20 @@ use async_trait::async_trait;
 use fs_interfaces::Capabilities;
 use tokio::io::AsyncWriteExt;
 
-use super::{io, path};
+use super::io;
+use super::path::{self, Reserved};
 
 use crate::backend::digest::{Digests, hash_chunks};
 use crate::backend::lock::KeyLocks;
 use crate::backend::provider::{BlobBackend, BlobInfo};
+use crate::backend::{Naming, Scanned, Spot};
 use crate::error::{Error, Result};
 
 /// Bytes as plain files under one root folder.
 pub struct LocalFolder {
-    root: PathBuf,
-    locks: KeyLocks,
-    digests: Digests,
+    pub(super) root: PathBuf,
+    pub(super) locks: KeyLocks,
+    pub(super) digests: Digests,
 }
 
 impl LocalFolder {
@@ -29,7 +32,9 @@ impl LocalFolder {
     pub async fn open(root: impl AsRef<Path>) -> Result<Self> {
         tokio::fs::create_dir_all(root.as_ref()).await?;
         let root = tokio::fs::canonicalize(root.as_ref()).await?;
-        tokio::fs::create_dir_all(root.join(path::PENDING_DIR)).await?;
+        for kind in [Reserved::Pending, Reserved::Trash] {
+            tokio::fs::create_dir_all(path::reserved_dir(&root, kind)).await?;
+        }
         Ok(Self {
             root,
             locks: KeyLocks::default(),
@@ -49,12 +54,18 @@ impl BlobBackend for LocalFolder {
         let mut c = Capabilities::new("local-folder");
         c.supported("blob.read")
             .supported("blob.write")
-            .supported("blob.delete");
+            .supported("blob.delete")
+            .supported("blob.rename")
+            .supported("blob.scan");
         c
     }
 
     fn kind(&self) -> &'static str {
         "local"
+    }
+
+    fn naming(&self) -> Naming {
+        Naming::ByName
     }
 
     async fn get(&self, key: &str, offset: u64, length: u32) -> Result<Vec<u8>> {
@@ -82,6 +93,8 @@ impl BlobBackend for LocalFolder {
                 got: offset,
             });
         }
+        let pending_dir = path::reserved_dir(&self.root, Reserved::Pending);
+        io::make_all(&pending_dir).await?;
         let mut file = tokio::fs::OpenOptions::new()
             .create(true)
             .append(true)
@@ -90,7 +103,7 @@ impl BlobBackend for LocalFolder {
         file.write_all(data).await?;
         file.sync_data().await?;
         if held.is_none() {
-            io::sync_dir(&self.root.join(path::PENDING_DIR)).await?;
+            io::sync_dir(&pending_dir).await?;
         }
         self.digests.feed(key, offset, data);
         Ok(())
@@ -113,12 +126,36 @@ impl BlobBackend for LocalFolder {
             None => hash_chunks(size, |o, l| io::read_range(&from, o, l)).await?,
         };
         let dir = to.parent().ok_or_else(|| Error::InvalidKey(key.into()))?;
-        tokio::fs::create_dir_all(dir).await?;
+        io::make_all(dir).await?;
         path::final_path(&self.root, key)?; // re-check after creating directories
         tokio::fs::rename(&from, &to).await?;
         io::sync_dir(dir).await?;
-        io::sync_dir(&self.root.join(path::PENDING_DIR)).await?;
+        io::sync_dir(&path::reserved_dir(&self.root, Reserved::Pending)).await?;
         Ok(BlobInfo { size, checksum })
+    }
+
+    async fn publish(&self, pending: &str, key: &str) -> Result<BlobInfo> {
+        self.do_publish(pending, key).await
+    }
+
+    async fn relocate(&self, from: &Spot, to: &Spot) -> Result<()> {
+        self.do_relocate(from, to).await
+    }
+
+    async fn discard(&self, spot: &Spot) -> Result<()> {
+        self.do_discard(spot).await
+    }
+
+    async fn make_dir(&self, path: &str, parents: bool) -> Result<()> {
+        self.do_make_dir(path, parents).await
+    }
+
+    async fn remove_dir(&self, path: &str) -> Result<()> {
+        self.do_remove_dir(path).await
+    }
+
+    async fn scan(&self, dir: &str) -> Result<Vec<Scanned>> {
+        self.do_scan(dir).await
     }
 
     async fn delete(&self, key: &str) -> Result<()> {

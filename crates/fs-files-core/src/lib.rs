@@ -27,7 +27,8 @@ mod transfer;
 
 pub use backend::{
     BackendConfig, BackendFactory, BackendRegistry, BlobBackend, BlobInfo, CHUNK, LocalFactory,
-    LocalFolder, MAX_KEY, MAX_SEGMENT, check_backend, check_key, format_checksum,
+    LocalFolder, MAX_KEY, MAX_SEGMENT, Naming, RESERVED_NAME, ScanKind, Scanned, Spot,
+    check_backend, check_key, format_checksum,
 };
 #[cfg(feature = "s3")]
 pub use backend::{
@@ -35,8 +36,8 @@ pub use backend::{
     S3Factory, S3Options,
 };
 pub use backends::Backends;
-pub use error::{Error, Result};
+pub use error::{Error, Problem, Result};
 pub use files::Files;
-pub use model::{BackendInfo, Cursor, Entry, File, FileFilter, Folder, Page};
+pub use model::{BackendInfo, Cursor, Entry, File, FileFilter, Folder, Page, RescanReport};
 pub use repo::{CONTEXT, FOLDER_TYPE, FileRepo, MAX_NAME, UPLOAD_TYPE, check_name};
 pub use transfer::{Blob, Transfer, Upload};

@@ -105,7 +105,7 @@ async fn abort_cleans_up_bytes_and_session() {
     ));
     assert!(matches!(up.write(4, b"x").await, Err(Error::NotFound(_))));
     assert!(names(&env.repo, None).await.is_empty());
-    let pending = std::fs::read_dir(env.dir.path().join("blobs/.pending"))
+    let pending = std::fs::read_dir(env.dir.path().join("blobs/.fs-files/pending"))
         .unwrap()
         .count();
     assert_eq!(pending, 0);
@@ -135,7 +135,7 @@ async fn a_taken_name_leaves_the_upload_intact() {
         .await
         .unwrap();
     up.write(0, b"mine").await.unwrap();
-    upload(&e, None, "Same.txt", "text/plain", b"theirs").await;
+    upload(&e, None, "same.txt", "text/plain", b"theirs").await;
     assert!(matches!(up.finish().await, Err(Error::Conflict(_))));
     assert_eq!(
         e.resume_upload(&id)

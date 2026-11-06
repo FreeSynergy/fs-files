@@ -9,7 +9,6 @@ use super::consts::{
     CONTEXT, FILE_CONTENT, FOLDER_CONTENT, FOLDER_TYPE, ROOT, UPLOAD_CONTENT, UPLOAD_TYPE,
 };
 use super::handle::FileRepo;
-use super::names::name_key;
 use super::session::SessionRecord;
 use crate::model::{FileRecord, FolderRecord};
 
@@ -89,7 +88,7 @@ fn index_file(o: &mut StoredObject, r: &FileRecord) {
     let one = |v: String| vec![v];
     o.index.insert("kind".into(), one("file".into()));
     o.index
-        .insert("name_key".into(), one(name_key(&o.envelope.name)));
+        .insert("name_exact".into(), one(o.envelope.name.clone()));
     o.index
         .insert("media_type".into(), one(r.media_type.clone()));
     o.index.insert("folder".into(), one(folder_key(r.folder)));
@@ -101,7 +100,7 @@ fn index_folder(o: &mut StoredObject, parent: Option<ObjectId>) {
     let one = |v: String| vec![v];
     o.index.insert("kind".into(), one("folder".into()));
     o.index
-        .insert("name_key".into(), one(name_key(&o.envelope.name)));
+        .insert("name_exact".into(), one(o.envelope.name.clone()));
     o.index.insert("folder".into(), one(folder_key(parent)));
     o.index.insert("trashed".into(), one("false".into()));
 }

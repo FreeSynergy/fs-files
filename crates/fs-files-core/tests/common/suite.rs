@@ -20,6 +20,23 @@ pub async fn run_all(b: &dyn BlobBackend, unique: &str) {
     empty_and_overwrite(b, &format!("{unique}/empty")).await;
     delete_and_abort(b, &format!("{unique}/delete")).await;
     hostile_keys(b).await;
+    if b.naming() == fs_files_core::Naming::ById {
+        strict_keys(b).await;
+    }
+}
+
+/// Backends that name by id accept only plain keys; a backend that keeps real names accepts these as names.
+async fn strict_keys(b: &dyn BlobBackend) {
+    for k in [".hidden/x", "x y", "ü", ".fs-files/x"] {
+        assert!(
+            matches!(b.put(k, 0, b"x").await, Err(Error::InvalidKey(_))),
+            "put {k:?}"
+        );
+        assert!(
+            matches!(b.get(k, 0, 1).await, Err(Error::InvalidKey(_))),
+            "get {k:?}"
+        );
+    }
 }
 
 fn capabilities(b: &dyn BlobBackend) {
@@ -111,14 +128,11 @@ async fn hostile_keys(b: &dyn BlobBackend) {
         "a/",
         "..",
         ".",
-        ".hidden/x",
         "a\\b",
         "a\0b",
         "C:\\x",
         "a/./b",
-        "x y",
-        "ü",
-        ".pending/x",
+        ".fs-files/x",
         &"k".repeat(600),
     ];
     for k in keys {

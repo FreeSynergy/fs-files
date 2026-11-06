@@ -10,6 +10,9 @@ pub const MAX_KEY: usize = 512;
 /// Longest segment (between two `/`) in bytes.
 pub const MAX_SEGMENT: usize = 200;
 
+/// The one folder a `ByName` backend keeps for itself (trash, unfinished uploads). No user file or folder may have this name.
+pub const RESERVED_NAME: &str = ".fs-files";
+
 /// Check a key and return its segments.
 ///
 /// A key is `/`-separated segments of `A-Z a-z 0-9 . _ -`. A segment is never empty and never starts

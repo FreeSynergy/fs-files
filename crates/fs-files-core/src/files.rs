@@ -10,7 +10,7 @@ use fs_interfaces::{Capabilities, Unsupported};
 use fs_store::ObjectId;
 
 use crate::error::Result;
-use crate::model::{Cursor, File, FileFilter, Folder, Page};
+use crate::model::{Cursor, File, FileFilter, Folder, Page, RescanReport};
 
 fn no<T>(capability: &str, why: &str) -> Result<T> {
     Err(Unsupported::new(capability, why).into())
@@ -77,6 +77,15 @@ pub trait Files: Send + Sync {
     /// `file.search`: files and folders that match all members of the filter.
     async fn find(&self, _filter: &FileFilter, _cursor: Option<Cursor>) -> Result<Page> {
         no("file.search", "this provider cannot search")
+    }
+    /// `folder.rescan`: look at the disk below `folder` (`None` = the top) and bring the records in line with
+    /// it: take over new files and folders, update size and checksum of changed files, and **report**
+    /// the vanished ones without deleting their records. Needs a backend that keeps real names.
+    async fn rescan(&self, _folder: Option<ObjectId>) -> Result<RescanReport> {
+        no(
+            "folder.rescan",
+            "this provider has no folder that people can change from outside",
+        )
     }
     /// `share.create` / `share.revoke`: placeholder, the contract has no methods yet.
     async fn sharing(&self) -> Result<()> {

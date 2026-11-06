@@ -8,6 +8,7 @@
 use async_trait::async_trait;
 use fs_interfaces::{Capabilities, Unsupported};
 
+use super::place::{Naming, Scanned, Spot};
 use crate::error::Result;
 
 /// Size and checksum of a stored blob (`BlobInfo` in the contract).
@@ -57,4 +58,51 @@ pub trait BlobBackend: Send + Sync {
     async fn delete(&self, _key: &str) -> Result<()> {
         Err(Unsupported::new("blob.delete", "this backend cannot delete").into())
     }
+
+    // ---- Backends that keep real names (`Naming::ByName`). Defaults answer `Unsupported`. ----
+
+    /// How this backend names what it stores. Decides whether the repository keeps the disk in step
+    /// with folders and names (`ByName`) or only the database (`ById`).
+    fn naming(&self) -> Naming {
+        Naming::ById
+    }
+    /// `blob.rename`: make the pending blob `pending` readable at the path `key`, **never replacing**
+    /// anything there (`Error::Conflict` if the path is taken). Creates missing folders.
+    async fn publish(&self, _pending: &str, _key: &str) -> Result<BlobInfo> {
+        no("blob.rename")
+    }
+    /// `blob.rename`: move a blob or a folder from one spot to another, **never replacing** the target
+    /// (`Error::Conflict` if it is taken, `Error::NotFound` if the source is missing).
+    async fn relocate(&self, _from: &Spot, _to: &Spot) -> Result<()> {
+        no("blob.rename")
+    }
+    /// `blob.delete`: remove the blob at a spot. Missing is not an error. Where the key of a pending
+    /// and a committed blob is the same (S3), both spots mean `delete`.
+    async fn discard(&self, spot: &Spot) -> Result<()> {
+        match spot {
+            Spot::Path(key) | Spot::Pending(key) => self.delete(key).await,
+            Spot::Trash(_) => no("blob.rename"),
+        }
+    }
+    /// `blob.rename`: create the folder `path`. With `parents` missing parents are created too and an
+    /// existing folder is fine; without, an existing path is `Error::Conflict`.
+    async fn make_dir(&self, _path: &str, _parents: bool) -> Result<()> {
+        no("blob.rename")
+    }
+    /// `blob.rename`: remove the **empty** folder `path` (`Error::Conflict` if it holds anything). Missing is fine.
+    async fn remove_dir(&self, _path: &str) -> Result<()> {
+        no("blob.rename")
+    }
+    /// `blob.scan`: the entries of the folder `dir` (empty = the top), one level, sorted by name.
+    async fn scan(&self, _dir: &str) -> Result<Vec<Scanned>> {
+        no("blob.scan")
+    }
+}
+
+fn no<T>(capability: &str) -> Result<T> {
+    Err(Unsupported::new(
+        capability,
+        "this backend keeps its bytes by id, not under real names",
+    )
+    .into())
 }

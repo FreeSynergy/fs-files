@@ -1,7 +1,7 @@
 //! Names of files and folders.
 //!
-//! Pattern: Specification — what a name may be, and the key under which two names count as the same
-//! (case-insensitive, Unicode-normalised, through the store's `sort_key`).
+//! Pattern: Specification — what a name may be. Two names are the same only if they are equal byte
+//! for byte: the operating system decides the rest (on Linux `Foto.jpg` and `foto.jpg` are two files).
 
 use crate::error::{Error, Result};
 
@@ -9,7 +9,8 @@ use crate::error::{Error, Result};
 pub const MAX_NAME: usize = 255;
 
 /// Check a name: not empty, at most 255 bytes, no `/` or `\`, no control characters, not `.` or `..`.
-/// Names are never used as paths, but they are shown and exported, so they must be harmless there too.
+/// On a backend that keeps real names a name is also a file name on the disk, so `.fs-files` (the program's
+/// own folder) is refused. Whether the disk accepts the rest is decided by the disk, and answered clearly.
 pub fn check_name(name: &str) -> Result<()> {
     let bad = |why: &str| Err(Error::InvalidName(format!("{why}: {name:?}")));
     if name.trim().is_empty() || name.len() > MAX_NAME {
@@ -17,6 +18,11 @@ pub fn check_name(name: &str) -> Result<()> {
     }
     if name == "." || name == ".." {
         return bad("reserved");
+    }
+    if name == crate::backend::RESERVED_NAME {
+        return bad(
+            "reserved: the program keeps its trash and unfinished uploads in a folder of this name",
+        );
     }
     if name
         .chars()
@@ -28,10 +34,6 @@ pub fn check_name(name: &str) -> Result<()> {
 }
 
 /// The comparison key of a name.
-pub(super) fn name_key(name: &str) -> String {
-    fs_store::sort_key(name)
-}
-
 /// `name` for the `n`-th copy: `a.txt` -> `a (copy).txt`, `a (copy 2).txt`.
 pub(super) fn copy_name(name: &str, n: u32) -> String {
     let tag = if n <= 1 {

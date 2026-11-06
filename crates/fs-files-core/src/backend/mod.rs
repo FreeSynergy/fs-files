@@ -8,15 +8,18 @@ mod factory;
 mod key;
 mod local;
 mod lock;
+mod place;
 mod provider;
 mod registry;
 #[cfg(feature = "s3")]
 mod s3;
 
+pub(crate) use digest::hash_chunks;
 pub use digest::{CHUNK, format_checksum};
 pub use factory::{BackendConfig, BackendFactory, LocalFactory, check_backend};
-pub use key::{MAX_KEY, MAX_SEGMENT, check_key};
+pub use key::{MAX_KEY, MAX_SEGMENT, RESERVED_NAME, check_key};
 pub use local::LocalFolder;
+pub use place::{Naming, ScanKind, Scanned, Spot};
 pub use provider::{BlobBackend, BlobInfo};
 pub use registry::BackendRegistry;
 #[cfg(feature = "s3")]

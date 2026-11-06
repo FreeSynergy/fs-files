@@ -81,7 +81,7 @@ impl BackendConfig {
 
 /// Write, read and delete a small probe blob. Any failure means the backend is not usable.
 pub async fn check_backend(backend: &dyn BlobBackend) -> Result<()> {
-    let key = format!("probe/{}", fs_store::ObjectId::new());
+    let key = format!("fs-files-probe-{}", fs_store::ObjectId::new());
     let body = b"fs-files probe";
     let run = async {
         backend.put(&key, 0, body).await?;

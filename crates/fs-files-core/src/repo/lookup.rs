@@ -7,7 +7,6 @@ use fs_store::{ObjectId, Query, StoredObject};
 use super::build::folder_key;
 use super::consts::CONTEXT;
 use super::handle::FileRepo;
-use super::names::name_key;
 use crate::error::{Error, Result};
 use crate::model::FolderRecord;
 
@@ -51,7 +50,7 @@ impl FileRepo {
         Ok(())
     }
 
-    /// Fail if a live entry called `name` (case-insensitive) is already in `folder`.
+    /// Fail if a live entry called `name` (exactly; the disk may know better) is already in `folder`.
     pub(super) async fn require_free(
         &self,
         folder: Option<ObjectId>,
@@ -62,11 +61,11 @@ impl FileRepo {
             .in_context(CONTEXT)
             .with_index("folder", folder_key(folder))
             .with_index("trashed", "false")
-            .with_index("name_key", name_key(name))
+            .with_index("name_exact", name)
             .limit(2);
         let taken = self.reads.query(&q).await?;
         if taken.iter().any(|o| Some(o.envelope.id) != except) {
-            return Err(Error::Conflict(format!(
+            return Err(Error::name_taken(format!(
                 "the name {name:?} is taken in this folder"
             )));
         }

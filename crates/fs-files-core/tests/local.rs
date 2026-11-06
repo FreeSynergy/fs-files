@@ -45,7 +45,7 @@ async fn files_are_ordinary_files_in_the_root() {
     let on_disk = std::fs::read(dir.path().join("ab").join("c1d2")).unwrap();
     assert_eq!(on_disk, b"plain");
     assert!(
-        std::fs::read_dir(dir.path().join(".pending"))
+        std::fs::read_dir(dir.path().join(".fs-files/pending"))
             .unwrap()
             .next()
             .is_none()
@@ -103,8 +103,8 @@ async fn a_symlinked_pending_folder_is_refused() {
     let outside = tmp();
     let root = dir.path().join("root");
     let b = open(&root).await;
-    std::fs::remove_dir(root.join(".pending")).unwrap();
-    std::os::unix::fs::symlink(outside.path(), root.join(".pending")).unwrap();
+    std::fs::remove_dir(root.join(".fs-files/pending")).unwrap();
+    std::os::unix::fs::symlink(outside.path(), root.join(".fs-files/pending")).unwrap();
     assert!(matches!(
         b.put("k", 0, b"x").await,
         Err(Error::InvalidKey(_))

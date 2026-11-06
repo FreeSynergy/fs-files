@@ -48,3 +48,63 @@ pub enum Error {
     #[error("json: {0}")]
     Json(#[from] serde_json::Error),
 }
+
+/// Prefix of the message of a `Conflict` that is about a name (see [`Error::problem`]).
+const NAME_TAKEN: &str = "name taken: ";
+/// Prefix of the message of an error that is about changes made outside the program.
+const CHANGED_OUTSIDE: &str = "changed outside: ";
+
+/// An error in the RFC 9457 shape of the contract (`Problem` in `common.capnp`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Problem {
+    /// `Problem.type`: one of the `*_PROBLEM_TYPE` constants of `fs_interfaces::files_capnp`.
+    pub kind: &'static str,
+    /// Short, fixed summary.
+    pub title: &'static str,
+    /// HTTP-like status.
+    pub status: u16,
+    /// The message of the error.
+    pub detail: String,
+}
+
+impl Error {
+    /// A name clash: the name is taken in the folder or on the disk. Still a [`Error::Conflict`].
+    pub(crate) fn name_taken(detail: impl Into<String>) -> Self {
+        Self::Conflict(format!("{NAME_TAKEN}{}", detail.into()))
+    }
+
+    /// The named problem of the contract this error maps to, if it has one: name clash, invalid
+    /// name, changed outside. Other errors (not found, offset, store) have none.
+    pub fn problem(&self) -> Option<Problem> {
+        use fs_interfaces::files_capnp::{
+            CHANGED_OUTSIDE_PROBLEM_TYPE, INVALID_NAME_PROBLEM_TYPE, NAME_CONFLICT_PROBLEM_TYPE,
+        };
+        let (kind, title, status, detail) = match self {
+            Self::Conflict(m) if m.starts_with(NAME_TAKEN) => (
+                NAME_CONFLICT_PROBLEM_TYPE,
+                "The name is taken",
+                409,
+                m.clone(),
+            ),
+            Self::InvalidName(_) | Self::InvalidKey(_) => (
+                INVALID_NAME_PROBLEM_TYPE,
+                "The name is not acceptable",
+                422,
+                self.to_string(),
+            ),
+            Self::Backend(m) | Self::NotFound(m) if m.starts_with(CHANGED_OUTSIDE) => (
+                CHANGED_OUTSIDE_PROBLEM_TYPE,
+                "The file was changed outside the program",
+                409,
+                m.clone(),
+            ),
+            _ => return None,
+        };
+        Some(Problem {
+            kind,
+            title,
+            status,
+            detail,
+        })
+    }
+}

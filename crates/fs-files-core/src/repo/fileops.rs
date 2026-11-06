@@ -1,16 +1,20 @@
 //! Moving, renaming and copying files; trash, restore, purge; classification.
 //!
 //! Pattern: Repository (write side) with Command-like small steps — each operation is: check the
-//! rules, change the record, rewrite the index, store. Trash only hides; purge deletes bytes first
-//! (repeatable), metadata second.
+//! rules, do the disk step if the file lives under its real name (`steps.rs`: disk first, undone if
+//! the database fails), change the record, rewrite the index, store. Trash moves the bytes to the
+//! program's own trash folder; purge deletes bytes first (repeatable), metadata second.
 
 use fs_store::ObjectId;
 
 use super::build::set_file;
 use super::handle::FileRepo;
-use super::names::{check_name, copy_name};
+use super::names::check_name;
+use super::steps::{Disk, Step};
+use crate::backend::Spot;
 use crate::error::{Error, Result};
 use crate::model::{File, FileRecord};
+use fs_store::StoredObject;
 
 impl FileRepo {
     pub(super) async fn do_move_file(
@@ -24,8 +28,9 @@ impl FileRepo {
         self.require_free(folder, &o.envelope.name, Some(id))
             .await?;
         let mut r = FileRecord::of(&o)?;
+        let steps = self.rename_steps(&o, &r, folder, &o.envelope.name).await?;
         r.folder = folder;
-        self.store_file(&mut o, &r).await
+        self.store_with(steps, &mut o, &r).await
     }
 
     pub(super) async fn do_rename_file(&self, id: ObjectId, name: &str) -> Result<File> {
@@ -34,16 +39,27 @@ impl FileRepo {
         let mut o = self.live_file_obj(id).await?;
         let r = FileRecord::of(&o)?;
         self.require_free(r.folder, name, Some(id)).await?;
+        let steps = self.rename_steps(&o, &r, r.folder, name).await?;
         o.envelope.name = name.to_string();
-        self.store_file(&mut o, &r).await
+        self.store_with(steps, &mut o, &r).await
     }
 
     pub(super) async fn do_trash(&self, id: ObjectId) -> Result<()> {
         let _w = self.lock.lock().await;
         let mut o = self.live_file_obj(id).await?;
         let mut r = FileRecord::of(&o)?;
+        let mut steps = Vec::new();
+        if r.named {
+            let from = Spot::Path(self.key_of(&o, &r).await?);
+            let to = Spot::Trash(id.to_string());
+            steps.push(Step::new(
+                self.backends.get(&r.backend)?,
+                Disk::Move(from, to),
+                true,
+            ));
+        }
         r.trashed = true;
-        self.store_file(&mut o, &r).await.map(|_| ())
+        self.store_with(steps, &mut o, &r).await.map(|_| ())
     }
 
     pub(super) async fn do_restore(&self, id: ObjectId) -> Result<File> {
@@ -56,8 +72,37 @@ impl FileRepo {
         self.require_folder(r.folder).await?;
         self.require_free(r.folder, &o.envelope.name, Some(id))
             .await?;
+        if !r.named {
+            r.trashed = false;
+            return self.store_file(&mut o, &r).await;
+        }
+        let backend = self.backends.get(&r.backend)?;
+        let key = self.path_in(r.folder, &o.envelope.name).await?;
+        let step = Step::new(
+            backend.clone(),
+            Disk::Move(Spot::Trash(id.to_string()), Spot::Path(key.clone())),
+            false,
+        );
         r.trashed = false;
-        self.store_file(&mut o, &r).await
+        set_file(&mut o, &r);
+        let file = File::of(&o)?;
+        match step.apply().await {
+            Ok(_) => Self::then_db(&[step], self.save(o)).await?,
+            // The bytes are not in the trash. After a crash between the two steps of an earlier
+            // restore they are already at their place: then only the record is missing.
+            Err(Error::NotFound(_))
+                if backend.stat(&key).await?.is_some_and(|i| i.size == r.size) =>
+            {
+                self.save(o).await?;
+            }
+            Err(Error::NotFound(_)) => {
+                return Err(Error::NotFound(format!(
+                    "changed outside: the bytes of file {id} are neither in the trash nor at {key:?}; run rescan"
+                )));
+            }
+            Err(e) => return Err(e),
+        }
+        Ok(file)
     }
 
     pub(super) async fn do_purge(&self, id: ObjectId) -> Result<()> {
@@ -70,7 +115,12 @@ impl FileRepo {
             ));
         }
         // Bytes first: deleting is repeatable, so a failure leaves a file that can be purged again.
-        self.backends.get(&r.backend)?.delete(&r.key).await?;
+        let backend = self.backends.get(&r.backend)?;
+        if r.named {
+            backend.discard(&Spot::Trash(id.to_string())).await?;
+        } else {
+            backend.delete(&r.key).await?;
+        }
         self.objects.delete(id, &self.actor).await?;
         Ok(())
     }
@@ -86,40 +136,40 @@ impl FileRepo {
         self.store_file(&mut o, &r).await
     }
 
-    pub(super) async fn do_copy_file(
+    /// The disk step of a rename or a move of a file that lives under its real name.
+    async fn rename_steps(
         &self,
-        id: ObjectId,
+        o: &StoredObject,
+        r: &FileRecord,
         folder: Option<ObjectId>,
-    ) -> Result<File> {
-        let src = self.live_file_obj(id).await?;
-        self.require_folder(folder).await?;
-        let mut r = FileRecord::of(&src)?;
-        let key = self.copy_bytes(&r).await?;
-        r.key = key;
-        r.folder = folder;
-        let _w = self.lock.lock().await;
-        let name = self.free_copy_name(folder, &src.envelope.name).await?;
-        let mut o = self.file_object(&name, &r);
-        o.envelope.sensitive.clone_from(&src.envelope.sensitive);
-        let file = File::of(&o)?;
-        if let Err(e) = self.save(o).await {
-            self.backends.get(&r.backend)?.delete(&r.key).await?;
-            return Err(e);
+        name: &str,
+    ) -> Result<Vec<Step>> {
+        if !r.named {
+            return Ok(Vec::new());
         }
-        Ok(file)
+        let from = self.key_of(o, r).await?;
+        let to = self.path_in(folder, name).await?;
+        if from == to {
+            return Ok(Vec::new());
+        }
+        let backend = self.backends.get(&r.backend)?;
+        Ok(vec![Step::new(
+            backend,
+            Disk::Move(Spot::Path(from), Spot::Path(to)),
+            false,
+        )])
     }
 
-    async fn free_copy_name(&self, folder: Option<ObjectId>, name: &str) -> Result<String> {
-        if self.require_free(folder, name, None).await.is_ok() {
-            return Ok(name.to_string());
-        }
-        for n in 1..1000 {
-            let candidate = copy_name(name, n);
-            if self.require_free(folder, &candidate, None).await.is_ok() {
-                return Ok(candidate);
-            }
-        }
-        Err(Error::Conflict("no free name for the copy".into()))
+    async fn store_with(
+        &self,
+        steps: Vec<Step>,
+        o: &mut StoredObject,
+        r: &FileRecord,
+    ) -> Result<File> {
+        set_file(o, r);
+        let file = File::of(o)?;
+        self.transact(steps, self.save(o.clone())).await?;
+        Ok(file)
     }
 
     async fn store_file(&self, o: &mut fs_store::StoredObject, r: &FileRecord) -> Result<File> {

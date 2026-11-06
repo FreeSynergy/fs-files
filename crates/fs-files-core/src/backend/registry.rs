@@ -57,6 +57,13 @@ impl BackendRegistry {
             .ok_or_else(|| Error::NotFound(format!("backend {id}")))
     }
 
+    /// Every backend that keeps real names, with its id (their folders must follow ours).
+    pub fn named(&self) -> Vec<(String, Arc<dyn BlobBackend>)> {
+        let snap = self.snapshot();
+        let by_name = |e: &&(String, Arc<dyn BlobBackend>)| e.1.naming() == super::Naming::ByName;
+        snap.entries.iter().filter(by_name).cloned().collect()
+    }
+
     /// Id and backend that take new files.
     pub fn active(&self) -> (String, Arc<dyn BlobBackend>) {
         let snap = self.snapshot();

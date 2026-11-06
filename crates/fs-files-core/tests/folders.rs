@@ -26,26 +26,27 @@ async fn folders_nest_and_list_in_name_order() {
 }
 
 #[tokio::test]
-async fn names_are_unique_per_folder_ignoring_case() {
+async fn names_are_unique_per_folder_exactly() {
     let e = env().await;
     let a = e.repo.create_folder(None, "Photos").await.unwrap();
     assert!(matches!(
-        e.repo.create_folder(None, "photos").await,
+        e.repo.create_folder(None, "Photos").await,
         Err(Error::Conflict(_))
     ));
+    // the operating system decides: on Linux a different case is a different name
+    e.repo.create_folder(None, "photos").await.unwrap();
     // the same name in another folder is fine, and a file and a folder share one namespace
-    e.repo.create_folder(Some(a.id), "photos").await.unwrap();
+    e.repo.create_folder(Some(a.id), "Photos").await.unwrap();
     upload(&e.repo, None, "x.txt", "text/plain", b"x").await;
     assert!(matches!(
-        e.repo.create_folder(None, "X.TXT").await,
+        e.repo.create_folder(None, "x.txt").await,
         Err(Error::Conflict(_))
     ));
     let other = e.repo.create_folder(None, "Other").await.unwrap();
     assert!(matches!(
-        e.repo.rename_folder(other.id, "photos").await,
+        e.repo.rename_folder(other.id, "Photos").await,
         Err(Error::Conflict(_))
     ));
-    // renaming to its own name (different case) is allowed
     e.repo.rename_folder(other.id, "OTHER").await.unwrap();
 }
 

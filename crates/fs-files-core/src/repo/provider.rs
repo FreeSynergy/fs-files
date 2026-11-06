@@ -13,16 +13,17 @@ use super::handle::FileRepo;
 use crate::backends::Backends;
 use crate::error::Result;
 use crate::files::Files;
-use crate::model::{BackendInfo, Cursor, File, FileFilter, Folder, Page};
+use crate::model::{BackendInfo, Cursor, File, FileFilter, Folder, Page, RescanReport};
 use crate::transfer::{Blob, Transfer, Upload};
 
-const SUPPORTED: [&str; 19] = [
+const SUPPORTED: [&str; 20] = [
     "file.resolve",
     "folder.list",
     "folder.create",
     "folder.rename",
     "folder.move",
     "folder.delete",
+    "folder.rescan",
     "file.move",
     "file.copy",
     "file.rename",
@@ -118,6 +119,9 @@ impl Files for FileRepo {
     }
     async fn find(&self, filter: &FileFilter, cursor: Option<Cursor>) -> Result<Page> {
         self.do_find(filter, cursor).await
+    }
+    async fn rescan(&self, folder: Option<ObjectId>) -> Result<RescanReport> {
+        self.do_rescan(folder).await
     }
 }
 
