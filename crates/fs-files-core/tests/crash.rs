@@ -10,7 +10,7 @@ use common::disk::{on_disk, root};
 use common::flaky::Flaky;
 use common::{ME, env, read_all, upload};
 use fs_files_core::{BlobBackend, Entry, FileRepo, Files, LocalFolder, Spot, Transfer};
-use fs_store::{Store, TursoStore};
+use fs_objects::{Store, TursoStore};
 
 async fn flaky_repo(dir: &Path) -> (FileRepo, Arc<AtomicBool>, Arc<dyn Store>) {
     let store: Arc<dyn Store> = Arc::new(TursoStore::open_in_memory().await.unwrap());

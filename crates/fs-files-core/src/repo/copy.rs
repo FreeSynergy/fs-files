@@ -4,7 +4,7 @@
 //! (S3) or, under the lock, pick a free name and `publish` at the real path (never replacing), then
 //! write the record; if that fails the copy is moved back to pending and removed.
 
-use fs_store::{ObjectId, StoredObject};
+use fs_objects::{ObjectId, StoredObject};
 
 use super::handle::FileRepo;
 use super::steps::{Disk, Step};

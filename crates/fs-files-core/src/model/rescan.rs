@@ -25,5 +25,5 @@ pub struct TrashReport {
     /// Files purged for good.
     pub purged: u32,
     /// Files that could not be purged (they stay in the trash; the rest was still purged).
-    pub failed: Vec<fs_store::ObjectId>,
+    pub failed: Vec<fs_objects::ObjectId>,
 }

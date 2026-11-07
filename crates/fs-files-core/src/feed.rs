@@ -6,7 +6,7 @@
 
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
-use fs_store::ObjectId;
+use fs_objects::ObjectId;
 
 /// What happened to a file or a folder. The id is all a listener gets: it asks for the entry itself
 /// (`Files::get`, `Files::get_folder`), so a change that has been overtaken is not told twice.

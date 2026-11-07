@@ -5,7 +5,7 @@
 //! that they still are those bytes: size first, then the modification time, and on doubt the
 //! checksum. Anything else is somebody else's file, and nothing is touched ("changed outside").
 
-use fs_store::StoredObject;
+use fs_objects::StoredObject;
 
 use super::handle::FileRepo;
 use crate::backend::{BlobBackend, Spot, hash_chunks};
@@ -42,7 +42,7 @@ impl FileRepo {
     pub(super) async fn in_trash(
         &self,
         backend: &dyn BlobBackend,
-        id: fs_store::ObjectId,
+        id: fs_objects::ObjectId,
         r: &FileRecord,
     ) -> Result<InTrash> {
         Ok(match backend.inspect(&Spot::Trash(id.to_string())).await? {

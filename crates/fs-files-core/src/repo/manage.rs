@@ -4,7 +4,7 @@
 //! of its kind builds the backend, `check_backend` proves it works, and only then it is swapped in
 //! atomically. A failure changes nothing and never repeats the configuration (credentials).
 
-use fs_store::Query;
+use fs_objects::Query;
 
 use super::consts::CONTEXT;
 use super::handle::FileRepo;

@@ -19,7 +19,7 @@ pub(crate) fn no<T>(capability: &str, why: &str) -> Result<T> {
 pub enum Error {
     /// The object store failed (this includes the refusal of sensitive objects, ADR 0029).
     #[error("object store: {0}")]
-    Store(#[from] fs_store::Error),
+    Store(#[from] fs_objects::Error),
     /// The explicit "not possible" of a provider (ADR 0045).
     #[error(transparent)]
     Unsupported(#[from] fs_interfaces::Unsupported),

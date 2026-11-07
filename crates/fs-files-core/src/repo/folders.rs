@@ -4,7 +4,7 @@
 //! folder (exact); a folder never moves into itself or below itself; only an empty
 //! folder (nothing live, nothing in the trash) can be deleted.
 
-use fs_store::ObjectId;
+use fs_objects::ObjectId;
 
 use super::build::set_folder;
 use super::handle::FileRepo;
@@ -102,9 +102,9 @@ impl FileRepo {
     /// The directory renames that go with moving or renaming a folder (one per disk that keeps real names).
     async fn move_steps(
         &self,
-        from_parent: Option<fs_store::ObjectId>,
+        from_parent: Option<fs_objects::ObjectId>,
         from_name: &str,
-        to_parent: Option<fs_store::ObjectId>,
+        to_parent: Option<fs_objects::ObjectId>,
         to_name: &str,
     ) -> Result<Vec<super::steps::Step>> {
         if self.backends.named().is_empty() {

@@ -11,8 +11,8 @@ use async_trait::async_trait;
 use common::search::find;
 use common::{caps, list_all, with_repo};
 use fs_files_core::{FileRepo, LocalFolder, Transfer};
-use fs_store::traits::{ObjectQuery, ObjectRepository};
-use fs_store::{Activity, LogEntry, ObjectId, Query, Result, Store, StoredObject, TursoStore};
+use fs_objects::traits::{ObjectQuery, ObjectRepository};
+use fs_objects::{Activity, LogEntry, ObjectId, Query, Result, Store, StoredObject, TursoStore};
 
 /// Passes everything on and counts the objects the queries hand back.
 struct Counting {

@@ -33,7 +33,7 @@ fn backend(prefix: &str) -> Arc<dyn BlobBackend> {
 }
 
 fn run_id() -> String {
-    format!("test-{}", fs_store::ObjectId::new())
+    format!("test-{}", fs_objects::ObjectId::new())
 }
 
 #[tokio::test]

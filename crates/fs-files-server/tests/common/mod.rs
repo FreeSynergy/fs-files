@@ -10,7 +10,7 @@ use fs_files_core::{Backends, FileFeed, FileRepo, Files, LocalFolder, Transfer};
 use fs_files_server::FilesServer;
 use fs_interfaces::files_capnp::files;
 use fs_interfaces::rpc::{bind_socket, connect, serve};
-use fs_store::{Store, TursoStore};
+use fs_objects::{Store, TursoStore};
 
 pub mod backend;
 pub mod program;
@@ -55,7 +55,7 @@ where
 
 /// A repository over a store file (with a key if `encrypted`, ADR 0024) and a local folder.
 pub async fn repo_on_disk(dir: &std::path::Path, encrypted: bool) -> Arc<FileRepo> {
-    use fs_store::{Cipher, EncryptionKey, OpenOptions, StaticKeyProvider};
+    use fs_objects::{Cipher, EncryptionKey, OpenOptions, StaticKeyProvider};
     let mut opts = OpenOptions::default();
     if encrypted {
         let key = EncryptionKey {

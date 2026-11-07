@@ -61,7 +61,7 @@ async fn a_file_can_be_restored_to_another_folder() {
 
     // a folder that does not exist
     r.trash(f.id).await.unwrap();
-    let nowhere = fs_store::ObjectId::new();
+    let nowhere = fs_objects::ObjectId::new();
     assert!(matches!(
         r.restore_to(f.id, Some(nowhere), OnConflict::Refuse).await,
         Err(Error::NotFound(_))

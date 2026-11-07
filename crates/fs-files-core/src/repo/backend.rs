@@ -6,8 +6,8 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use fs_store::traits::{ObjectQuery, ObjectRepository};
-use fs_store::{
+use fs_objects::traits::{ObjectQuery, ObjectRepository};
+use fs_objects::{
     Activity, LogEntry, ObjectId, Query, Result, Store, StoreId, StoreInfo, StoredObject,
 };
 

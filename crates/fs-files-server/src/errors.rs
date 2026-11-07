@@ -10,7 +10,7 @@ use std::future::Future;
 
 use fs_files_core::Error;
 use fs_interfaces::rpc::{Problem, failed, problem_keys, run_to_end, unsupported};
-use fs_store::Error as Store;
+use fs_objects::Error as Store;
 
 use crate::facts::with_facts;
 
@@ -84,7 +84,7 @@ mod tests {
     use fs_interfaces::files_capnp::{
         CHANGED_OUTSIDE_PROBLEM_TYPE, INVALID_NAME_PROBLEM_TYPE, NAME_CONFLICT_PROBLEM_TYPE,
     };
-    use fs_store::ObjectId;
+    use fs_objects::ObjectId;
 
     use super::*;
 

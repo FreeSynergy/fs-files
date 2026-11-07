@@ -7,7 +7,7 @@
 //! written, so a failure never loses an upload; the record remembers its session, so a session
 //! whose deletion failed is recognised as stale and never touches the file.
 
-use fs_store::ObjectId;
+use fs_objects::ObjectId;
 
 use super::handle::FileRepo;
 use super::names::numbered_name;
@@ -50,7 +50,7 @@ impl FileRepo {
     async fn drop_session(&self, id: ObjectId) -> Result<()> {
         let _w = self.lock.lock().await;
         match self.objects.delete(id, &self.actor).await {
-            Ok(_) | Err(fs_store::Error::NotFound(_)) => Ok(()),
+            Ok(_) | Err(fs_objects::Error::NotFound(_)) => Ok(()),
             Err(e) => Err(e.into()),
         }
     }

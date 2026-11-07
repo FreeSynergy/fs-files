@@ -9,7 +9,7 @@ use common::{ME, text_file, with_repo, with_stub};
 use fs_files_core::{FileRepo, LocalFolder};
 use fs_interfaces::files_capnp::files;
 use fs_interfaces::rpc::read_uuid;
-use fs_store::{ActivityFilter, Store, TursoStore};
+use fs_objects::{ActivityFilter, Store, TursoStore};
 use uuid::Uuid;
 
 async fn instance_of(root: &files::Client) -> Option<Uuid> {

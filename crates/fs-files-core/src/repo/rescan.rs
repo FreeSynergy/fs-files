@@ -12,7 +12,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use fs_store::{ObjectId, Query, StoredObject};
+use fs_objects::{ObjectId, Query, StoredObject};
 
 use super::build::folder_key;
 use super::consts::CONTEXT;

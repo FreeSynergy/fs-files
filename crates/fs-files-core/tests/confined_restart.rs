@@ -13,7 +13,7 @@ use fs_files_core::{
     Result,
 };
 use fs_interfaces::Capabilities;
-use fs_store::{Store, TursoStore};
+use fs_objects::{Store, TursoStore};
 
 fn cfg(id: &str, path: &str, active: bool) -> String {
     serde_json::json!({ "id": id, "kind": "local", "path": path, "active": active }).to_string()

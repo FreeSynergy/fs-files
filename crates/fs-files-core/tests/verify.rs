@@ -8,7 +8,7 @@ use async_trait::async_trait;
 use common::names;
 use fs_files_core::{BlobBackend, BlobInfo, Error, FileRepo, LocalFolder, Transfer};
 use fs_interfaces::Capabilities;
-use fs_store::{Store, TursoStore};
+use fs_objects::{Store, TursoStore};
 
 /// A backend whose commit reports one byte too many.
 struct Lying(LocalFolder);

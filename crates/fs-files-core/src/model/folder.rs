@@ -2,7 +2,7 @@
 //!
 //! Pattern: Value objects — [`Folder`] is the contract's `Folder`; its stored content is the parent id only.
 
-use fs_store::{ObjectId, StoredObject};
+use fs_objects::{ObjectId, StoredObject};
 use serde::{Deserialize, Serialize};
 
 use crate::error::{Error, Result};
@@ -11,7 +11,7 @@ use crate::error::{Error, Result};
 #[derive(Clone, Debug, PartialEq)]
 pub struct Folder {
     /// The AS2 envelope as stored: what goes on the wire as `Folder.envelope`.
-    pub envelope: fs_store::Envelope,
+    pub envelope: fs_objects::Envelope,
     /// Object id.
     pub id: ObjectId,
     /// `https://<instance>/files/<id>`.

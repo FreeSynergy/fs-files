@@ -6,7 +6,7 @@
 //! session whose file exists (only deleting the session failed) is skipped in a page and removed
 //! once, when the list is read from its start, so a removal cannot shift a page in the middle.
 
-use fs_store::{ObjectId, Order, Query};
+use fs_objects::{ObjectId, Order, Query};
 
 use super::handle::FileRepo;
 use super::session::SessionRecord;

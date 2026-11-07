@@ -2,7 +2,7 @@
 //!
 //! Pattern: Value object.
 
-use fs_store::ObjectId;
+use fs_objects::ObjectId;
 
 /// One unfinished upload (`UploadInfo` in the contract).
 #[derive(Clone, Debug, PartialEq, Eq)]

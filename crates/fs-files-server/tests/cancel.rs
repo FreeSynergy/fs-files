@@ -8,8 +8,8 @@ use std::time::Duration;
 use async_trait::async_trait;
 use common::{ME, caps, list_all, with_repo};
 use fs_files_core::{FileRepo, LocalFolder};
-use fs_store::traits::{ObjectQuery, ObjectRepository};
-use fs_store::{Activity, LogEntry, ObjectId, Query, Result, Store, StoredObject, TursoStore};
+use fs_objects::traits::{ObjectQuery, ObjectRepository};
+use fs_objects::{Activity, LogEntry, ObjectId, Query, Result, Store, StoredObject, TursoStore};
 use tokio::sync::{Notify, watch};
 
 /// A store whose writes wait at a gate while it is closed.

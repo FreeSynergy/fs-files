@@ -4,7 +4,7 @@ mod common;
 
 use common::{env, names, upload};
 use fs_files_core::{Error, Files, Transfer};
-use fs_store::ObjectId;
+use fs_objects::ObjectId;
 
 #[tokio::test]
 async fn folders_nest_and_list_in_name_order() {
