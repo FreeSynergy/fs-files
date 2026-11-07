@@ -1,9 +1,9 @@
 # fs-files – Design
 
-`fs-files` is the files program of FreeSynergy. This repo holds the **program core** (`crates/fs-files-core`, no GUI) and the **server** (`crates/fs-files-server`, the contract over a Unix socket).
+`fs-files` is the files program of FreeSynergy. This repo holds the **program core** (`crates/fs-files-core`, no GUI), the **server** (`crates/fs-files-server`, the contract over a Unix socket), the **client** (`crates/fs-files-client`, the traits of the core over that socket) and the **app** (`crates/fs-files-app`, the window; talks to the server only).
 **Metadata** (name, media type, size, checksum, folder, trash flag) is an object in `fs-store`; the **bytes** are in a
 backend behind `BlobBackend`. Other programs refer to a file by its object id and read through the `Blob` trait; they never
-see a path or a backend. Contract: `files.capnp` in `fs-interfaces` v0.35.0 (draft, consumers: 0 of 2).
+see a path or a backend. Contract: `files.capnp` in `fs-interfaces` v0.35.0 (draft, consumers: the app, 1 of 2).
 
 ## State
 
@@ -37,7 +37,9 @@ Version 0.4.0, not tagged (stage 1: local folder, stage 2: S3, stage 3: real nam
 | `File` and `Folder` carry the envelope as stored; every write answers the object as stored (the store sets the times), so an answer equals what `get` says afterwards | done |
 | Server `fs-files-server`: every method of `Files`, `Folders`, `Transfer`, `Upload`, `Blob` (common), `Search`, `Backends` and `BlobBackend` (provider side), `subscribe` with `ended`, `supportReport`; errors as typed problems; binary with `--socket --data --actor --instance` and `FS_FILES_ROOT` | done, draft |
 | `sharing` (empty placeholder interface): `Unsupported` (`share.create`); versions, encryption, sync, WebDAV, previews: not built | as agreed |
-| Tests | 201 run by default: core 141, server 60; 2 ignored live tests. The server tests run over a real socket against a real `FileRepo`, compare values, and run the real binary across a restart |
+| Client `fs-files-client`: `RpcFiles` implements `Files` and `Transfer` over the socket of `fs-files-server` (every method the app calls and the plain forms of them); the rest is `Unsupported`; see Client | done, draft |
+| Frontend `fs-files-app`: the workbench `file-manager` of `fs-components` over the socket (`--socket`); holds no store and no backend; see Frontend | first version, provisional, not reviewed |
+| Tests | 269 run by default: core 141, server 60, client 22, app 46 (incl. unit tests); 4 ignored (2 live S3 in the core, 2 measurements in the app). The server tests run over a real socket against a real `FileRepo`; the client and app tests run the real server on a thread of its own with a real folder and the real client; the app also runs its real binary |
 
 ## Structure and pattern map (ADR 0043)
 
@@ -80,6 +82,13 @@ Version 0.4.0, not tagged (stage 1: local folder, stage 2: S3, stage 3: real nam
 | `fs-files-server/places.rs` | Specification | the folder of the files must not hold the data directory (`check_places`) |
 | `fs-files-server/errors.rs` | Adapter | core errors as RFC 9457 problems; `finish` = `run_to_end` |
 | `fs-files-server/wire/*` | Adapter, Specification | ids, texts with limits, cursor, entries and pages, filter, reports |
+| `fs-files-client/{peer,remote}.rs` | Adapter | `RpcFiles` hides the connection thread (the shared `Worker` of `fs-interfaces`); `remote.rs` fetches the capabilities at connect |
+| `fs-files-client/{files_impl,transfer_impl}.rs` | Adapter | the traits `Files` and `Transfer` of the core, one call each; the upload and the blob handed out are small adapters that name their upload or file again in every call |
+| `fs-files-client/{folder,file,transfer}_calls.rs`, `read.rs`, `write.rs`, `cursor.rs` | Adapter | requests and replies of the contract as values of the core; pages and the unfinished uploads are read page by page |
+| `fs-files-client/problems.rs` | Adapter | the table of problem types to `fs_files_core::Error`, chosen by the type, never by the words |
+| `fs-files-app/src/source/*` | Adapter (+ Template method for transfers) | the contract's `Files` and `Transfer` as the workbench's `FileSource`; a request of the workbench as one call |
+| `fs-files-app/surface.rs` | Adapter, Command | the workbench as a screen of the shell; a menu entry is an id and one handler |
+| `fs-files-app/args.rs`, `words.rs`, `commands.rs` | none / Value object / Facade consumer | arguments; the words of the program (named places, ADR 0057); upload and download without a window |
 
 ## Decisions (the owner may want to change these)
 
@@ -204,6 +213,84 @@ same code as in `fs-tasks` and `fs-maps` and wants to live once in `fs-interface
 added between two pages (the shared limit of `fs-interfaces`); (6) the `Files` root has no way to hand out `BlobBackend`, correct for the contract, but a program that
 wants remote backends needs the client side (`RemoteBackend`), not built; (7) a person who changes the folder from outside is seen only by `rescan`, no watcher.
 
+## Client (`crates/fs-files-client`)
+
+`RpcFiles` is the Adapter of `Files` and `Transfer` in front of the Cap'n Proto client of `files.capnp`, so a frontend depends on the traits and never on the
+core (ADR 0021). `RpcFiles::connect(socket)` (or `connect_with(socket, Timeouts)`) starts the shared `Worker<FilesRemote>` of `fs_interfaces::rpc::client`: one
+thread with a current-thread runtime and a `LocalSet` (a capnp-rpc client is not `Send`); `FilesRemote::open` asks `supportReport` and takes `Folders`,
+`Transfer` and `Search`; calls from any thread queue for that thread and overlap there. **Deadlines:** the handshake waits at most 5 s, a call at most 30 s
+(`files server did not answer within <limit>`); a write that ran out of time may still have happened, the server finishes what it began. A server that is
+gone is `Error::Backend("files server: the connection is gone")` on every later call; there is **no reconnect** (restart the app).
+
+| Method | Over the wire |
+|---|---|
+| `capabilities` | what `supportReport` said at connect, cut to what the client calls (a snapshot) |
+| `get`, `get_folder` | `Folders.get`, `getFolder`; `found = false` is `None` |
+| `list`, `list_sorted`, `find`, `find_sorted` | `Folders.list`, `Search.find`: one page per call, the cursor of the wire is the core's `Cursor` |
+| `create_folder`, `rename_folder[_as]`, `move_folder[_as]`, `delete_folder` | `Folders.createFolder`, `renameFolder`, `moveFolder`, `deleteFolder` |
+| `move_file[_as]`, `copy_file[_as]`, `rename_file[_as]` | `moveFile`, `copyFile`, `renameFile`; the plain forms are the refuse rule (`copy_file`: keep both, as in the core) |
+| `trash`, `restore[_as]`, `restore_to`, `purge`, `empty_trash`, `rescan` | the same-named calls |
+| `start_upload[_as]`, `resume_upload`, `pending_uploads`, `open` | `Transfer.startUpload`, `resumeUpload`, `pendingUploads` (every page until the cursor is empty), `open` |
+| `Upload::{write, received, finish, abort}`, `Blob::{size, read}` | `Upload.*`, `Blob.*` |
+
+**Handles are ids.** A capability of the wire cannot leave the thread of the connection, so an `RpcUpload` is the id of the session and an `RpcBlob` the id of
+the file, and each call names its upload (`resumeUpload`) or file (`open`) again. That costs one more round trip per call on a local socket and gives: a handle
+survives a dropped one, nothing leaks on the server, and an upload goes on after a lost connection exactly as the contract wants. `start_upload` and
+`resume_upload` check once that the session exists. A chunk is what the caller gives (the app uses `CHUNK`, 1 MiB; the server takes 16 MiB per write and
+answers at most 32 MiB per read).
+
+**Unsupported (explicit):** `classify` (`file.classify`), `Files::sharing`, the `Backends` interface (`backend.list`, `backend.add`, `backend.remove`), `subscribe` /
+`FileFeed` (`file.subscribe`) and `BlobBackend` (the provider side) are not implemented: the trait defaults answer `Unsupported`. The server offers the first
+four; the client leaves them out because the app calls none of them. **`capabilities()` is cut to match:** those ids are reported as not possible ("the server
+offers it, the client of the files program does not yet"), everything else as the server said (`sharing` and the like: the server's own `Unsupported`).
+
+**Errors** are read back from the problem type (the wire carries a type, a status and a text, not the fields of a variant): `name-conflict` is `Conflict`
+(the text begins `name taken: `, so `Error::problem()` gives the same type again), `invalid-name` is `InvalidName`, `changed-outside` is `Backend` with
+`changed outside: ` in front (again `problem()` gives the type), `not-found` is `NotFound(text)`, `conflict` is `Conflict`, `wrong-offset` is `Offset { expected, got }`
+(the two numbers are read from the text; a text without them stays a `Conflict`), `invalid` is `Config`, `encryption-required` is `Store(EncryptionRequired(id))` when the text names the
+id, `stored-data-invalid` is `Store(Backend(..))` (there is no way to build a `Json` error from the wire), `backend-failed` is `Backend`, `invalid-request` and `too-large` are `Store(Invalid)`, `unsupported` is
+`Unsupported(capability, reason)`. **Deviations from the core:** the id of a not-found is not carried (the text is); a change of wording on the server breaks the reading of
+`Offset` and the ids (the table is tested in `problems_table.rs`, the common types over the real socket). `TrashReport.failedMissing` (ids the server could not list,
+only with more than 1.3 million failures) has no place in the core's type and is dropped.
+
+**What does not arrive exactly:** `published` and `updated` of the envelope come in milliseconds, the wire's resolution (the store's microseconds are lost).
+
+**Tests** (`tests/{folders,paging,transfer,rescan,gone}.rs`, `problems_table.rs`, `cursor.rs`): the real server on a Unix socket on a thread of its own, the real `FileRepo` with a real
+folder, the real client; values compared with the provider behind the server; 130 folders over two pages with the cursors equal to the provider's; 105 unfinished uploads over two pages;
+a 3 MiB upload in chunks, resumed with a new handle, a wrong offset writes nothing; ranges of a blob; a server that stops. Not tested: an upload above the server's limits over the
+wire (the server's own tests cover 34 MiB), a server that never answers (the shared worker's tests cover the deadline).
+
+## Frontend (`crates/fs-files-app`, provisional, not reviewed)
+
+The work surface is the workbench `file-manager` of `fs-components` (it knows no store and no type of this repo); the app is the adapter between it and the contract, plus the
+shell with its menus (`surface.rs`: File: New folder, Upload, Rescan; View: List, Grid, Trash, Transfers; only what the source can do is offered, nothing destructive), the command line
+and the words (`words.rs`). It imports no `blinc_*` crate. **`--socket <path>` is required** and names a running `fs-files-server`; `--root` and `--store` are refused with a hint at the
+server (the folder is its `FS_FILES_ROOT`, the store its `--data`). The app opens no store and no backend. Further options: `--no-rescan`, `--snapshot`, `--size`, `--view list|grid`,
+`--upload`, `--into`, `--keep-both`, `--download`, `--to`, `--release-sensitive`. A server that is not there is `cannot reach the files server at <path>: ...` and exit code 1.
+Pinned: `fs-interfaces` v0.35.0 and `fs-components` at `8c38a3b` (a commit of `main`, not yet a tag).
+
+**What works** (all of it over the socket, tested in `crates/fs-files-app/tests` against the real server): folders as a tree, breadcrumb, list and grid; sorting by name, size, type (ascending only) and
+changed; search by name and filter by size and date (`find` has no "top level only", so a page can be short); create, rename, move, copy folders and files, with the keep-both rule; trash, restore (also to
+another folder), purge, empty; rescan (also at the start); upload and download by a path typed in (chunked, resumable, a list of unfinished uploads to resume or drop, a taken name refused or kept both,
+a file marked sensitive written only with the person's release and readable by its owner only); the preview of the start of a file; marks of sensitive files shown (never opened by the workbench).
+
+**Paging and the "+1" effect.** The workbench does not ask by offset: it hands the source the page mark of the last page and loops until it has its goal of rows (`PAGE`, 200). The mark is the
+core's `Cursor`, i.e. the cursor of `Folders.list` and `Search.find`; the unfinished uploads are read page by page in the client. So the page size is the server's (100), the workbench takes
+what comes, and there is no re-reading from the start to skip rows as in `fs-people-app`. The cursor is a place in the list and shifts if an entry is added between two pages (the limit of `fs-interfaces`).
+
+**`Unsupported` / not there, honestly:**
+* **Dates:** the entries show none (`FileCapabilities::dates = false`), although the envelope has `updated`; the adapter does not pass it on yet (a review point). Sorting by "changed" works.
+* **Sort by type descending:** the contract says ascending only.
+* **`subscribe`:** the app has none; a change another program or a person makes in the folder shows after the next read or Rescan. The client does not implement `FileFeed`.
+* **Marking a file sensitive** (`classify`), **backends** (`Backends`, S3 and others): not in the app and not in the client. **Sharing, versions, encryption, sync, WebDAV, tags:** not built in the contract either.
+* **Upload and download are paths typed into the input (and the command line):** there is no file dialog (it needs Blinc support). Both **block the interface thread** until they are done, per call with the
+  30 s deadline of the client (a chunk is one call; a large file is many); there is no worker that posts back, so the window does not move meanwhile. A download is written whole from memory and refused above 2 GiB. **Bigger than that over the wire is not
+  built; there is no stand-in.** The transfer list shows no sizes and the command line prints no byte counts: the commits of the workbench that return them (`Transferred`, branch `files-gui`, not pushed to `fs-components`) are not in `main`, so the
+  app is on `main`'s API (`upload` and `download` answer the name).
+* **A `rescan` of a very large folder** is one call under the 30 s deadline; one that is missed shows as an error while the server goes on.
+* **A server that stops** is an error on the next action; no reconnect.
+* **Not reviewed:** this is the state of 2026-11-06 plus the move to the socket; the review points of the first version are still open. The measurements `tests/measure.rs` (large folder, large upload) are ignored and were not run over the socket.
+
 ## Crates
 
 * `fs-store` (v0.2.0), `fs-interfaces` (v0.35.0): git tags.
@@ -215,6 +302,8 @@ wants remote backends needs the client side (`RemoteBackend`), not built; (7) a 
   trait, which exposes the multipart id and the part etags. That is what a resumable upload needs (state is persisted, so a new process
   can go on). It also gives us signing, retries and the in-memory store for tests. Its TLS comes via `reqwest` + `rustls` + `aws-lc-rs`, which
   contains C code: not pure Rust. Hence the feature: `--no-default-features` is a pure-Rust build with the local folder only. `bytes` for its payloads.
+* Client: `fs-interfaces` with feature `rpc` (the shared `Worker`, `Timeouts`, problems), `capnp` 0.27, `async-trait`; `fs-files-core` without the S3 feature.
+* App: `fs-components-app`, `-workbenches`, (tests) `-render`, `-widgets` at `8c38a3b` of `fs-components`; `chrono`, `tokio` (runtime for the workbench's blocking calls); dev: `image`, `tempfile`, the server.
 * Server: `capnp` 0.27, `capnp-rpc` 0.27 (MIT), `tokio` (sync); `fs-interfaces` with feature `rpc` (socket, problems, pages, feed, `run_to_end`).
 * Dev: `tempfile`, `uuid`, `async-trait`, `serde_json`, `chrono`, `blake3`.
 * Not taken: `opendal` (broad, many services we do not use; its writer hides the multipart id, so an upload could not be resumed after a restart). `rusty-s3` + an own HTTP layer would be pure sans-IO but means writing the client.
