@@ -250,3 +250,9 @@ wants remote backends needs the client side (`RemoteBackend`), not built; (7) a 
 file and a folder IS its real name (not derived). In the core `Error::problem()` makes the mapping; a name clash is still `Error::Conflict`.
 `OnConflict` is a last parameter of rename, move, copy and `startUpload` (0 = refuse, so old callers keep working; the wire `copyFile` now refuses by default, the Rust `copy_file` without `_as` still keeps both). `Sort` is a last parameter of `list` and `find`. Capabilities: `file.sort`, `file.conflictRule`, `folder.rescan` (Files), `blob.rename` and `blob.scan` (backend). Also appended since v0.8.0: `OnConflict` (v0.9.0), `Sort` (v0.10.0), size and date filters (v0.11.0), `emptyTrash`, `restoreTo`, `TrashReport` (v0.12.0), `getFolder` (v0.13.0), `pendingUploads`, `UploadInfo` (v0.14.0). `moveFolder`, `pending`, `FileFilter.trashed` exist since v0.5.0. `Files.subscribe @6` takes a `ChangeListener`
 (common.capnp); the Rust form is `FileFeed` (the placeholder `Files::subscribe` is gone).
+
+## After the sprint (strategy list, 2026-11-07)
+
+* `issue` values such as "empty or too long segment" (`backend/key.rs`, `backend/local/path.rs`) are sentences instead of identifiers (§2a): replace them by identifiers.
+* The cursors of `list` and `find` are offsets; a cursor as a place in the sort key needs one query per sort order.
+* `wrong-offset` and the upload errors from `write` carry no upload `id`; `name_taken` in `backend/local/io.rs` has no `name`.
