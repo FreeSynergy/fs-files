@@ -3,7 +3,7 @@
 //! Pattern: Visitor (see `rescan.rs`) — what to do when the disk and the records agree,
 //! when the disk has something new, and when a record has nothing at its place.
 
-use fs_store::{ObjectId, StoredObject};
+use fs_objects::{ObjectId, StoredObject};
 
 use super::handle::FileRepo;
 use super::rescan::{Item, SNIFF, Walk};

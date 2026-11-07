@@ -8,8 +8,8 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use fs_store::traits::ObjectRepository;
-use fs_store::{Activity, ActivityKind, LogEntry, ObjectId, Result, StoredObject};
+use fs_objects::traits::ObjectRepository;
+use fs_objects::{Activity, ActivityKind, LogEntry, ObjectId, Result, StoredObject};
 
 use super::consts::UPLOAD_TYPE;
 use crate::feed::{FileChange, Registry};

@@ -5,7 +5,7 @@ use super::seen::{Seen, read_entry, read_file};
 use fs_interfaces::common_capnp::uuid as wire_uuid;
 use fs_interfaces::files_capnp::{OnConflict, backends, files, folders, search, transfer};
 use fs_interfaces::rpc::{read_envelope, read_uuid, write_uuid};
-use fs_store::Envelope;
+use fs_objects::Envelope;
 use uuid::Uuid;
 
 /// The four capabilities behind the root.

@@ -7,7 +7,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use fs_store::{ObjectId, Order, Query, StoredObject};
+use fs_objects::{ObjectId, Order, Query, StoredObject};
 use serde::{Deserialize, Serialize};
 
 use super::blob::new_key;
@@ -213,7 +213,7 @@ impl Upload for UploadSession {
             self.discard_bytes().await?;
         }
         match self.repo.objects.delete(self.id, &self.repo.actor).await {
-            Ok(_) | Err(fs_store::Error::NotFound(_)) => Ok(()),
+            Ok(_) | Err(fs_objects::Error::NotFound(_)) => Ok(()),
             Err(e) => Err(e.into()),
         }
     }

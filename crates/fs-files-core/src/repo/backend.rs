@@ -6,8 +6,8 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use fs_store::traits::{ObjectQuery, ObjectRepository};
-use fs_store::{Activity, LogEntry, ObjectId, Query, Result, Store, StoredObject};
+use fs_objects::traits::{ObjectQuery, ObjectRepository};
+use fs_objects::{Activity, LogEntry, ObjectId, Query, Result, Store, StoredObject};
 
 /// Presents an `Arc<dyn Store>` as the narrow read / write traits.
 pub(super) struct StoreAdapter(pub(super) Arc<dyn Store>);

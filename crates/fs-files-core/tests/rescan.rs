@@ -5,7 +5,7 @@ mod common;
 use common::disk::root;
 use common::{env, read_all, upload};
 use fs_files_core::{BlobBackend, Entry, Files, LocalFolder, Transfer};
-use fs_store::ObjectId;
+use fs_objects::ObjectId;
 
 #[tokio::test]
 async fn rescan_takes_over_new_files_and_folders_and_updates_changed_ones() {

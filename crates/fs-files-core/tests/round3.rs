@@ -93,8 +93,8 @@ async fn a_folder_move_counts_the_root_of_the_disk_too() {
     }
     deep.push("d".repeat(3599 - deep.as_os_str().len()));
     std::fs::create_dir_all(&deep).unwrap();
-    let store: std::sync::Arc<dyn fs_store::Store> =
-        std::sync::Arc::new(fs_store::TursoStore::open_in_memory().await.unwrap());
+    let store: std::sync::Arc<dyn fs_objects::Store> =
+        std::sync::Arc::new(fs_objects::TursoStore::open_in_memory().await.unwrap());
     let backend = std::sync::Arc::new(LocalFolder::open(&deep).await.unwrap());
     let r = fs_files_core::FileRepo::new(store, common::ME, "main", backend);
     let a = r.create_folder(None, &"a".repeat(200)).await.unwrap();
@@ -237,8 +237,8 @@ mod s3 {
 
     #[tokio::test]
     async fn received_reports_the_committed_size_when_only_the_record_is_missing() {
-        let store: Arc<dyn fs_store::Store> =
-            Arc::new(fs_store::TursoStore::open_in_memory().await.unwrap());
+        let store: Arc<dyn fs_objects::Store> =
+            Arc::new(fs_objects::TursoStore::open_in_memory().await.unwrap());
         let flaky = Arc::new(Flaky {
             store,
             fail: Arc::default(),

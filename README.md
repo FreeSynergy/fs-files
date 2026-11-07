@@ -1,7 +1,7 @@
 # fs-files (FreeSynergy.Files)
 
 FreeSynergy program (ADR 0017): files and folders. What we know about a file is an object in
-[fs-store](https://github.com/FreeSynergy/fs-store); its bytes are in a backend: a local folder (default) or
+[fs-objects](https://github.com/FreeSynergy/fs-objects); its bytes are in a backend: a local folder (default) or
 S3 (RustFS and others). Other programs refer to a file by id and never see paths or backends.
 
 The program core is `crates/fs-files-core` (no GUI); `crates/fs-files-server` serves the contract over a Unix socket. Contract: `files.capnp` in

@@ -21,7 +21,7 @@ async fn a_folder_is_resolved_by_id() {
     // a file id is not a folder, an unknown id is nothing
     let f = common::upload(r, None, "a.txt", "text/plain", b"x").await;
     assert_eq!(r.get_folder(f.id).await.unwrap(), None);
-    assert_eq!(r.get_folder(fs_store::ObjectId::new()).await.unwrap(), None);
+    assert_eq!(r.get_folder(fs_objects::ObjectId::new()).await.unwrap(), None);
     // renaming shows in the resolved folder
     r.rename_folder(top.id, "Ferien").await.unwrap();
     assert_eq!(r.get_folder(top.id).await.unwrap().unwrap().name, "Ferien");

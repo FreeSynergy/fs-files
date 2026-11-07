@@ -39,7 +39,7 @@ impl FileRepo {
     pub(super) async fn in_trash(
         &self,
         backend: &dyn BlobBackend,
-        id: fs_store::ObjectId,
+        id: fs_objects::ObjectId,
         r: &FileRecord,
     ) -> Result<InTrash> {
         Ok(match backend.inspect(&Spot::Trash(id.to_string())).await? {

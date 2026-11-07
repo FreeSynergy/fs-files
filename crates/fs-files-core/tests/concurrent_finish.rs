@@ -62,8 +62,8 @@ async fn two_finishes_at_once_on_s3() {
     use common::fake_s3::Fake;
     use fs_files_core::{S3Backend, S3Options};
     use std::sync::Arc;
-    let store: Arc<dyn fs_store::Store> =
-        Arc::new(fs_store::TursoStore::open_in_memory().await.unwrap());
+    let store: Arc<dyn fs_objects::Store> =
+        Arc::new(fs_objects::TursoStore::open_in_memory().await.unwrap());
     let backend =
         Arc::new(S3Backend::new(Arc::new(Fake::default()), &S3Options::default()).unwrap());
     let r = fs_files_core::FileRepo::new(store, common::ME, "cloud", backend);

@@ -12,7 +12,7 @@ pub mod suite;
 use std::sync::Arc;
 
 use fs_files_core::{File, FileRepo, Files, LocalFolder, Transfer};
-use fs_store::{ObjectId, Store, TursoStore};
+use fs_objects::{ObjectId, Store, TursoStore};
 
 pub const ME: &str = "https://local.invalid/users/owner";
 
@@ -72,7 +72,7 @@ pub async fn names(repo: &FileRepo, folder: Option<ObjectId>) -> Vec<String> {
 /// A repository over a store *file* and a blob folder inside `dir`; can be opened again later.
 /// `encrypted` opens the store with a key (ADR 0024); otherwise sensitive objects are refused (ADR 0029).
 pub async fn reopen(dir: &std::path::Path, encrypted: bool) -> (FileRepo, Arc<dyn Store>) {
-    use fs_store::{Cipher, EncryptionKey, OpenOptions, StaticKeyProvider};
+    use fs_objects::{Cipher, EncryptionKey, OpenOptions, StaticKeyProvider};
     let mut opts = OpenOptions::default();
     if encrypted {
         let key = EncryptionKey {

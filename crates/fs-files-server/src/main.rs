@@ -10,7 +10,7 @@ use std::sync::Arc;
 use fs_files_core::{FileRepo, LocalFolder, RESERVED_NAME};
 use fs_files_server::{FilesServer, check_places};
 use fs_interfaces::rpc::{ServerOptions, prepare_data_dir, run_until_signal};
-use fs_store::{Store, TursoStore};
+use fs_objects::{Store, TursoStore};
 
 const ROOT: &str = "FS_FILES_ROOT";
 /// The id files record for the backend this program starts with.

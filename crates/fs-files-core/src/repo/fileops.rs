@@ -5,7 +5,7 @@
 //! the database fails), change the record, rewrite the index, store. Trash moves the bytes to the
 //! program's own trash folder; purge deletes bytes first (repeatable), metadata second.
 
-use fs_store::ObjectId;
+use fs_objects::ObjectId;
 
 use super::build::set_file;
 use super::handle::FileRepo;
@@ -15,7 +15,7 @@ use super::verify::InTrash;
 use crate::backend::Spot;
 use crate::error::{Error, Result};
 use crate::model::{File, FileRecord, OnConflict, TrashReport};
-use fs_store::{Query, StoredObject};
+use fs_objects::{Query, StoredObject};
 
 use super::consts::CONTEXT;
 
@@ -224,7 +224,7 @@ impl FileRepo {
         self.transact(steps, self.save_file(o.clone())).await
     }
 
-    async fn store_file(&self, o: &mut fs_store::StoredObject, r: &FileRecord) -> Result<File> {
+    async fn store_file(&self, o: &mut fs_objects::StoredObject, r: &FileRecord) -> Result<File> {
         set_file(o, r);
         self.save_file(o.clone()).await
     }

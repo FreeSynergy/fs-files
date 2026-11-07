@@ -6,8 +6,8 @@
 
 use std::sync::Arc;
 
-use fs_store::traits::{ObjectQuery, ObjectRepository};
-use fs_store::{ObjectId, Store};
+use fs_objects::traits::{ObjectQuery, ObjectRepository};
+use fs_objects::{ObjectId, Store};
 use tokio::sync::Mutex;
 
 use super::backend::StoreAdapter;

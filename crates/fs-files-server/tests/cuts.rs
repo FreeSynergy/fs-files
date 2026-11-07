@@ -6,7 +6,7 @@ mod common;
 use common::stub::{Stub, entries, heavy_file};
 use common::{caps, with_stub};
 use fs_files_core::{RescanReport, UploadInfo};
-use fs_store::ObjectId;
+use fs_objects::ObjectId;
 
 #[tokio::test(flavor = "current_thread")]
 async fn a_rescan_report_beyond_a_message_is_cut_and_the_cut_is_in_skipped() {

@@ -8,7 +8,7 @@ use fs_files_core::{OnConflict, Sort, SortBy};
 use fs_interfaces::common_capnp::uuid;
 use fs_interfaces::files_capnp;
 use fs_interfaces::rpc::{invalid_request, read_uuid, write_uuid};
-use fs_store::ObjectId;
+use fs_objects::ObjectId;
 
 /// An id that may be unset (`None`: the top level, no folder).
 pub(crate) fn optional(r: uuid::Reader<'_>) -> capnp::Result<Option<ObjectId>> {

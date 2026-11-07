@@ -9,7 +9,7 @@ use fs_files_core::{FileChange, FileFeed, FileListener, Files};
 use fs_interfaces::Unsupported;
 use fs_interfaces::common_capnp::{change_listener, subscription};
 use fs_interfaces::rpc::{ChangeSender, Notice, change_channel, forward, unsupported};
-use fs_store::{Envelope, ObjectId};
+use fs_objects::{Envelope, ObjectId};
 
 struct ToChannel(ChangeSender<FileChange>);
 
