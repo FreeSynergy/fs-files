@@ -38,8 +38,8 @@ Version 0.4.0, not tagged (stage 1: local folder, stage 2: S3, stage 3: real nam
 | Server `fs-files-server`: every method of `Files`, `Folders`, `Transfer`, `Upload`, `Blob` (common), `Search`, `Backends` and `BlobBackend` (provider side), `subscribe` with `ended`, `supportReport`; errors as typed problems; binary with `--socket --data --actor --instance` and `FS_FILES_ROOT` | done, draft |
 | `sharing` (empty placeholder interface): `Unsupported` (`share.create`); versions, encryption, sync, WebDAV, previews: not built | as agreed |
 | Client `fs-files-client`: `RpcFiles` implements `Files` and `Transfer` over the socket of `fs-files-server` (every method the app calls and the plain forms of them); the rest is `Unsupported`; see Client | done, draft |
-| Frontend `fs-files-app`: the workbench `file-manager` of `fs-components` over the socket (`--socket`); holds no store and no backend; see Frontend | first version, provisional, not reviewed |
-| Tests | 269 run by default: core 141, server 60, client 22, app 46 (incl. unit tests); 4 ignored (2 live S3 in the core, 2 measurements in the app). The server tests run over a real socket against a real `FileRepo`; the client and app tests run the real server on a thread of its own with a real folder and the real client; the app also runs its real binary |
+| Frontend `fs-files-app`: the workbench `file-manager` of `fs-components` over the socket (`--socket`); holds no store and no backend; see Frontend | first version, provisional; reviewed once, 2026-11-07 (Opus), see Frontend |
+| Tests | run by default: core 141, server 60, client 22, app 50 (incl. unit tests); 4 ignored (2 live S3 in the core, 2 measurements in the app). The server tests run over a real socket against a real `FileRepo`; the client and app tests run the real server on a thread of its own with a real folder and the real client; the app also runs its real binary |
 
 ## Structure and pattern map (ADR 0043)
 
@@ -86,9 +86,14 @@ Version 0.4.0, not tagged (stage 1: local folder, stage 2: S3, stage 3: real nam
 | `fs-files-client/{files_impl,transfer_impl}.rs` | Adapter | the traits `Files` and `Transfer` of the core, one call each; the upload and the blob handed out are small adapters that name their upload or file again in every call |
 | `fs-files-client/{folder,file,transfer}_calls.rs`, `read.rs`, `write.rs`, `cursor.rs` | Adapter | requests and replies of the contract as values of the core; pages and the unfinished uploads are read page by page |
 | `fs-files-client/problems.rs` | Adapter | the table of problem types to `fs_files_core::Error`, chosen by the type, never by the words |
-| `fs-files-app/src/source/*` | Adapter (+ Template method for transfers) | the contract's `Files` and `Transfer` as the workbench's `FileSource`; a request of the workbench as one call |
+| `fs-files-app/src/source/{adapter,provider,listing,change}.rs` | Adapter | the contract's `Files` and `Transfer` as the workbench's `FileSource`; a request of the workbench as one call |
+| `fs-files-app/src/source/transfer.rs` | Facade | upload, resume, drop and download in front of the client and the person's file system: one fixed flow each, and it reads, writes and calls |
+| `fs-files-app/src/source/paths.rs` | Specification | what a path of the person's own computer may be |
 | `fs-files-app/surface.rs` | Adapter, Command | the workbench as a screen of the shell; a menu entry is an id and one handler |
-| `fs-files-app/args.rs`, `words.rs`, `commands.rs` | none / Value object / Facade consumer | arguments; the words of the program (named places, ADR 0057); upload and download without a window |
+| `fs-files-app/args.rs`, `words.rs` | none | a pure function over the argument list; constants (whole sentences, named places, ADR 0057) and pure functions that fill them: nothing is read, written or called |
+| `fs-files-app/main.rs` | none | a thin binary: parses, connects, hands over; no logic of its own |
+| `fs-files-app/commands.rs` | Facade | two small functions (upload, download) in front of the `FileSource`; it calls it, so it is not `none` |
+| `fs-files-app/tests/common/decorators.rs` | Decorator | a provider that misbehaves on purpose in front of the real `FileRepo` (a hostile name; the server stopped after n chunks) |
 
 ## Decisions (the owner may want to change these)
 
@@ -213,6 +218,10 @@ same code as in `fs-tasks` and `fs-maps` and wants to live once in `fs-interface
 added between two pages (the shared limit of `fs-interfaces`); (6) the `Files` root has no way to hand out `BlobBackend`, correct for the contract, but a program that
 wants remote backends needs the client side (`RemoteBackend`), not built; (7) a person who changes the folder from outside is seen only by `rescan`, no watcher.
 
+## Data-loss paths
+
+What could lose or misplace bytes, and what stops it. **Download:** a file is written whole or not at all, never over an existing path or a link; a marked file only with the person's release and readable by its owner only; the name comes from the server, so it is checked with `check_name` before it is joined to the path (`../x`, `/abs`, `a/b` are refused, tested with a decorator in front of the real server). A file above `FileAdapter::MOST_IN_MEMORY` (2 GiB) is refused before anything is written (tested with a smaller limit; the real value is asserted). **Upload:** chunks go in order; a connection that breaks leaves what arrived as an unfinished upload, no half file is made (tested by stopping the real server after two chunks, then resuming on the provider). **Resume:** the core cannot tell whether a file is the one an upload started from; the app checks only that the name matches (a number added by keep-both is allowed) and that the file is not smaller than what arrived. A different file of the same name and a larger size is appended. That is a known gap, not closed.
+
 ## Client (`crates/fs-files-client`)
 
 `RpcFiles` is the Adapter of `Files` and `Transfer` in front of the Cap'n Proto client of `files.capnp`, so a frontend depends on the traits and never on the
@@ -260,7 +269,7 @@ folder, the real client; values compared with the provider behind the server; 13
 a 3 MiB upload in chunks, resumed with a new handle, a wrong offset writes nothing; ranges of a blob; a server that stops. Not tested: an upload above the server's limits over the
 wire (the server's own tests cover 34 MiB), a server that never answers (the shared worker's tests cover the deadline).
 
-## Frontend (`crates/fs-files-app`, provisional, not reviewed)
+## Frontend (`crates/fs-files-app`, provisional, reviewed once)
 
 The work surface is the workbench `file-manager` of `fs-components` (it knows no store and no type of this repo); the app is the adapter between it and the contract, plus the
 shell with its menus (`surface.rs`: File: New folder, Upload, Rescan; View: List, Grid, Trash, Transfers; only what the source can do is offered, nothing destructive), the command line
@@ -289,7 +298,7 @@ what comes, and there is no re-reading from the start to skip rows as in `fs-peo
   app is on `main`'s API (`upload` and `download` answer the name).
 * **A `rescan` of a very large folder** is one call under the 30 s deadline; one that is missed shows as an error while the server goes on.
 * **A server that stops** is an error on the next action; no reconnect.
-* **Not reviewed:** this is the state of 2026-11-06 plus the move to the socket; the review points of the first version are still open. The measurements `tests/measure.rs` (large folder, large upload) are ignored and were not run over the socket.
+* **Reviewed once, 2026-11-07 (Opus): no data loss found.** Fixed after it: patterns named as in `coding.md` 2, sentences with named places in `words.rs`, the name of a downloaded file checked with `check_name` (a hostile server cannot choose the path), tests for the 2 GiB limit and for a connection that breaks mid-upload. Remaining points: dates in the entries, a file dialog, work off the interface thread, `subscribe`, the resume gap (see "Data-loss paths"), all named above. The measurements `tests/measure.rs` (large folder, large upload) are ignored and were not run over the socket.
 
 ## Crates
 
