@@ -1,58 +1,35 @@
-//! Stub for the red tests; replaced in the next commit.
+//! `fs-files-client`: the files program as a client of its own contract `files.capnp`.
 //!
-//! Pattern: none (stub).
+//! [`RpcFiles`] implements [`fs_files_core::Files`] and [`fs_files_core::Transfer`] over a Unix socket,
+//! so a frontend depends on the traits and talks to a running `fs-files-server`, never to the core of
+//! the program (ADR 0021). What a method does not offer answers the `Unsupported` of the provider rule
+//! (ADR 0045); `DESIGN.md` lists which.
+//!
+//! Interface status: draft (ADR 0045), as the contract.
+//!
+//! Pattern: Facade — this file only declares modules and re-exports the public API.
 
-use std::io;
-use std::path::Path;
-use std::sync::Arc;
+#![deny(missing_docs)]
+#![warn(clippy::pedantic)]
+// A closure reads better than the full path of a generated reader type.
+#![allow(
+    clippy::module_name_repetitions,
+    clippy::redundant_closure_for_method_calls
+)]
 
-use async_trait::async_trait;
-use fs_files_core::{Blob, Cursor, File, Files, Folder, Page, Result, Transfer};
-use fs_interfaces::Capabilities;
-use fs_store::ObjectId;
+mod cursor;
+mod file_calls;
+mod files_impl;
+mod folder_calls;
+mod peer;
+mod problems;
+#[cfg(test)]
+mod problems_table;
+mod read;
+mod remote;
+mod transfer_calls;
+mod transfer_impl;
+mod write;
 
-pub use fs_interfaces::rpc::client::Timeouts;
-
-/// Stub.
-pub struct RpcFiles;
-
-impl RpcFiles {
-    /// Stub.
-    ///
-    /// # Errors
-    /// Never.
-    pub fn connect_with(socket: &Path, _t: Timeouts) -> io::Result<Self> {
-        Self::connect(socket)
-    }
-
-    /// Stub that connects to nothing and answers `Unsupported` everywhere.
-    ///
-    /// # Errors
-    /// Never.
-    pub fn connect(_socket: &Path) -> io::Result<Self> {
-        Ok(Self)
-    }
-}
-
-#[async_trait]
-impl Files for RpcFiles {
-    fn capabilities(&self) -> Capabilities {
-        Capabilities::new("stub")
-    }
-    async fn get(&self, _id: ObjectId) -> Result<Option<File>> {
-        Err(fs_interfaces::Unsupported::new("file.resolve", "stub").into())
-    }
-    async fn get_folder(&self, _id: ObjectId) -> Result<Option<Folder>> {
-        Err(fs_interfaces::Unsupported::new("folder.resolve", "stub").into())
-    }
-    async fn list(&self, _folder: Option<ObjectId>, _cursor: Option<Cursor>) -> Result<Page> {
-        Err(fs_interfaces::Unsupported::new("folder.list", "stub").into())
-    }
-}
-
-#[async_trait]
-impl Transfer for RpcFiles {
-    async fn open(&self, _id: ObjectId) -> Result<Arc<dyn Blob>> {
-        Err(fs_interfaces::Unsupported::new("file.download", "stub").into())
-    }
-}
+pub use fs_interfaces::rpc::client::{CALL_TIMEOUT, CONNECT_TIMEOUT, Timeouts};
+pub use peer::RpcFiles;
