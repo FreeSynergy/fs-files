@@ -43,7 +43,7 @@ pub use feed::{FileChange, FileFeed, FileListener, Registry, Subscription};
 pub use files::Files;
 pub use model::{
     BackendInfo, Cursor, Entry, File, FileFilter, Folder, OnConflict, Page, RescanReport, Sort,
-    SortBy, TrashReport, UploadInfo,
+    SortBy, TrashReport, UploadInfo, UploadPage,
 };
 pub use note::{Kind, Note, Subject};
 pub use repo::{CONTEXT, FOLDER_TYPE, FileRepo, MAX_NAME, UPLOAD_TYPE, check_name};

@@ -18,4 +18,4 @@ pub(crate) use folder::FolderRecord;
 pub use page::{BackendInfo, Cursor, Entry, FileFilter, Page};
 pub use rescan::{RescanReport, TrashReport};
 pub use sort::{Sort, SortBy};
-pub use upload::UploadInfo;
+pub use upload::{UploadInfo, UploadPage};

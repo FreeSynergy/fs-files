@@ -11,7 +11,7 @@ use fs_interfaces::Unsupported;
 use fs_store::ObjectId;
 
 use crate::error::Result;
-use crate::model::{File, OnConflict, UploadInfo};
+use crate::model::{Cursor, File, OnConflict, UploadInfo, UploadPage};
 
 /// Bytes behind a capability (`Blob` in `common.capnp`).
 #[async_trait]
@@ -74,6 +74,22 @@ pub trait Transfer: Send + Sync {
     /// (after a restart, or on another device).
     async fn pending_uploads(&self) -> Result<Vec<UploadInfo>> {
         Err(Unsupported::new("file.pendingUploads", "this provider cannot list uploads").into())
+    }
+    /// `file.upload`: one page of the unfinished uploads, oldest first, from `cursor` (`None` = the start).
+    /// The default cuts the whole list; a provider with many uploads cuts the page where they are kept.
+    async fn pending_uploads_page(
+        &self,
+        cursor: Option<Cursor>,
+        size: usize,
+    ) -> Result<UploadPage> {
+        let all = self.pending_uploads().await?;
+        let start = cursor.map_or(0, Cursor::position).min(all.len());
+        let end = start.saturating_add(size).min(all.len());
+        let next = (end < all.len()).then(|| Cursor::at(end));
+        Ok(UploadPage {
+            items: all[start..end].to_vec(),
+            next,
+        })
     }
     /// `file.upload`: take up a started upload again, also after a restart.
     async fn resume_upload(&self, _id: &str) -> Result<Arc<dyn Upload>> {

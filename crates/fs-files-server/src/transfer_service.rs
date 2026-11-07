@@ -10,14 +10,14 @@ use std::sync::Arc;
 use capnp_rpc::new_client;
 use fs_files_core::Transfer;
 use fs_interfaces::files_capnp::transfer;
-use fs_interfaces::rpc::{DEFAULT_PAGE_SIZE, Page, read_object_id};
+use fs_interfaces::rpc::{DEFAULT_PAGE_SIZE, check_answer, read_object_id};
 
 use crate::blob_service::BlobImpl;
 use crate::errors::{finish, rpc_error};
 use crate::upload_service::UploadImpl;
 use crate::wire::report::{upload_weight, write_uploads};
 use crate::wire::text::{self, MAX_SHORT, limited};
-use crate::wire::{count, ids};
+use crate::wire::{count, cursor, ids};
 
 pub(crate) struct TransferImpl {
     pub(crate) transfer: Arc<dyn Transfer>,
@@ -78,15 +78,20 @@ impl transfer::Server for TransferImpl {
         params: transfer::PendingUploadsParams,
         mut results: transfer::PendingUploadsResults,
     ) -> Done {
-        let cursor = params.get()?.get_cursor()?.get_opaque()?.to_vec();
-        let all = self.transfer.pending_uploads().await.map_err(rpc_error)?;
-        let page = Page::of_weighted(all, &cursor, DEFAULT_PAGE_SIZE, upload_weight)?;
+        let cursor = cursor::read(params.get()?.get_cursor()?.get_opaque()?)?;
+        let page = self
+            .transfer
+            .pending_uploads_page(cursor, DEFAULT_PAGE_SIZE)
+            .await
+            .map_err(rpc_error)?;
+        // A page of uploads is far below a message; the check keeps it so should the limits change.
+        check_answer(page.items.iter().map(upload_weight).sum())?;
         let mut out = results.get();
         write_uploads(
             out.reborrow().init_items(count(page.items.len())?),
             &page.items,
         );
-        out.init_next().set_opaque(&page.next);
+        out.init_next().set_opaque(&cursor::write(page.next));
         Ok(())
     }
 }

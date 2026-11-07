@@ -18,6 +18,7 @@ mod manage;
 mod names;
 mod notify;
 mod paths;
+mod pending;
 mod provider;
 mod rescan;
 mod rescan_known;

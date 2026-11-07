@@ -20,3 +20,12 @@ pub struct UploadInfo {
     /// When the upload was started.
     pub started: chrono::DateTime<chrono::Utc>,
 }
+
+/// One page of unfinished uploads; `next` is `None` on the last page.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct UploadPage {
+    /// The uploads of this page, oldest first.
+    pub items: Vec<UploadInfo>,
+    /// Where the next page starts.
+    pub next: Option<super::Cursor>,
+}

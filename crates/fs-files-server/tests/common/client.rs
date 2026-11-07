@@ -197,3 +197,19 @@ pub async fn received(upload: &fs_interfaces::files_capnp::upload::Client) -> u6
     let answer = upload.received_request().send().promise.await.unwrap();
     answer.get().unwrap().get_bytes()
 }
+
+/// Follow `pendingUploads` to the end; how many uploads came.
+pub async fn pending_all(c: &Caps) -> usize {
+    let (mut seen, mut cursor) = (0, vec![]);
+    loop {
+        let mut call = c.transfer.pending_uploads_request();
+        call.get().init_cursor().set_opaque(&cursor);
+        let answer = call.send().promise.await.unwrap();
+        let r = answer.get().unwrap();
+        seen += r.get_items().unwrap().len() as usize;
+        cursor = r.get_next().unwrap().get_opaque().unwrap().to_vec();
+        if cursor.is_empty() {
+            return seen;
+        }
+    }
+}
