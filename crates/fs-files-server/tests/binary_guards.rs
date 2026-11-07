@@ -48,7 +48,8 @@ fn it_refuses_a_relative_root_before_it_opens_anything() {
 fn it_refuses_a_root_that_holds_the_data_and_leaves_no_trace_in_it() {
     let dir = tempfile::tempdir().unwrap();
     let data = dir.path().join("data");
-    for root in [dir.path().to_path_buf(), data.clone()] {
+    let hidden = dir.path().join("not-made/..");
+    for root in [dir.path().to_path_buf(), data.clone(), hidden] {
         let code = code_of(&dir.path().join("x.sock"), &data, &root);
         assert_eq!(code, Some(1), "{}", root.display());
         assert!(
@@ -98,7 +99,11 @@ async fn a_backend_added_over_the_socket_stays_below_the_root() {
             }
             assert!(ok && stored);
             assert!(!outside.exists(), "nothing was made outside the root");
-            assert!(root.join("second").is_dir());
+            assert!(root.join(".fs-files/backends/second").is_dir());
+            assert!(
+                !root.join("second").exists(),
+                "not among the files of the main backend"
+            );
         })
         .await;
 }

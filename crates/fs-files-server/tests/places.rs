@@ -21,7 +21,7 @@ fn a_root_that_holds_the_data_is_refused_in_every_shape() {
     assert!(refused(&data, &data).contains("objects.db"));
     assert!(refused(dir.path(), &data).contains("objects.db"));
     assert!(refused(&dir.path().join("data/./"), &data).contains("objects.db"));
-    assert!(refused(&dir.path().join("data/../data"), &data).contains("objects.db"));
+    refused(&dir.path().join("data/../data"), &data);
     let link = dir.path().join("link");
     std::os::unix::fs::symlink(&data, &link).unwrap();
     refused(&link, &data);
@@ -44,4 +44,21 @@ fn a_root_beside_or_below_the_data_is_fine_made_or_not() {
     std::fs::create_dir(dir.path().join("elsewhere")).unwrap();
     std::os::unix::fs::symlink(dir.path().join("elsewhere"), &link).unwrap();
     check_places(&link.join("new"), &data).unwrap();
+}
+
+#[test]
+fn a_dot_dot_after_a_part_that_is_not_there_yet_does_not_hide_the_data() {
+    let (dir, data) = fresh();
+    for root in [
+        dir.path().join("not-made/.."),
+        data.join("files/.."),
+        data.join("a/b/../.."),
+        dir.path().join("not-made/../data/files/.."),
+    ] {
+        check_places(&root, &data).expect_err(&root.display().to_string());
+    }
+    assert!(
+        !dir.path().join("not-made").exists(),
+        "the check makes nothing"
+    );
 }

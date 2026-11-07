@@ -186,11 +186,15 @@ configuration), `files/encryption-required` 409 (ADR 0029: the store has no key)
   whole as `too-large` if it does not fit (the contract has no paging for it).
 
 **Places.** The binary refuses to start (exit 1, before anything is opened or made) if `FS_FILES_ROOT` is, or lies above, `--data`: `objects.db` would lie
-among the files and a rescan would take it for one. Links are resolved first. With that, a rescan cannot see the database; the core has no knowledge of its name and takes no
-special case. `backend.add` over the socket is confined: the binary sets `FileRepo::with_local_base(root)`, so a `local` configuration needs a path **relative to the root**
-(absolute, `..`, a symbolic link on the way, the root itself and `.fs-files` are `invalid` 422, and nothing is made or mounted). A program that embeds the core and takes
-`backend.add` from others should do the same; without `with_local_base` the core takes any path (its own tests do). `s3` is not confined (a network address).
-A text of a request that is no UTF-8 is `invalid-request`. `examples/serve.rs` runs the server and a consumer in one process.
+among the files and a rescan would take it for one. Links are resolved first; a path with `..` is refused outright (after a part that does not exist yet it cannot
+be resolved without making it). With that, a rescan cannot see the database; the core has no knowledge of its name and takes no special case.
+`backend.add` over the socket is confined: the binary sets `FileRepo::with_local_base(<root>/.fs-files/backends)`, so a `local` configuration needs a path **relative to the
+backends base** (absolute, `..`, a symbolic link on the way, the base itself, `.fs-files` in any case, and a folder inside another backend are `invalid` 422). The base lies in the
+program's own folder, which a rescan never lists: a backend is no part of the main one (its files are not taken over, deleting a folder of the main backend does not reach it, and
+a path like `Docs` makes a new folder there and covers nothing). Honest limits: the checks are by path, not `openat2`, and the base must be written by this program alone; `LocalFolder::open` makes
+the folders it needs before the final check, so a link swapped in between the checks can leave empty folders behind (it still mounts nothing); a folder that holds a backend is
+not looked for below the one being added. A program that embeds the core and takes `backend.add` from others should call `with_local_base` too; without it the core takes any path
+(its own tests do). `s3` is not confined (a network address). A text of a request that is no UTF-8 is `invalid-request`. `examples/serve.rs` runs the server and a consumer in one process.
 
 **Writes run to their end** (`run_to_end`): a client that drops the call or the connection cannot leave the disk and the database out of step. Calls on one `Upload` run in the
 order they arrived, so chunks may be sent without waiting for each answer (mutation-tested).

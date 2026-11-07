@@ -7,7 +7,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use fs_files_core::{FileRepo, LocalFolder};
+use fs_files_core::{FileRepo, LocalFolder, RESERVED_NAME};
 use fs_files_server::{FilesServer, check_places};
 use fs_interfaces::rpc::{ServerOptions, prepare_data_dir, run_until_signal};
 use fs_store::{Store, TursoStore};
@@ -55,9 +55,10 @@ fn main() {
         let local = LocalFolder::open(&root)
             .await
             .map_err(std::io::Error::other)?;
-        // `backend.add` comes over the socket: its local folders live below the root, nowhere else.
-        let mut repo =
-            FileRepo::new(store, actor, BACKEND_ID, Arc::new(local)).with_local_base(&root);
+        // `backend.add` comes over the socket: its local folders live in the program's own folder inside
+        // the root, which a rescan never lists, so no backend is part of another.
+        let mut repo = FileRepo::new(store, actor, BACKEND_ID, Arc::new(local))
+            .with_local_base(root.join(RESERVED_NAME).join("backends"));
         if let Some(instance) = instance {
             repo = repo.with_instance(instance);
         }

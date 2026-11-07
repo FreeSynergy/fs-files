@@ -8,23 +8,14 @@
 use std::path::{Component, Path, PathBuf};
 
 /// The path as the file system sees it, though not all of it exists yet: the longest existing part
-/// is resolved (links and all), the rest is appended without `.` and `..`.
+/// is resolved (links and all), the rest is appended. A `..` is refused by the caller before: after a
+/// part that is not there, it cannot be resolved without making that part.
 fn resolved(path: &Path) -> PathBuf {
     let mut rest = Vec::new();
     let mut at = path.to_path_buf();
     loop {
         if let Ok(real) = at.canonicalize() {
-            let mut out = real;
-            for part in rest.iter().rev() {
-                match Path::new(part).components().next() {
-                    Some(Component::ParentDir) => {
-                        out.pop();
-                    }
-                    Some(Component::CurDir) | None => {}
-                    _ => out.push(part),
-                }
-            }
-            return out;
+            return rest.iter().rev().fold(real, |out, part| out.join(part));
         }
         match (at.file_name().map(ToOwned::to_owned), at.parent()) {
             (Some(name), Some(parent)) => {
@@ -39,8 +30,13 @@ fn resolved(path: &Path) -> PathBuf {
 /// Refuse a `root` for the files that is, or lies above, the `data` directory.
 ///
 /// # Errors
-/// The text says which two places collide.
+/// The text says which two places collide, or that a path has a `..`.
 pub fn check_places(root: &Path, data: &Path) -> Result<(), String> {
+    for path in [root, data] {
+        if path.components().any(|c| c == Component::ParentDir) {
+            return Err(format!("{} must not contain \"..\"", path.display()));
+        }
+    }
     let (root, data) = (resolved(root), resolved(data));
     if data.starts_with(&root) {
         return Err(format!(
