@@ -7,7 +7,7 @@
 
 use async_trait::async_trait;
 use fs_interfaces::{Capabilities, Unsupported};
-use fs_store::ObjectId;
+use fs_store::{ObjectId, StoreId};
 
 use crate::error::Result;
 use crate::model::{
@@ -27,6 +27,10 @@ fn no<T>(capability: &str, why: &str) -> Result<T> {
 pub trait Files: Send + Sync {
     /// What this provider can do, per capability id (also for [`Transfer`](crate::Transfer) and [`Backends`](crate::Backends)).
     fn capabilities(&self) -> Capabilities;
+    /// The identity of the store behind this provider, if it has one (never in the log); `None` for a fake.
+    fn identity(&self) -> Option<StoreId> {
+        None
+    }
     /// `file.resolve`: a file by id, trashed or not.
     async fn get(&self, id: ObjectId) -> Result<Option<File>>;
     /// A folder by id.

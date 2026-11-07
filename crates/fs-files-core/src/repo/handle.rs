@@ -7,7 +7,7 @@
 use std::sync::Arc;
 
 use fs_store::traits::{ObjectQuery, ObjectRepository};
-use fs_store::{ObjectId, Store};
+use fs_store::{ObjectId, Store, StoreInfo};
 use tokio::sync::Mutex;
 
 use super::backend::StoreAdapter;
@@ -31,6 +31,7 @@ pub struct FileRepo {
     pub(super) factories: Arc<Vec<Arc<dyn BackendFactory>>>,
     pub(super) actor: String,
     pub(super) instance: String,
+    pub(super) info: Option<Arc<dyn StoreInfo>>,
     pub(super) page: usize,
     pub(super) lock: Arc<Mutex<()>>,
     /// One lock per upload: finishing the same upload twice at once is serialised, the second gets the first's file.
@@ -50,7 +51,8 @@ impl FileRepo {
         backend: Arc<dyn BlobBackend>,
     ) -> Self {
         let adapter = Arc::new(StoreAdapter(store));
-        Self::with_backend(adapter.clone(), adapter, actor, backend_id, backend)
+        Self::with_backend(adapter.clone(), adapter.clone(), actor, backend_id, backend)
+            .with_info(adapter)
     }
 
     /// Files over the narrow store traits only (a remote or fake store can supply them).
@@ -78,12 +80,20 @@ impl FileRepo {
             factories: Arc::new(factories),
             actor: actor.into(),
             instance: "local.invalid".into(),
+            info: None,
             page: PAGE,
             lock: Arc::new(Mutex::new(())),
             orphan_after_secs: 30 * 24 * 3600,
             uploads: Arc::default(),
             feed,
         }
+    }
+
+    /// Say whose store this is: [`Files::identity`](crate::Files::identity) answers from it.
+    #[must_use]
+    pub fn with_info(mut self, info: Arc<dyn StoreInfo>) -> Self {
+        self.info = Some(info);
+        self
     }
 
     /// Instance domain for external IRIs `https://<instance>/files/<id>` (ADR 0027).

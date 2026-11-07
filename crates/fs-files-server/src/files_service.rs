@@ -11,7 +11,7 @@ use capnp_rpc::new_client;
 use fs_files_core::{Backends, FileFeed, Files, Transfer};
 use fs_interfaces::Unsupported;
 use fs_interfaces::files_capnp::files;
-use fs_interfaces::rpc::unsupported;
+use fs_interfaces::rpc::{unsupported, write_uuid};
 
 use crate::backends_service::BackendsImpl;
 use crate::errors::rpc_error;
@@ -61,7 +61,10 @@ impl files::Server for FilesServer {
         mut results: files::SupportReportResults,
     ) -> Done {
         let report = self.files.capabilities();
-        report.write(CONTRACT_VERSION, results.get().init_report());
+        let mut out = results.get().init_report();
+        report.write(CONTRACT_VERSION, out.reborrow());
+        // The store's id, as the store says it: empty where the provider has no store.
+        write_uuid(out.init_instance(), self.files.identity().map(|id| id.as_uuid()));
         Ok(())
     }
 

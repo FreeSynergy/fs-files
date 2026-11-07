@@ -7,7 +7,9 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use fs_store::traits::{ObjectQuery, ObjectRepository};
-use fs_store::{Activity, LogEntry, ObjectId, Query, Result, Store, StoredObject};
+use fs_store::{
+    Activity, LogEntry, ObjectId, Query, Result, Store, StoreId, StoreInfo, StoredObject,
+};
 
 /// Presents an `Arc<dyn Store>` as the narrow read / write traits.
 pub(super) struct StoreAdapter(pub(super) Arc<dyn Store>);
@@ -44,5 +46,15 @@ impl ObjectQuery for StoreAdapter {
 
     async fn count(&self, query: &Query) -> Result<usize> {
         Store::count(&*self.0, query).await
+    }
+}
+
+impl StoreInfo for StoreAdapter {
+    fn identity(&self) -> StoreId {
+        Store::identity(&*self.0)
+    }
+
+    fn is_encrypted(&self) -> bool {
+        Store::is_encrypted(&*self.0)
     }
 }

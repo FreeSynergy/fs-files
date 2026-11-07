@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use fs_interfaces::Capabilities;
-use fs_store::ObjectId;
+use fs_store::{ObjectId, StoreId};
 
 use super::fileops::Target;
 use super::handle::FileRepo;
@@ -76,6 +76,9 @@ impl Files for FileRepo {
         }
         c.unsupported("file.preview", "not built yet");
         c
+    }
+    fn identity(&self) -> Option<StoreId> {
+        self.info.as_ref().map(|info| info.identity())
     }
     async fn get(&self, id: ObjectId) -> Result<Option<File>> {
         match self.file_obj(id).await {
