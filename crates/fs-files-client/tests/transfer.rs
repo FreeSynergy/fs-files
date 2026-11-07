@@ -4,7 +4,7 @@ mod common;
 
 use common::Served;
 use fs_files_core::{Error, Files, OnConflict, Transfer};
-use fs_store::ObjectId;
+use fs_objects::ObjectId;
 
 const MIB: usize = 1 << 20;
 

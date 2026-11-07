@@ -12,7 +12,7 @@ use fs_files_core::{
     TrashReport,
 };
 use fs_interfaces::Capabilities;
-use fs_store::ObjectId;
+use fs_objects::ObjectId;
 
 use crate::RpcFiles;
 use crate::file_calls::{self as file, Change};

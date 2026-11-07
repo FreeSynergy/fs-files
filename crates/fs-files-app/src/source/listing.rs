@@ -56,7 +56,7 @@ fn entry_of(entry: &Entry) -> FileEntry {
     }
 }
 
-fn parent_of(entry: &Entry) -> Option<fs_store::ObjectId> {
+fn parent_of(entry: &Entry) -> Option<fs_objects::ObjectId> {
     match entry {
         Entry::File(file) => file.folder,
         Entry::Folder(folder) => folder.parent,

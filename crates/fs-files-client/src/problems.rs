@@ -17,7 +17,7 @@ use fs_interfaces::files_capnp::{
 };
 use fs_interfaces::rpc::Problem;
 use fs_interfaces::rpc::client::problems::{Failure, local_type, object_id_in, unsupported_of};
-use fs_store::Error as StoreError;
+use fs_objects::Error as StoreError;
 
 /// The error of the core for what the server (or the wire) said.
 pub(crate) fn error_of(e: &capnp::Error) -> Error {

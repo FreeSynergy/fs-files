@@ -5,7 +5,7 @@
 use std::sync::Arc;
 
 use fs_files_core::{Entry, FileRepo, Files, LocalFolder, Transfer};
-use fs_store::{Store, TursoStore};
+use fs_objects::{Store, TursoStore};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

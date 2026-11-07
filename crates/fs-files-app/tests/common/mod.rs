@@ -22,7 +22,7 @@ use fs_components_workbenches::file_manager::{FileManagerWidget, FilesState, PAG
 use fs_files_app::{FileAdapter, labels};
 use fs_files_client::RpcFiles;
 use fs_files_core::{File, FileRepo, Files, Folder, LocalFolder, Transfer};
-use fs_store::{
+use fs_objects::{
     Cipher, EncryptionKey, ObjectId, OpenOptions, StaticKeyProvider, Store, TursoStore,
 };
 

@@ -61,7 +61,7 @@ pub(crate) fn filter(mut out: file_filter::Builder<'_>, f: &FileFilter) {
 /// An id that may be unset, written where the contract says "unset = the top level".
 pub(crate) fn top(
     out: fs_interfaces::common_capnp::uuid::Builder<'_>,
-    id: Option<fs_store::ObjectId>,
+    id: Option<fs_objects::ObjectId>,
 ) {
     write_uuid(out, id.map(|i| i.as_uuid()));
 }

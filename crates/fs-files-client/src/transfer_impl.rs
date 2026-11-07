@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use fs_files_core::{Blob, File, OnConflict, Result, Transfer, Upload, UploadInfo};
-use fs_store::ObjectId;
+use fs_objects::ObjectId;
 
 use crate::peer::Link;
 use crate::{RpcFiles, transfer_calls as calls};

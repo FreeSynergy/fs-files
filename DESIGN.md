@@ -1,13 +1,13 @@
 # fs-files – Design
 
 `fs-files` is the files program of FreeSynergy. This repo holds the **program core** (`crates/fs-files-core`, no GUI), the **server** (`crates/fs-files-server`, the contract over a Unix socket), the **client** (`crates/fs-files-client`, the traits of the core over that socket) and the **app** (`crates/fs-files-app`, the window; talks to the server only).
-**Metadata** (name, media type, size, checksum, folder, trash flag) is an object in `fs-store`; the **bytes** are in a
+**Metadata** (name, media type, size, checksum, folder, trash flag) is an object in `fs-objects`; the **bytes** are in a
 backend behind `BlobBackend`. Other programs refer to a file by its object id and read through the `Blob` trait; they never
 see a path or a backend. Contract: `files.capnp` in `fs-interfaces` v0.35.0 (draft, consumers: the app, 1 of 2).
 
 ## State
 
-Version 0.4.0, not tagged (stage 1: local folder, stage 2: S3, stage 3: real names, stage 4: the server). Built on fs-store 0.2.0 and fs-interfaces 0.35.0 (git tags). Interface status: draft, provisional, consumers 0 of 2.
+Version 0.4.0, not tagged (stage 1: local folder, stage 2: S3, stage 3: real names, stage 4: the server). Built on fs-objects 0.2.0 and fs-interfaces 0.35.0 (git tags). Interface status: draft, provisional, consumers 0 of 2.
 
 | Area | State |
 |---|---|
@@ -214,7 +214,7 @@ order they arrived, so chunks may be sent without waiting for each answer (mutat
 **Open points of the server** (to the strategy session): (1) (closed by v0.35.0: problem types, paging, `failedMissing`); (2) `file.subscribe` sends the envelope of a
 file marked sensitive (ADR 0029) like any other: the names and categories leave; whether they should only on release (as in `fs-people`) is a decision;
 (3) `backend.add` is not persisted (the core's decision): after a restart the binary has the `main` local backend only; (4) the `Registry` of the feed is the
-same code as in `fs-tasks` and `fs-maps` and wants to live once in `fs-interfaces` or `fs-store`; (5) the cursor is a place in a list and shifts when an entry is
+same code as in `fs-tasks` and `fs-maps` and wants to live once in `fs-interfaces` or `fs-objects`; (5) the cursor is a place in a list and shifts when an entry is
 added between two pages (the shared limit of `fs-interfaces`); (6) the `Files` root has no way to hand out `BlobBackend`, correct for the contract, but a program that
 wants remote backends needs the client side (`RemoteBackend`), not built; (7) a person who changes the folder from outside is seen only by `rescan`, no watcher.
 
@@ -302,11 +302,11 @@ what comes, and there is no re-reading from the start to skip rows as in `fs-peo
 
 ## Crates
 
-* `fs-store` (v0.2.0), `fs-interfaces` (v0.35.0): git tags.
+* `fs-objects` (v0.2.0), `fs-interfaces` (v0.35.0): git tags.
 * `rustix` 1 (MIT OR Apache-2.0, Linux only, features `std` + `fs`): `renameat2` with `RENAME_NOREPLACE`, the atomic no-replace rename that `std` lacks. No C code with its default backend, already in the lock file through other crates.
 * `blake3` 1.8 (CC0-1.0 OR Apache-2.0): checksums, with the `pure` feature (no C / assembly). Fast enough for a first version.
 * `infer` 0.22 (MIT): media type from the first bytes when the caller gives none; pure Rust, no dependencies.
-* `tokio` (fs, io, sync), `async-trait`, `thiserror`, `serde`, `serde_json`, `chrono` (MIT or Apache-2.0, already used by fs-store / fs-people).
+* `tokio` (fs, io, sync), `async-trait`, `thiserror`, `serde`, `serde_json`, `chrono` (MIT or Apache-2.0, already used by fs-objects / fs-people).
 * `object_store` 0.14 (MIT OR Apache-2.0, Apache Arrow project), feature `aws` only, optional (`s3`): the S3 client with a real `MultipartStore`
   trait, which exposes the multipart id and the part etags. That is what a resumable upload needs (state is persisted, so a new process
   can go on). It also gives us signing, retries and the in-memory store for tests. Its TLS comes via `reqwest` + `rustls` + `aws-lc-rs`, which

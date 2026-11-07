@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use common::env;
 use fs_files_core::{BackendInfo, Backends, Error, Files, Page, Result, Transfer};
 use fs_interfaces::Capabilities;
-use fs_store::ObjectId;
+use fs_objects::ObjectId;
 
 /// A read-only source, for example a mounted archive.
 struct ReadOnly;

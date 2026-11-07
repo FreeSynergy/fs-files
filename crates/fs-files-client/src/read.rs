@@ -8,7 +8,7 @@ use fs_files_core::{Entry, Error, File, Folder, RescanReport, Result, TrashRepor
 use fs_interfaces::common_capnp::uuid;
 use fs_interfaces::files_capnp::{entry, file, folder, rescan_report, trash_report, upload_info};
 use fs_interfaces::rpc::{from_millis, read_envelope, read_object_id, read_uuid};
-use fs_store::ObjectId;
+use fs_objects::ObjectId;
 
 /// A reply that does not read.
 pub(crate) fn unreadable(e: impl std::fmt::Display) -> Error {

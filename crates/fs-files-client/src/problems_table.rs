@@ -8,7 +8,7 @@ use fs_files_core::Error;
 use fs_interfaces::files_capnp::*;
 use fs_interfaces::rpc::Problem;
 use fs_interfaces::rpc::client::problems::PROBLEM_BASE as BASE;
-use fs_store::{Error as StoreError, ObjectId};
+use fs_objects::{Error as StoreError, ObjectId};
 
 use crate::problems::error_of;
 

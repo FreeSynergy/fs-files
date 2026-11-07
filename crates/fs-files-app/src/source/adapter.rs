@@ -12,7 +12,7 @@ use fs_files_core::{Error, File, Files, Folder, Transfer};
 use fs_interfaces::files_capnp::{
     CHANGED_OUTSIDE_PROBLEM_TYPE, INVALID_NAME_PROBLEM_TYPE, NAME_CONFLICT_PROBLEM_TYPE,
 };
-use fs_store::ObjectId;
+use fs_objects::ObjectId;
 use tokio::runtime::Handle;
 
 use crate::words::say;

@@ -10,7 +10,7 @@ use fs_files_core::{FileRepo, LocalFolder};
 use fs_files_server::FilesServer;
 use fs_interfaces::files_capnp::files;
 use fs_interfaces::rpc::{bind_socket, connect, read_envelope, serve};
-use fs_store::{Store, TursoStore};
+use fs_objects::{Store, TursoStore};
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

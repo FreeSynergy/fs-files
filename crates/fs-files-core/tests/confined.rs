@@ -5,7 +5,7 @@ mod common;
 
 use common::{ME, env};
 use fs_files_core::{Backends, Error, FileRepo, Files, LocalFolder};
-use fs_store::{Store, TursoStore};
+use fs_objects::{Store, TursoStore};
 use std::sync::Arc;
 
 fn local(id: &str, path: &str) -> String {

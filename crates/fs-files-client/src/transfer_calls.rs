@@ -8,7 +8,7 @@ use fs_files_core::{File, OnConflict, Result, UploadInfo};
 use fs_interfaces::common_capnp::blob;
 use fs_interfaces::files_capnp::{transfer, upload};
 use fs_interfaces::rpc::write_object_id;
-use fs_store::ObjectId;
+use fs_objects::ObjectId;
 
 use crate::problems::error_of;
 use crate::read::{self, unreadable};

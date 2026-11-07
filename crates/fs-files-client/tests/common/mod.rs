@@ -12,7 +12,7 @@ use fs_files_client::RpcFiles;
 use fs_files_core::{File, FileRepo, Files, Folder, LocalFolder, Transfer};
 use fs_files_server::FilesServer;
 use fs_interfaces::rpc::{bind_socket, serve};
-use fs_store::{ObjectId, Store, TursoStore};
+use fs_objects::{ObjectId, Store, TursoStore};
 use tokio::sync::oneshot;
 
 pub const ME: &str = "https://local.invalid/users/owner";

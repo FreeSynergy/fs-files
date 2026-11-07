@@ -10,7 +10,7 @@ use common::disk::{on_disk, root};
 use common::flaky::Flaky;
 use common::{ME, env, names, upload};
 use fs_files_core::{Error, FileRepo, Files, LocalFolder, Transfer};
-use fs_store::{Store, TursoStore};
+use fs_objects::{Store, TursoStore};
 
 // ---- blocker 1: abort and stale sessions ----
 

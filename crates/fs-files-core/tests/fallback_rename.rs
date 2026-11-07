@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use common::{ME, read_all};
 use fs_files_core::{BlobBackend, Error, FileRepo, Files, LocalFolder, Spot, Transfer};
-use fs_store::{Store, TursoStore};
+use fs_objects::{Store, TursoStore};
 
 async fn backend(dir: &std::path::Path) -> LocalFolder {
     LocalFolder::open(dir.join("root"))

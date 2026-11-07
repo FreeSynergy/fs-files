@@ -1,6 +1,6 @@
 //! `fs-files-core`: program core of FreeSynergy files (no GUI).
 //!
-//! What we know about a file is an object in `fs-store` (AS2 `Document`, folders are `Collection`);
+//! What we know about a file is an object in `fs-objects` (AS2 `Document`, folders are `Collection`);
 //! its bytes are in a backend behind [`BlobBackend`]. Other programs refer to a file by id and read
 //! it through [`Blob`]; they never see paths or backends. Start with the traits [`Files`],
 //! [`Transfer`] and [`Backends`]; [`FileRepo`] implements them over a store. See `DESIGN.md`.

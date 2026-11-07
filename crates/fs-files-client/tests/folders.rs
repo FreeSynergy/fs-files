@@ -8,7 +8,7 @@ mod common;
 use common::Served;
 use fs_files_core::{Entry, Error, File, Files, OnConflict, Sort, SortBy};
 use fs_interfaces::files_capnp::{INVALID_NAME_PROBLEM_TYPE, NAME_CONFLICT_PROBLEM_TYPE};
-use fs_store::ObjectId;
+use fs_objects::ObjectId;
 
 fn same(a: &File, b: &File) {
     assert_eq!(

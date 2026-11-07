@@ -6,7 +6,7 @@
 use fs_files_core::{Cursor, File, FileFilter, OnConflict, Page, Result, Sort};
 use fs_interfaces::files_capnp::{folders, search};
 use fs_interfaces::rpc::write_object_id;
-use fs_store::ObjectId;
+use fs_objects::ObjectId;
 
 use crate::folder_calls::page;
 use crate::problems::error_of;

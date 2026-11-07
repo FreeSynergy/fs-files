@@ -7,7 +7,7 @@ use std::time::Duration;
 use common::Served;
 use fs_files_client::{RpcFiles, Timeouts};
 use fs_files_core::{Error, Files};
-use fs_store::ObjectId;
+use fs_objects::ObjectId;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn nobody_listens() {
