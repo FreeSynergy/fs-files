@@ -187,8 +187,6 @@ impl FileRepo {
         self.require_folder(s.folder).await?; // the world may have changed during the upload
         self.require_free(s.folder, name, None).await?;
         let o = self.file_object(name, &record);
-        let file = File::of(&o)?;
-        self.save(o).await?;
-        Ok(file)
+        self.save_file(o).await
     }
 }

@@ -21,7 +21,7 @@ use super::names::check_name;
 use super::rescan_known::{is_folder, is_legacy_key};
 use crate::backend::{BlobBackend, ScanKind, Scanned};
 use crate::error::{Error, Result};
-use crate::model::{Entry, Folder, RescanReport};
+use crate::model::{Entry, RescanReport};
 
 pub(super) const SNIFF: u32 = 8192;
 /// Folders nested deeper than this are not entered (reported as skipped).
@@ -174,8 +174,7 @@ impl FileRepo {
                     return Ok(());
                 }
                 let o = self.folder_object(&entry.name, item.folder);
-                let f = Folder::of(&o)?;
-                self.save(o).await?;
+                let f = self.save_folder(o).await?;
                 report.added.push(Entry::Folder(f.clone()));
                 Self::enter(item, Some(f.id), at, todo, report);
             }

@@ -27,9 +27,7 @@ impl FileRepo {
         let path = self.path_in(parent, name).await?;
         let steps = self.named_steps(|| Disk::MakeDir(path.clone()), false);
         let o = self.folder_object(name, parent);
-        let folder = Folder::of(&o)?;
-        self.transact(steps, self.save(o)).await?;
-        Ok(folder)
+        self.transact(steps, self.save_folder(o)).await
     }
 
     pub(super) async fn do_rename_folder(
@@ -52,9 +50,7 @@ impl FileRepo {
             .await?;
         o.envelope.name = name;
         set_folder(&mut o, parent);
-        let folder = Folder::of(&o)?;
-        self.transact(steps, self.save(o)).await?;
-        Ok(folder)
+        self.transact(steps, self.save_folder(o)).await
     }
 
     pub(super) async fn do_move_folder(
@@ -78,9 +74,7 @@ impl FileRepo {
             .await?;
         o.envelope.name = name;
         set_folder(&mut o, parent);
-        let folder = Folder::of(&o)?;
-        self.transact(steps, self.save(o)).await?;
-        Ok(folder)
+        self.transact(steps, self.save_folder(o)).await
     }
 
     pub(super) async fn do_delete_folder(&self, id: ObjectId) -> Result<()> {

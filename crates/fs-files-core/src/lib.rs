@@ -20,6 +20,7 @@
 mod backend;
 mod backends;
 mod error;
+mod feed;
 mod files;
 mod model;
 mod repo;
@@ -37,6 +38,7 @@ pub use backend::{
 };
 pub use backends::Backends;
 pub use error::{Error, Problem, Result};
+pub use feed::{FileChange, FileFeed, FileListener, Registry, Subscription};
 pub use files::Files;
 pub use model::{
     BackendInfo, Cursor, Entry, File, FileFilter, Folder, OnConflict, Page, RescanReport, Sort,

@@ -16,12 +16,14 @@ mod list;
 mod lookup;
 mod manage;
 mod names;
+mod notify;
 mod paths;
 mod provider;
 mod rescan;
 mod rescan_known;
 mod session;
 mod steps;
+mod subscribe;
 mod verify;
 
 pub use consts::{CONTEXT, FOLDER_TYPE, UPLOAD_TYPE};

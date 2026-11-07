@@ -199,9 +199,4 @@ pub trait Files: Send + Sync {
             "one specification for all programs, not written yet",
         )
     }
-    /// `file.subscribe`: live changes for other programs. The contract takes a listener; this
-    /// placeholder has none because nothing can be built on it yet.
-    async fn subscribe(&self) -> Result<()> {
-        no("file.subscribe", "not built yet; it is possible")
-    }
 }

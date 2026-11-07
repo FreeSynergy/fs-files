@@ -12,7 +12,9 @@ use tokio::sync::Mutex;
 
 use super::backend::StoreAdapter;
 use super::consts::PAGE;
+use super::notify::Notifying;
 use crate::backend::{BackendFactory, BackendRegistry, BlobBackend, LocalFactory};
+use crate::feed::Registry;
 
 /// The shortest age at which `rescan` removes an unfinished blob without an upload (one hour).
 const MIN_ORPHAN_AFTER_SECS: u64 = 3600;
@@ -34,6 +36,8 @@ pub struct FileRepo {
     /// One lock per upload: finishing the same upload twice at once is serialised, the second gets the first's file.
     pub(super) orphan_after_secs: u64,
     pub(super) uploads: Arc<crate::backend::lock::KeyLocks>,
+    /// The subject of `FileFeed`: told by `objects`, which wraps every write.
+    pub(super) feed: Arc<Registry>,
 }
 
 impl FileRepo {
@@ -62,6 +66,11 @@ impl FileRepo {
             #[cfg(feature = "s3")]
             Arc::new(crate::backend::S3Factory),
         ];
+        let feed = Arc::new(Registry::default());
+        let objects = Arc::new(Notifying {
+            inner: objects,
+            feed: feed.clone(),
+        });
         Self {
             objects,
             reads,
@@ -73,6 +82,7 @@ impl FileRepo {
             lock: Arc::new(Mutex::new(())),
             orphan_after_secs: 30 * 24 * 3600,
             uploads: Arc::default(),
+            feed,
         }
     }
 

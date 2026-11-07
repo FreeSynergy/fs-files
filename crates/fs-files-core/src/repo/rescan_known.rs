@@ -46,9 +46,7 @@ impl FileRepo {
             r.trashed = true;
             let mut o = o.clone();
             super::build::set_file(&mut o, &r);
-            let old = File::of(&o)?;
-            self.save(o).await?;
-            report.updated.push(old);
+            report.updated.push(self.save_file(o).await?);
             return self.adopt(walk, item.folder, entry, at, report).await;
         }
         if r.size == entry.size && r.modified == Some(entry.modified) {
@@ -59,9 +57,7 @@ impl FileRepo {
         r.modified = Some(entry.modified);
         let mut o = o.clone();
         super::build::set_file(&mut o, &r);
-        let file = File::of(&o)?;
-        self.save(o).await?;
-        report.updated.push(file);
+        report.updated.push(self.save_file(o).await?);
         Ok(())
     }
 
@@ -90,9 +86,7 @@ impl FileRepo {
             upload: None,
         };
         let o = self.file_object(&entry.name, &r);
-        let file = File::of(&o)?;
-        self.save(o).await?;
-        report.added.push(Entry::File(file));
+        report.added.push(Entry::File(self.save_file(o).await?));
         Ok(())
     }
 

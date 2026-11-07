@@ -8,8 +8,10 @@ use serde::{Deserialize, Serialize};
 use crate::error::{Error, Result};
 
 /// A folder (`Folder` in `files.capnp`): an AS2 `Collection`.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Folder {
+    /// The AS2 envelope as stored: what goes on the wire as `Folder.envelope`.
+    pub envelope: fs_store::Envelope,
     /// Object id.
     pub id: ObjectId,
     /// `https://<instance>/files/<id>`.
@@ -38,6 +40,7 @@ impl Folder {
     /// The caller's view of a stored folder.
     pub(crate) fn of(o: &StoredObject) -> Result<Self> {
         Ok(Self {
+            envelope: o.envelope.clone(),
             id: o.envelope.id,
             iri: o
                 .envelope

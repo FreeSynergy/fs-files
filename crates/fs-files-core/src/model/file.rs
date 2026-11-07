@@ -9,8 +9,10 @@ use serde::{Deserialize, Serialize};
 use crate::error::{Error, Result};
 
 /// A file (`File` in `files.capnp`). It carries no path and no backend.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct File {
+    /// The AS2 envelope as stored (type, times, audience, sensitive categories): what goes on the wire as `File.envelope`.
+    pub envelope: fs_store::Envelope,
     /// Object id; other programs refer to the file by it.
     pub id: ObjectId,
     /// `https://<instance>/files/<id>`.
@@ -73,6 +75,7 @@ impl File {
     pub(crate) fn of(o: &StoredObject) -> Result<Self> {
         let r = FileRecord::of(o)?;
         Ok(Self {
+            envelope: o.envelope.clone(),
             id: o.envelope.id,
             iri: o
                 .envelope

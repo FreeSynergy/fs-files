@@ -130,9 +130,8 @@ impl FileRepo {
         );
         r.trashed = false;
         set_file(&mut o, &r);
-        let file = File::of(&o)?;
         match step.apply().await {
-            Ok(_) => Self::then_db(&[step], self.save(o)).await?,
+            Ok(_) => Self::then_db(&[step], self.save_file(o)).await,
             // The bytes are not in the trash. After a crash between the two steps of an earlier
             // restore they are already at their place: then only the record is missing.
             // Only if they are the recorded bytes (the checksum decides): a stranger's file of the
@@ -143,16 +142,13 @@ impl FileRepo {
                     .await
                     .is_ok() =>
             {
-                self.save(o).await?;
+                self.save_file(o).await
             }
-            Err(Error::NotFound(_)) => {
-                return Err(Error::NotFound(format!(
-                    "changed outside: the bytes of file {id} are neither in the trash nor at {key:?}, or other bytes are there; run rescan"
-                )));
-            }
-            Err(e) => return Err(e),
+            Err(Error::NotFound(_)) => Err(Error::NotFound(format!(
+                "changed outside: the bytes of file {id} are neither in the trash nor at {key:?}, or other bytes are there; run rescan"
+            ))),
+            Err(e) => Err(e),
         }
-        Ok(file)
     }
 
     pub(super) async fn do_purge(&self, id: ObjectId) -> Result<()> {
@@ -225,16 +221,12 @@ impl FileRepo {
         r: &FileRecord,
     ) -> Result<File> {
         set_file(o, r);
-        let file = File::of(o)?;
-        self.transact(steps, self.save(o.clone())).await?;
-        Ok(file)
+        self.transact(steps, self.save_file(o.clone())).await
     }
 
     async fn store_file(&self, o: &mut fs_store::StoredObject, r: &FileRecord) -> Result<File> {
         set_file(o, r);
-        let file = File::of(o)?;
-        self.save(o.clone()).await?;
-        Ok(file)
+        self.save_file(o.clone()).await
     }
 }
 
