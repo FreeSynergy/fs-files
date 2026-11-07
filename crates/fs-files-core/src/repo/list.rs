@@ -1,6 +1,6 @@
 //! Listing a folder and searching.
 //!
-//! Pattern: Repository (read side) + Iterator-style paging — builds backend-neutral `Query` values;
+//! Pattern: Repository (read side) — builds backend-neutral `Query` values;
 //! filtering, ordering and paging are done by the store, one extra row tells whether a next page exists.
 
 use fs_store::{Op, Order, Query, StoredObject, TimeField};

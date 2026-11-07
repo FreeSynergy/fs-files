@@ -1,6 +1,6 @@
 //! Moving, renaming and copying files; trash, restore, purge; classification.
 //!
-//! Pattern: Repository (write side) with Command-like small steps — each operation is: check the
+//! Pattern: Repository (write side) — each operation is: check the
 //! rules, do the disk step if the file lives under its real name (`steps.rs`: disk first, undone if
 //! the database fails), change the record, rewrite the index, store. Trash moves the bytes to the
 //! program's own trash folder; purge deletes bytes first (repeatable), metadata second.

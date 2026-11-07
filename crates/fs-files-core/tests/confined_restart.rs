@@ -187,3 +187,24 @@ async fn an_add_whose_folder_cannot_be_opened_leaves_the_folder_as_it_was() {
         "nothing of ours is left in it"
     );
 }
+
+#[test]
+fn forget_does_not_clean_through_a_link_that_took_the_place_of_the_folder() {
+    let dir = tempfile::tempdir().unwrap();
+    let (elsewhere, base) = (dir.path().join("elsewhere"), dir.path().join("base"));
+    std::fs::create_dir_all(elsewhere.join(".fs-files/pending")).unwrap();
+    std::fs::create_dir_all(&base).unwrap();
+    let link = base.join("X");
+    std::os::unix::fs::symlink(&elsewhere, &link).unwrap();
+    let place = Place {
+        path: link.clone(),
+        made: vec![link.clone()],
+        marker_new: true,
+    };
+    fs_files_core::BackendFactory::forget(&ConfinedLocalFactory::new(&base), &place);
+    assert!(
+        elsewhere.join(".fs-files/pending").is_dir(),
+        "the other folder was touched"
+    );
+    assert!(link.exists(), "and so was the link");
+}

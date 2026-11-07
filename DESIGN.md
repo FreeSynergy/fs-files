@@ -37,7 +37,7 @@ Version 0.4.0, not tagged (stage 1: local folder, stage 2: S3, stage 3: real nam
 | `File` and `Folder` carry the envelope as stored; every write answers the object as stored (the store sets the times), so an answer equals what `get` says afterwards | done |
 | Server `fs-files-server`: every method of `Files`, `Folders`, `Transfer`, `Upload`, `Blob` (common), `Search`, `Backends` and `BlobBackend` (provider side), `subscribe` with `ended`, `supportReport`; errors as typed problems; binary with `--socket --data --actor --instance` and `FS_FILES_ROOT` | done, draft |
 | `sharing` (empty placeholder interface): `Unsupported` (`share.create`); versions, encryption, sync, WebDAV, previews: not built | as agreed |
-| Tests | 200 run by default: core 140, server 60; 2 ignored live tests. The server tests run over a real socket against a real `FileRepo`, compare values, and run the real binary across a restart |
+| Tests | 201 run by default: core 141, server 60; 2 ignored live tests. The server tests run over a real socket against a real `FileRepo`, compare values, and run the real binary across a restart |
 
 ## Structure and pattern map (ADR 0043)
 
@@ -49,22 +49,23 @@ Version 0.4.0, not tagged (stage 1: local folder, stage 2: S3, stage 3: real nam
 | `backend/s3/api.rs`, `adapter.rs` | Adapter | the few S3 calls as a narrow trait; one adapter over `object_store`, a fake in the tests |
 | `backend/s3/state.rs` | Memento | multipart id, part etags and tail pieces live in the bucket and are rebuilt on load |
 | `backend/s3/{layout,config,factory}.rs` | Specification / Factory | object names; JSON config -> client; `kind: s3` for `backend.add` |
-| `backend/local/*` | Strategy | `LocalFolder`; `path.rs` is a Specification of the path rules, `io.rs` durable file helpers, `named.rs` the name-based operations |
+| `backend/local/*` | Strategy | `LocalFolder`; `path.rs` is a Specification of the path rules, `io.rs` durable file helpers, `named.rs` the name-based operations (no pattern of its own: small steps) |
 | `backend/place.rs` | Value objects | `Naming` (Strategy switch), `Spot`, `Scanned` |
 | `repo/steps.rs` | Command | a disk step that knows how to undo itself; `transact` = disk first, database second |
 | `repo/paths.rs` | Specification | a path is derived from folder names + name, never stored for a named file |
 | `repo/rescan.rs` | Visitor | disk tree and record tree walked together |
+| `backend/nested.rs` | Specification | is there a backend (`.fs-files`) below this folder; bounded, fail closed |
 | `backend/key.rs` | Specification | the one place that decides what a key may be |
 | `backend/digest.rs` | Strategy (hash) | running BLAKE3 per key, fallback streaming hash |
 | `backend/lock.rs` | RAII / Guard | one async lock per key |
 | `backend/registry.rs` | Registry with atomic snapshots | readers see the old or the new set, never a mix |
-| `backend/factory.rs` | Factory + Chain of checks | config -> backend per kind; `check_backend` probes it before the swap |
+| `backend/factory.rs` | Factory | config -> backend per kind; `check_backend` probes it before the swap |
 | `repo/handle.rs`, `repo/provider.rs` | Repository + Facade | `FileRepo` hides store, envelope rules and backends; trait impls forward |
 | `repo/backend.rs` | Adapter | `Arc<dyn Store>` as the narrow `ObjectRepository` + `ObjectQuery` |
 | `repo/build.rs` | Adapter | our records to AS2 envelope + index fields |
 | `repo/{folders,fileops,list,lookup}.rs` | Repository | one concern each |
 | `repo/session.rs`, `repo/finish.rs` | State / Template method | upload session; the fixed finish flow |
-| `repo/blob.rs` | Proxy | `FileBlob` stands in for the bytes |
+| `repo/blob.rs` | Adapter | `FileBlob` presents the bytes under a key of a backend as the `Blob` trait |
 | `repo/manage.rs` | Factory + Registry | `backend.add` / `backend.remove` |
 | `repo/names.rs` | Specification | what a name may be (two names are the same only if equal byte for byte) |
 | `model/*` | Value objects | `File`, `Folder`, `Page`, `FileFilter`, ... |
@@ -72,7 +73,7 @@ Version 0.4.0, not tagged (stage 1: local folder, stage 2: S3, stage 3: real nam
 | `repo/notify.rs`, `repo/subscribe.rs` | Decorator, Observer (subject) | `Notifying` wraps the `ObjectRepository` and tells each write, so no operation can forget it |
 | `fs-files-server/{files,folders,transfer,search,backends}_service.rs` | Adapter + Factory / Facade | wire in, one trait call, wire out; the root hands out the capabilities; depends on the traits only |
 | `fs-files-server/{folder,file,trash}_ops.rs` | Adapter | the methods of `Folders` by concern, behind the one-line trait impl in `folders_service.rs` |
-| `fs-files-server/{upload,blob}_service.rs` | Adapter + State, Proxy | `Upload` (calls in arrival order, writes run to their end) and `Blob` (clamped ranges) in front of the core's objects |
+| `fs-files-server/{upload,blob}_service.rs` | Adapter + RAII / Guard | `Upload` (calls in arrival order, writes run to their end) and `Blob` (clamped ranges) in front of the core's objects |
 | `fs-files-server/backend_service.rs`, `backend_wire.rs` | Adapter | the provider interface `BlobBackend` in front of a core `BlobBackend`; for a backend that runs as a program |
 | `fs-files-server/feed.rs` | Observer + Adapter | `FileFeed` into the shared forwarder; the envelope is read when the change is told |
 | `backend/confined.rs` | Factory + Specification | `ConfinedLocalFactory`: a `local` backend only below a base; `FileRepo::with_local_base` |
@@ -190,7 +191,7 @@ be resolved without making it). With that, a rescan cannot see the database; the
 backends base** (absolute, `..`, a symbolic link on the way, the base itself, `.fs-files` in any case, and a folder inside another backend are `invalid` 422). The base lies in the
 program's own folder, which a rescan never lists: a backend is no part of the main one (its files are not taken over, deleting a folder of the main backend does not reach it, and
 a path like `Docs` makes a new folder there and covers nothing). **No two backends share a folder:** a folder is refused if another mounted backend has it, holds it or lies in it (both orders; `BlobBackend::local_root`, `BackendFactory::place`), and all of this is decided before anything is made. After a restart no backend is mounted, so a program may add its backends again under their ids. **Changed since a95acdf / 79e77c2:** a `local` configuration there took `path` relative to the root of the main backend and made the backend inside the tree of the main one; now a relative path such as `second` makes a new, empty folder under `.fs-files/backends`, and bytes of a backend added by those versions stay where they are (`<root>/second`) and are not taken over: such a backend has to be added again with that folder moved. Honest limits: the checks are by path, not `openat2`, and the base must be written by this program alone; `LocalFolder::open` makes
-the folders it needs before the final check, so a link swapped in between the checks can leave empty folders behind (it still mounts nothing). **A backend that is not mounted is found on the disk:** a folder that has no program folder of its own is walked (depth 16, 10 000 entries, links not followed) and refused if a `.fs-files` lies anywhere below it, and also if the walk cannot finish (fail closed); so after a restart a parent of an earlier backend is refused, and the earlier one can be added again under its id. A failed add takes back exactly the folders that add made (and the program folder in an existing empty folder), nothing else, also after a failed check. Not handled: on file systems that fold case, `.FS-FILES` and `.fs-files` are one folder, which the name check treats as different spellings of the same name only for ASCII; other foldings (Unicode) are not compared. A program that that embeds the core and takes `backend.add` from others should call `with_local_base` too; without it the core takes any path
+the folders it needs before the final check, so a link swapped in between the checks can leave empty folders behind (it still mounts nothing). The walk for a backend below the folder (`nested.rs`) is blocking `std::fs` work done while the repository lock is held; it is bounded, and moves to `spawn_blocking` later. **A backend that is not mounted is found on the disk:** a folder that has no program folder of its own is walked (depth 16, 10 000 entries, links not followed) and refused if a `.fs-files` lies anywhere below it, and also if the walk cannot finish (fail closed); so after a restart a parent of an earlier backend is refused, and the earlier one can be added again under its id. A failed add takes back exactly the folders that add made (and the program folder in any existing folder that had none), and does nothing through a link that took the place of the folder, nothing else, also after a failed check. Not handled: on file systems that fold case, `.FS-FILES` and `.fs-files` are one folder, which the name check treats as different spellings of the same name only for ASCII; other foldings (Unicode) are not compared. A program that embeds the core and takes `backend.add` from others should call `with_local_base` too; without it the core takes any path
 (its own tests do). `s3` is not confined (a network address). A text of a request that is no UTF-8 is `invalid-request`. `examples/serve.rs` runs the server and a consumer in one process.
 
 **Writes run to their end** (`run_to_end`): a client that drops the call or the connection cannot leave the disk and the database out of step. Calls on one `Upload` run in the

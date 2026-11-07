@@ -1,6 +1,6 @@
 //! Blob keys and their safety rules.
 //!
-//! Pattern: Newtype-style validation (a checked `&str`) — every backend validates a key through
+//! Pattern: Specification — the rules a key must meet, as a pure check on a `&str`; every backend validates a key through
 //! [`check_key`] before it touches anything, so a hostile key cannot reach a path or an object name.
 
 use crate::error::{Error, Result};

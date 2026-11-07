@@ -116,6 +116,12 @@ impl BackendFactory for ConfinedLocalFactory {
     }
 
     fn forget(&self, place: &Place) {
+        // A link where the folder was (swapped in since) is not ours to clean through.
+        let is_link =
+            std::fs::symlink_metadata(&place.path).is_ok_and(|m| m.file_type().is_symlink());
+        if is_link {
+            return;
+        }
         if place.marker_new || !place.made.is_empty() {
             let _ = std::fs::remove_dir_all(place.path.join(RESERVED_NAME));
         }

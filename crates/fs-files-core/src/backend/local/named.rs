@@ -1,6 +1,6 @@
 //! The name-based operations of the local folder: publish, relocate, discard, folders, scan.
 //!
-//! Pattern: Command-like small steps — each is: validate the spot, create missing parent folders,
+//! Pattern: none (small steps, no command objects) — each is: validate the spot, create missing parent folders,
 //! do **one** atomic no-replace rename (or one create/remove), then fsync the directories touched.
 //! Nothing here ever replaces a file: a taken target is `Error::Conflict`.
 

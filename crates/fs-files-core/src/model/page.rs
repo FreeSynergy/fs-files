@@ -1,7 +1,7 @@
 //! Entries, pages, cursors and the search filter.
 //!
-//! Pattern: Iterator-style paging — a [`Page`] carries a [`Cursor`] to ask for the next one;
-//! the cursor is opaque to callers.
+//! Pattern: Value object — a [`Page`] carries a [`Cursor`] to ask for the next one (the caller loops;
+//! no iterator is offered); the cursor is opaque to callers.
 
 use fs_store::ObjectId;
 

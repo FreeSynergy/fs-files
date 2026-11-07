@@ -1,6 +1,6 @@
 //! Building backends from a configuration, and checking them before use.
 //!
-//! Pattern: Factory + Chain of checks — a [`BackendFactory`] per kind turns the JSON configuration
+//! Pattern: Factory — a [`BackendFactory`] per kind turns the JSON configuration
 //! into a backend; `check_backend` then writes, reads and deletes a probe blob, so a wrong path or
 //! wrong credentials are found before anything is swapped in (ADR 0045).
 

@@ -1,7 +1,7 @@
 //! `Blob` capability: the bytes of one file, read in ranges.
 //!
-//! Pattern: Proxy — the capability other programs read through; it stands in for the core's `Blob`
-//! and shows no path and no backend. A read is clamped to what a message carries, which the contract
+//! Pattern: Adapter — the capability other programs read through: the core's `Blob` trait as the wire
+//! `Blob`; it shows no path and no backend. A read is clamped to what a message carries, which the contract
 //! allows: fewer bytes than asked, an empty answer is the end. Nothing here reads a file whole.
 
 use std::rc::Rc;
