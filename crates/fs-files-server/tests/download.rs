@@ -11,7 +11,7 @@ async fn blob(
 ) -> capnp::Result<fs_interfaces::common_capnp::blob::Client> {
     let mut open = c.transfer.open_request();
     set_id(open.get().init_id(), id);
-    Ok(open.send().promise.await?.get()?.get_blob()?)
+    open.send().promise.await?.get()?.get_blob()
 }
 
 async fn read(

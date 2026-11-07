@@ -16,6 +16,8 @@ use fs_interfaces::rpc::{bind_socket, connect, read_envelope, read_uuid, serve, 
 use fs_store::{Envelope, Store, TursoStore};
 use uuid::Uuid;
 
+pub mod stub;
+
 pub const ME: &str = "https://local.invalid/users/owner";
 
 /// What a test sees of the program: the repository, the folder the files live in.
@@ -330,4 +332,14 @@ pub async fn start(
 pub async fn received(upload: &fs_interfaces::files_capnp::upload::Client) -> u64 {
     let answer = upload.received_request().send().promise.await.unwrap();
     answer.get().unwrap().get_bytes()
+}
+
+/// A real server in front of this one stub.
+pub async fn with_stub<F, Fut>(stub: stub::Stub, test: F)
+where
+    F: FnOnce(files::Client) -> Fut,
+    Fut: Future<Output = ()>,
+{
+    let stub = Arc::new(stub);
+    with_provider(stub.clone(), stub.clone(), stub.clone(), stub, test).await;
 }

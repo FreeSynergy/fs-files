@@ -33,15 +33,37 @@ fn fitting<T>(items: &[T], budget: &mut usize, weight: impl Fn(&T) -> usize) -> 
     kept
 }
 
+/// Split `budget` between lists of these total weights: a short list gets all it needs, so a long one
+/// cannot crowd it out; what the short ones leave over goes to the long ones.
+fn shares(totals: [usize; 4], budget: usize) -> [usize; 4] {
+    let mut order = [0, 1, 2, 3];
+    order.sort_by_key(|&i| totals[i]);
+    let (mut left, mut out) = (budget, [0; 4]);
+    for (done, &i) in order.iter().enumerate() {
+        out[i] = totals[i].min(left / (4 - done));
+        left -= out[i];
+    }
+    out
+}
+
 /// Write a rescan report within a message. The entries left out are named in `skipped`.
 pub(crate) fn write_rescan(
     mut out: rescan_report::Builder<'_>,
     report: &RescanReport,
 ) -> capnp::Result<()> {
-    let mut budget = MAX_PAGE_BYTES - NOTES;
-    let added = fitting(&report.added, &mut budget, weight);
-    let updated = fitting(&report.updated, &mut budget, file_weight);
-    let missing = fitting(&report.missing, &mut budget, file_weight);
+    let skipped_weight = |t: &String| capped(t).len() + TEXT_BYTES;
+    let [for_added, for_updated, for_missing, mut for_skipped] = shares(
+        [
+            report.added.iter().map(weight).sum(),
+            report.updated.iter().map(file_weight).sum(),
+            report.missing.iter().map(file_weight).sum(),
+            report.skipped.iter().map(skipped_weight).sum(),
+        ],
+        MAX_PAGE_BYTES - NOTES,
+    );
+    let added = fitting(&report.added, &mut { for_added }, weight);
+    let updated = fitting(&report.updated, &mut { for_updated }, file_weight);
+    let missing = fitting(&report.missing, &mut { for_missing }, file_weight);
     let mut notes = Vec::new();
     for (what, all, shown) in [
         (
@@ -67,9 +89,7 @@ pub(crate) fn write_rescan(
             ));
         }
     }
-    let kept = fitting(&report.skipped, &mut budget, |t| {
-        capped(t).len() + TEXT_BYTES
-    });
+    let kept = fitting(&report.skipped, &mut for_skipped, skipped_weight);
     let mut skipped: Vec<String> = report.skipped[..kept]
         .iter()
         .map(|t| capped(t).to_string())
