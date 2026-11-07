@@ -13,6 +13,7 @@ use fs_interfaces::rpc::{bind_socket, connect, serve};
 use fs_store::{Store, TursoStore};
 
 pub mod backend;
+pub mod program;
 pub mod search;
 pub mod seen;
 pub mod stub;

@@ -4,49 +4,11 @@
 mod common;
 
 use std::os::unix::fs::PermissionsExt;
-use std::path::Path;
-use std::process::{Child, Command, Stdio};
-use std::time::Duration;
+use std::process::{Command, Stdio};
 
-use common::{Caps, caps, list_all, mkdir, names, put_file, text_file};
-use fs_interfaces::files_capnp::{OnConflict, files};
-use fs_interfaces::rpc::connect;
-
-fn start(socket: &Path, data: &Path, root: Option<&Path>) -> Child {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_fs-files-server"));
-    command.arg("--socket").arg(socket).arg("--data").arg(data);
-    match root {
-        Some(root) => command.env("FS_FILES_ROOT", root),
-        None => command.env_remove("FS_FILES_ROOT"),
-    };
-    command.stderr(Stdio::null()).spawn().unwrap()
-}
-
-async fn wait_for(socket: &Path) {
-    for _ in 0..200 {
-        if tokio::net::UnixStream::connect(socket).await.is_ok() {
-            return;
-        }
-        tokio::time::sleep(Duration::from_millis(25)).await;
-    }
-    panic!("the server did not come up");
-}
-
-fn terminate(mut child: Child) {
-    let status = Command::new("kill")
-        .arg("-TERM")
-        .arg(child.id().to_string())
-        .status()
-        .unwrap();
-    assert!(status.success());
-    assert!(child.wait().unwrap().success());
-}
-
-async fn connected(socket: &Path) -> (fs_interfaces::rpc::Connection<files::Client>, Caps) {
-    let connection = connect::<files::Client>(socket).await.unwrap();
-    let c = caps(&connection.client).await;
-    (connection, c)
-}
+use common::program::{connected, start, terminate, wait_for};
+use common::{list_all, mkdir, names, put_file, text_file};
+use fs_interfaces::files_capnp::OnConflict;
 
 #[tokio::test(flavor = "current_thread")]
 async fn files_survive_a_restart_under_their_real_names_and_a_second_start_is_refused() {
@@ -153,23 +115,6 @@ fn it_refuses_an_instance_that_is_no_domain() {
             .code();
         assert_eq!(code, Some(2), "{bad}");
     }
-    assert!(!dir.path().join("data").exists(), "nothing was opened");
-}
-
-#[test]
-fn it_refuses_a_relative_root_before_it_opens_anything() {
-    let dir = tempfile::tempdir().unwrap();
-    let code = Command::new(env!("CARGO_BIN_EXE_fs-files-server"))
-        .arg("--socket")
-        .arg(dir.path().join("x.sock"))
-        .arg("--data")
-        .arg(dir.path().join("data"))
-        .env("FS_FILES_ROOT", "relative/files")
-        .stderr(Stdio::null())
-        .status()
-        .unwrap()
-        .code();
-    assert_eq!(code, Some(2));
     assert!(!dir.path().join("data").exists(), "nothing was opened");
 }
 

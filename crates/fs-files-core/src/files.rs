@@ -1,9 +1,9 @@
 //! The [`Files`] contract: folders, files, trash, classification, search.
 //!
 //! Pattern: Repository (interface) + Null Object — callers depend on this trait, never on the
-//! store-backed `FileRepo`. Like a parent class (ADR 0045): every provider has every method; one
-//! it does not override answers an explicit `Unsupported`. The Rust form of `Files`, `Folders` and
-//! `Search` in `files.capnp`. Bytes are in [`Transfer`](crate::Transfer), backends in [`Backends`](crate::Backends).
+//! store-backed `FileRepo`. Like a parent class (ADR 0045): every provider has every method; one it
+//! does not override answers an explicit `Unsupported`. The Rust form of `Files`, `Folders` and
+//! `Search` in `files.capnp`; bytes are in [`Transfer`](crate::Transfer).
 
 use async_trait::async_trait;
 use fs_interfaces::{Capabilities, Unsupported};
@@ -107,8 +107,7 @@ pub trait Files: Send + Sync {
             OnConflict::KeepBoth => no("file.conflictRule", NO_RULE),
         }
     }
-    /// `file.copy` with a rule for a taken name. Unlike `copy_file`, the default is to refuse: a
-    /// frontend that duplicates a file sends `KeepBoth`.
+    /// `file.copy` with a rule for a taken name. Unlike `copy_file` the default refuses.
     async fn copy_file_as(
         &self,
         id: ObjectId,
@@ -183,9 +182,8 @@ pub trait Files: Send + Sync {
             no("file.sort", "this provider only searches by name")
         }
     }
-    /// `folder.rescan`: look at the disk below `folder` (`None` = the top) and bring the records in line with
-    /// it: take over new files and folders, update size and checksum of changed files, and **report**
-    /// the vanished ones without deleting their records. Needs a backend that keeps real names.
+    /// `folder.rescan`: look at the disk below `folder` (`None` = the top) and bring the records in line:
+    /// take over new files and folders, update changed ones, **report** vanished ones (records kept).
     async fn rescan(&self, _folder: Option<ObjectId>) -> Result<RescanReport> {
         no(
             "folder.rescan",

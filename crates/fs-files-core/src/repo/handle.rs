@@ -117,6 +117,24 @@ impl FileRepo {
         self
     }
 
+    /// Let `backend.add` make local backends only below `base`, with a path relative to it (see
+    /// `ConfinedLocalFactory`). Replaces the factory that takes any path. A program whose
+    /// `backend.add` is open to other programs should always set this.
+    #[must_use]
+    pub fn with_local_base(mut self, base: impl AsRef<std::path::Path>) -> Self {
+        let mut all: Vec<_> = self
+            .factories
+            .iter()
+            .filter(|f| f.kind() != "local")
+            .cloned()
+            .collect();
+        all.push(Arc::new(crate::backend::ConfinedLocalFactory::new(
+            base.as_ref(),
+        )));
+        self.factories = Arc::new(all);
+        self
+    }
+
     pub(super) fn iri(&self, id: ObjectId) -> String {
         format!("https://{}/files/{}", self.instance, id)
     }

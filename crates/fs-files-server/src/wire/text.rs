@@ -18,9 +18,15 @@ pub(crate) const MAX_CONFIG: usize = 64 * 1024;
 /// All sensitive categories of one file together.
 pub(crate) const MAX_CATEGORIES: usize = 64 * 1024;
 
+/// The text, or `invalid-request`: bytes that are no UTF-8 are a bad request, not a failure of the server.
+pub(crate) fn utf8(text: capnp::text::Reader<'_>) -> capnp::Result<&str> {
+    text.to_str()
+        .map_err(|_| invalid_request("a text is not valid UTF-8"))
+}
+
 /// A name of a file or folder. Too long is the contract's `invalid-name`.
 pub(crate) fn name(text: capnp::text::Reader<'_>) -> capnp::Result<&str> {
-    let text = text.to_str()?;
+    let text = utf8(text)?;
     if text.len() > MAX_NAME_INTAKE {
         return Err(Problem::new(
             INVALID_NAME_PROBLEM_TYPE,
@@ -39,7 +45,7 @@ pub(crate) fn limited<'a>(
     what: &str,
     max: usize,
 ) -> capnp::Result<&'a str> {
-    let text = text.to_str()?;
+    let text = utf8(text)?;
     if text.len() > max {
         return Err(invalid_request(format!(
             "{what} has {} bytes, at most {max} are allowed",

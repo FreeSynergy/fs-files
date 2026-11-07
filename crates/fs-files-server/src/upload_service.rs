@@ -1,10 +1,10 @@
 //! `Upload` capability: one resumable upload.
 //!
-//! Pattern: Adapter + State (the session lives in the core) — every call is one call of the core's
-//! `Upload`. Calls on one upload run in the order they arrived (a fair lock held by the work, not by
-//! the call), so a client may send chunks without waiting for each answer; a chunk that comes at the
-//! wrong offset is still refused by the core, and nothing is written. A chunk above what a message
-//! can safely carry in is refused whole.
+//! Pattern: Adapter + ordering Guard (RAII) — every call is one call of the core's `Upload`, which
+//! owns the session state. Calls on one upload run in the order they arrived: a fair lock whose
+//! guard is held by the work and dropped with it, not by the call. So a client may send chunks
+//! without waiting for each answer; a chunk at the wrong offset is still refused by the core and
+//! nothing is written. A chunk above what a message can safely carry in is refused whole.
 
 use std::rc::Rc;
 use std::sync::Arc;

@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use fs_files_core::{FileRepo, LocalFolder};
-use fs_files_server::FilesServer;
+use fs_files_server::{FilesServer, check_places};
 use fs_interfaces::rpc::{ServerOptions, prepare_data_dir, run_until_signal};
 use fs_store::{Store, TursoStore};
 
@@ -47,14 +47,17 @@ fn main() {
     let served = run_until_signal(&socket, || async move {
         let data = prepare_data_dir(&data)?;
         let root = root.unwrap_or_else(|| data.join("files"));
+        check_places(&root, &data).map_err(std::io::Error::other)?;
         let store = TursoStore::open(data.join("objects.db"))
             .await
             .map_err(std::io::Error::other)?;
         let store: Arc<dyn Store> = Arc::new(store);
-        let local = LocalFolder::open(root)
+        let local = LocalFolder::open(&root)
             .await
             .map_err(std::io::Error::other)?;
-        let mut repo = FileRepo::new(store, actor, BACKEND_ID, Arc::new(local));
+        // `backend.add` comes over the socket: its local folders live below the root, nowhere else.
+        let mut repo =
+            FileRepo::new(store, actor, BACKEND_ID, Arc::new(local)).with_local_base(&root);
         if let Some(instance) = instance {
             repo = repo.with_instance(instance);
         }

@@ -20,6 +20,7 @@ mod file_ops;
 mod files_service;
 mod folder_ops;
 mod folders_service;
+mod places;
 mod search_service;
 mod transfer_service;
 mod trash_ops;
@@ -28,3 +29,4 @@ mod wire;
 
 pub use backend_service::BlobBackendServer;
 pub use files_service::FilesServer;
+pub use places::check_places;

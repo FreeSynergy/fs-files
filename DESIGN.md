@@ -37,7 +37,7 @@ Version 0.4.0, not tagged (stage 1: local folder, stage 2: S3, stage 3: real nam
 | `File` and `Folder` carry the envelope as stored; every write answers the object as stored (the store sets the times), so an answer equals what `get` says afterwards | done |
 | Server `fs-files-server`: every method of `Files`, `Folders`, `Transfer`, `Upload`, `Blob` (common), `Search`, `Backends` and `BlobBackend` (provider side), `subscribe` with `ended`, `supportReport`; errors as typed problems; binary with `--socket --data --actor --instance` and `FS_FILES_ROOT` | done, draft |
 | `sharing` (empty placeholder interface): `Unsupported` (`share.create`); versions, encryption, sync, WebDAV, previews: not built | as agreed |
-| Tests | 182 run by default: core 131 (103 + 4 without the `s3` feature), server 51; 2 ignored live tests. The server tests run over a real socket against a real `FileRepo`, compare values, and run the real binary across a restart |
+| Tests | 189 run by default: core 132, server 57; 2 ignored live tests. The server tests run over a real socket against a real `FileRepo`, compare values, and run the real binary across a restart |
 
 ## Structure and pattern map (ADR 0043)
 
@@ -75,6 +75,8 @@ Version 0.4.0, not tagged (stage 1: local folder, stage 2: S3, stage 3: real nam
 | `fs-files-server/{upload,blob}_service.rs` | Adapter + State, Proxy | `Upload` (calls in arrival order, writes run to their end) and `Blob` (clamped ranges) in front of the core's objects |
 | `fs-files-server/backend_service.rs`, `backend_wire.rs` | Adapter | the provider interface `BlobBackend` in front of a core `BlobBackend`; for a backend that runs as a program |
 | `fs-files-server/feed.rs` | Observer + Adapter | `FileFeed` into the shared forwarder; the envelope is read when the change is told |
+| `backend/confined.rs` | Factory + Specification | `ConfinedLocalFactory`: a `local` backend only below a base; `FileRepo::with_local_base` |
+| `fs-files-server/places.rs` | Specification | the folder of the files must not hold the data directory (`check_places`) |
 | `fs-files-server/errors.rs` | Adapter | core errors as RFC 9457 problems; `finish` = `run_to_end` |
 | `fs-files-server/wire/*` | Adapter, Specification | ids, texts with limits, cursor, entries and pages, filter, reports |
 
@@ -182,6 +184,13 @@ configuration), `files/encryption-required` 409 (ADR 0029: the store has no key)
   (`... N more added entries (they are taken over) are not listed here`). `pendingUploads` comes **oldest first, as many as fit** (about 20 000 of the largest); the contract
   has no marker, a consumer deals with those and asks again. `TrashReport.failed` is cut at 1.3 million ids. `BlobBackend.scan` is one level and is refused
   whole as `too-large` if it does not fit (the contract has no paging for it).
+
+**Places.** The binary refuses to start (exit 1, before anything is opened or made) if `FS_FILES_ROOT` is, or lies above, `--data`: `objects.db` would lie
+among the files and a rescan would take it for one. Links are resolved first. With that, a rescan cannot see the database; the core has no knowledge of its name and takes no
+special case. `backend.add` over the socket is confined: the binary sets `FileRepo::with_local_base(root)`, so a `local` configuration needs a path **relative to the root**
+(absolute, `..`, a symbolic link on the way, the root itself and `.fs-files` are `invalid` 422, and nothing is made or mounted). A program that embeds the core and takes
+`backend.add` from others should do the same; without `with_local_base` the core takes any path (its own tests do). `s3` is not confined (a network address).
+A text of a request that is no UTF-8 is `invalid-request`. `examples/serve.rs` runs the server and a consumer in one process.
 
 **Writes run to their end** (`run_to_end`): a client that drops the call or the connection cannot leave the disk and the database out of step. Calls on one `Upload` run in the
 order they arrived, so chunks may be sent without waiting for each answer (mutation-tested).

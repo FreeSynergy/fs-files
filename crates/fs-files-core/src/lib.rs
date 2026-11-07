@@ -27,9 +27,9 @@ mod repo;
 mod transfer;
 
 pub use backend::{
-    BackendConfig, BackendFactory, BackendRegistry, BlobBackend, BlobInfo, CHUNK, LocalFactory,
-    LocalFolder, MAX_KEY, MAX_SEGMENT, Naming, RESERVED_NAME, ScanKind, Scanned, Spot,
-    check_backend, check_key, format_checksum,
+    BackendConfig, BackendFactory, BackendRegistry, BlobBackend, BlobInfo, CHUNK,
+    ConfinedLocalFactory, LocalFactory, LocalFolder, MAX_KEY, MAX_SEGMENT, Naming, RESERVED_NAME,
+    ScanKind, Scanned, Spot, check_backend, check_key, format_checksum,
 };
 #[cfg(feature = "s3")]
 pub use backend::{
