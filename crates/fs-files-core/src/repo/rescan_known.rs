@@ -1,6 +1,6 @@
 //! The parts of `rescan` that deal with one record or one file: known, new, gone.
 //!
-//! Pattern: Visitor-like walk (see `rescan.rs`) — what to do when the disk and the records agree,
+//! Pattern: Visitor (see `rescan.rs`) — what to do when the disk and the records agree,
 //! when the disk has something new, and when a record has nothing at its place.
 
 use fs_store::{ObjectId, StoredObject};

@@ -29,27 +29,29 @@ impl FileRepo {
         let roots = self.backends.local_roots();
         if place
             .as_ref()
-            .is_some_and(|at| overlapping(at, &roots).is_some())
+            .is_some_and(|p| overlapping(&p.path, &roots).is_some())
         {
             return Err(Error::Config(
                 "the folder of a local backend is, holds, or lies in the folder of another backend"
                     .into(),
             ));
         }
-        let new = place.as_ref().filter(|at| !at.exists());
-        let forget = |factory: &dyn crate::BackendFactory| {
-            if let Some(at) = new {
-                factory.forget(at);
+        // From here on a failure takes back what this add made.
+        let forget = || place.iter().for_each(|p| factory.forget(p));
+        let backend = match factory.build(&cfg.raw).await {
+            Ok(backend) => backend,
+            Err(e) => {
+                forget();
+                return Err(e);
             }
         };
-        let backend = factory.build(&cfg.raw).await?;
         if let Err(e) = check_backend(&*backend).await {
-            forget(&**factory);
+            forget();
             return Err(Error::Config(format!("the backend failed its check: {e}")));
         }
         let added = self.backends.add(&cfg.id, backend, cfg.active);
         if added.is_err() {
-            forget(&**factory);
+            forget();
         }
         added
     }

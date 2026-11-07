@@ -1,6 +1,6 @@
 //! `folder.rescan`: bring the records in line with a folder that people can change from outside.
 //!
-//! Pattern: Visitor-like walk — the disk tree and the record tree are walked together, one folder at
+//! Pattern: Visitor — the disk tree and the record tree are walked together, one folder at
 //! a time, with a work list instead of recursion (a deep tree cannot overflow the stack). Rules
 //! (provisional, owner to confirm): new files and folders are taken over (size and checksum read from
 //! the bytes); a file whose size or modification time differs gets new size and checksum; a file that

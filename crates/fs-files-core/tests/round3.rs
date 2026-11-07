@@ -62,9 +62,18 @@ async fn a_quiet_upload_survives_a_rescan_and_the_limit_has_a_floor() {
 async fn a_root_that_leaves_little_room_gives_invalid_name_not_io() {
     let dir = tempfile::tempdir().unwrap();
     let mut deep = dir.path().to_path_buf();
-    while deep.as_os_str().len() < 3900 {
+    // About 3900 bytes in all, whatever the temporary directory is called (PATH_MAX is 4096).
+    while deep.as_os_str().len() + 201 <= 3900 {
         deep.push("d".repeat(200));
     }
+    let left = 3900usize.saturating_sub(deep.as_os_str().len() + 1);
+    if left > 0 {
+        deep.push("e".repeat(left.min(255)));
+    }
+    assert!(
+        deep.as_os_str().len() < 4000,
+        "the temporary directory itself is too long for this test"
+    );
     std::fs::create_dir_all(&deep).unwrap();
     let b = LocalFolder::open(&deep).await.unwrap();
     let key = format!("{}/{}", "k".repeat(100), "l".repeat(100));

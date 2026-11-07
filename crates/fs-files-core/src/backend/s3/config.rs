@@ -1,6 +1,6 @@
 //! The configuration of an S3 backend.
 //!
-//! Pattern: Builder-style value object — parsed from the `backend.add` JSON, checked, and turned into
+//! Pattern: Value object — parsed from the `backend.add` JSON, checked, and turned into
 //! a client. The credentials live only here and in the client; `Debug` hides them and no error
 //! message repeats the input.
 

@@ -15,7 +15,8 @@ use async_trait::async_trait;
 use serde_json::Value;
 
 use super::{BlobBackend, LocalFolder, RESERVED_NAME};
-use crate::backend::factory::BackendFactory;
+use crate::backend::factory::{BackendFactory, Place};
+use crate::backend::nested;
 use crate::error::{Error, Result};
 
 /// `{"kind": "local", "path": "second"}`: the path is relative to the base.
@@ -69,7 +70,7 @@ impl ConfinedLocalFactory {
 
 impl ConfinedLocalFactory {
     /// The canonical base (made if it is not there: it is the program's own folder) and the place.
-    async fn resolve(&self, config: &Value) -> Result<(PathBuf, PathBuf)> {
+    async fn resolve(&self, config: &Value) -> Result<(PathBuf, Place)> {
         let path = config
             .get("path")
             .and_then(Value::as_str)
@@ -77,7 +78,30 @@ impl ConfinedLocalFactory {
         tokio::fs::create_dir_all(&self.base).await?;
         let base = tokio::fs::canonicalize(&self.base).await?;
         let at = Self::place(&base, path)?;
-        Ok((base, at))
+        let marker_new = at.is_dir() && !at.join(RESERVED_NAME).exists();
+        // An existing folder that is no backend of its own may hold backends that are not mounted
+        // (after a restart): it would take their files. Looked for, bounded; too big is refused.
+        if marker_new && nested::holds_backend(&at) {
+            return Err(Error::Config(
+                "the folder of a local backend holds another backend, or is too big to check"
+                    .into(),
+            ));
+        }
+        let missing = |d: &&Path| !d.exists();
+        let mut made: Vec<PathBuf> = at
+            .ancestors()
+            .take_while(missing)
+            .map(Path::to_path_buf)
+            .collect();
+        made.reverse();
+        Ok((
+            base,
+            Place {
+                path: at,
+                made,
+                marker_new,
+            },
+        ))
     }
 }
 
@@ -87,28 +111,28 @@ impl BackendFactory for ConfinedLocalFactory {
         "local"
     }
 
-    async fn place(&self, config: &Value) -> Result<Option<PathBuf>> {
+    async fn place(&self, config: &Value) -> Result<Option<Place>> {
         Ok(Some(self.resolve(config).await?.1))
     }
 
-    fn forget(&self, place: &Path) {
-        let _ = std::fs::remove_dir_all(place);
-        // The parents made on the way, as far as they are empty; the base itself stays.
-        let mut parent = place.parent();
-        while let Some(dir) = parent.filter(|d| d.starts_with(&self.base) && *d != self.base) {
+    fn forget(&self, place: &Place) {
+        if place.marker_new || !place.made.is_empty() {
+            let _ = std::fs::remove_dir_all(place.path.join(RESERVED_NAME));
+        }
+        // Only folders this add made, innermost first, and only while they are empty.
+        for dir in place.made.iter().rev() {
             if std::fs::remove_dir(dir).is_err() {
                 break;
             }
-            parent = dir.parent();
         }
     }
 
     async fn build(&self, config: &Value) -> Result<Arc<dyn BlobBackend>> {
-        let (base, at) = self.resolve(config).await?;
+        let (base, place) = self.resolve(config).await?;
         // `open` makes the folders it needs before the check below: a refusal found only there may
         // leave empty folders behind (a link swapped in between the check above and this open);
-        // it never mounts the backend. The base must be a folder only this program writes to.
-        let backend = LocalFolder::open(&at).await?;
+        // `forget` takes back what this add made. The base must be a folder only this program writes to.
+        let backend = LocalFolder::open(&place.path).await?;
         // Belt and braces: a link made between the check and the open must not carry it out.
         if !backend.root().starts_with(&base) || backend.root() == base {
             return Err(Error::Config(

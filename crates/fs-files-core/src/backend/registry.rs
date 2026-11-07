@@ -1,6 +1,6 @@
 //! The backends currently in use, swapped atomically.
 //!
-//! Pattern: Registry + Memento-like snapshots — readers take an `Arc` snapshot and see either the old
+//! Pattern: Registry + Memento (snapshots) — readers take an `Arc` snapshot and see either the old
 //! or the new set, never a mix; `add` and `remove` build a new snapshot and replace it in one step.
 
 use std::sync::{Arc, RwLock};

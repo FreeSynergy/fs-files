@@ -21,11 +21,22 @@ pub trait BackendFactory: Send + Sync {
     async fn build(&self, config: &Value) -> Result<Arc<dyn BlobBackend>>;
     /// The folder `build` would use, checked, and nothing made. `None`: this kind has no folder of this
     /// machine, or does not say. `backend.add` refuses a folder that another backend has or lies in.
-    async fn place(&self, _config: &Value) -> Result<Option<std::path::PathBuf>> {
+    async fn place(&self, _config: &Value) -> Result<Option<Place>> {
         Ok(None)
     }
-    /// Remove what `build` made for `place` (a folder that did not exist before) after a failed add.
-    fn forget(&self, _place: &std::path::Path) {}
+    /// Remove what `build` made for `place`, after a failed add: only what this add made.
+    fn forget(&self, _place: &Place) {}
+}
+
+/// A folder a backend will use, and what making it will add to the disk.
+#[derive(Clone, Debug)]
+pub struct Place {
+    /// The folder.
+    pub path: std::path::PathBuf,
+    /// The folders that do not exist yet and that `build` makes, outermost first (`path` is the last, if it is new).
+    pub made: Vec<std::path::PathBuf>,
+    /// `path` exists but has no program folder (`.fs-files`) yet: `build` makes it.
+    pub marker_new: bool,
 }
 
 /// `{"kind": "local", "path": "/data/files"}`.
