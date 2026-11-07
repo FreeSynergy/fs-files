@@ -3,11 +3,11 @@
 `fs-files` is the files program of FreeSynergy. This repo holds the **program core** (`crates/fs-files-core`, no GUI) and the **server** (`crates/fs-files-server`, the contract over a Unix socket).
 **Metadata** (name, media type, size, checksum, folder, trash flag) is an object in `fs-store`; the **bytes** are in a
 backend behind `BlobBackend`. Other programs refer to a file by its object id and read through the `Blob` trait; they never
-see a path or a backend. Contract: `files.capnp` in `fs-interfaces` v0.33.0 (draft, consumers: 0 of 2).
+see a path or a backend. Contract: `files.capnp` in `fs-interfaces` v0.35.0 (draft, consumers: 0 of 2).
 
 ## State
 
-Version 0.4.0, not tagged (stage 1: local folder, stage 2: S3, stage 3: real names, stage 4: the server). Built on fs-store 0.2.0 and fs-interfaces 0.33.0 (git tags). Interface status: draft, provisional, consumers 0 of 2.
+Version 0.4.0, not tagged (stage 1: local folder, stage 2: S3, stage 3: real names, stage 4: the server). Built on fs-store 0.2.0 and fs-interfaces 0.35.0 (git tags). Interface status: draft, provisional, consumers 0 of 2.
 
 | Area | State |
 |---|---|
@@ -37,7 +37,7 @@ Version 0.4.0, not tagged (stage 1: local folder, stage 2: S3, stage 3: real nam
 | `File` and `Folder` carry the envelope as stored; every write answers the object as stored (the store sets the times), so an answer equals what `get` says afterwards | done |
 | Server `fs-files-server`: every method of `Files`, `Folders`, `Transfer`, `Upload`, `Blob` (common), `Search`, `Backends` and `BlobBackend` (provider side), `subscribe` with `ended`, `supportReport`; errors as typed problems; binary with `--socket --data --actor --instance` and `FS_FILES_ROOT` | done, draft |
 | `sharing` (empty placeholder interface): `Unsupported` (`share.create`); versions, encryption, sync, WebDAV, previews: not built | as agreed |
-| Tests | 194 run by default: core 136, server 58; 2 ignored live tests. The server tests run over a real socket against a real `FileRepo`, compare values, and run the real binary across a restart |
+| Tests | 196 run by default: core 136, server 60; 2 ignored live tests. The server tests run over a real socket against a real `FileRepo`, compare values, and run the real binary across a restart |
 
 ## Structure and pattern map (ADR 0043)
 
@@ -168,10 +168,9 @@ backend that runs as its own program serves it). `Unsupported` (501, `share.crea
 methods yet, and `file.sort` descending by media type (the contract says so). A provider that lacks `file.subscribe` answers `subscribe` with its own
 reason; a backend that cannot do a method answers its own `Unsupported`.
 
-**Problem types.** The three of the contract come from the core (`Error::problem`). The contract names no others, so these are
-provisional and reported: `files/not-found` 404, `files/conflict` 409, `files/wrong-offset` 409, `files/invalid` 422 (bad backend
+**Problem types.** All come from the contract since v0.35.0 (constants in `files_capnp`; the core maps the three name problems with `Error::problem`): `files/not-found` 404, `files/conflict` 409, `files/wrong-offset` 409, `files/invalid` 422 (bad backend
 configuration), `files/encryption-required` 409 (ADR 0029: the store has no key), `files/stored-data-invalid` 500, `files/backend-failed`
-500; from `fs_interfaces::rpc`: `invalid-request` 422 (a text or id that cannot be right), `too-large` 413, `feed-ended` 410.
+500; and from `fs_interfaces::rpc`: `invalid-request` 422 (a text or id that cannot be right), `too-large` 413, `feed-ended` 410.
 
 **Limits (no unbounded reading, no answer beyond a message).**
 * Bytes: a `Blob.read` and a backend `get` answer at most 32 MiB (`clamp_read`; fewer is allowed, empty is the end). An `Upload.write` or `put` above
@@ -181,9 +180,8 @@ configuration), `files/encryption-required` 409 (ADR 0029: the store has no key)
 * Texts: a name above 4096 bytes is the contract's `invalid-name` (the core decides the 255); a search text or key above 8 KiB, a media type, id or
   category above 1 KiB, all categories of one file above 64 KiB, a configuration above 64 KiB: `invalid-request`, before the core sees them.
 * Reports: a `RescanReport` is held to 32 MiB; the lists share it (a short list is never crowded out) and **what is left out is named in `skipped`**
-  (`... N more added entries (they are taken over) are not listed here`). `pendingUploads` comes **oldest first, as many as fit** (about 20 000 of the largest); the contract
-  has no marker, a consumer deals with those and asks again. `TrashReport.failed` is cut at 1.3 million ids. `BlobBackend.scan` is one level and is refused
-  whole as `too-large` if it does not fit (the contract has no paging for it).
+  (`... N more added entries (they are taken over) are not listed here`). `pendingUploads` and `BlobBackend.scan` are **paged** (since v0.35.0): 100 per page, by weight, oldest first / sorted by
+  name, the cursor of `rpc::Page`; the provider returns the whole list and the server cuts it. `TrashReport.failed` lists at most 1 398 101 ids and `failedMissing` counts the rest.
 
 **Places.** The binary refuses to start (exit 1, before anything is opened or made) if `FS_FILES_ROOT` is, or lies above, `--data`: `objects.db` would lie
 among the files and a rescan would take it for one. Links are resolved first; a path with `..` is refused outright (after a part that does not exist yet it cannot
@@ -199,7 +197,7 @@ not looked for below the one being added. A program that embeds the core and tak
 **Writes run to their end** (`run_to_end`): a client that drops the call or the connection cannot leave the disk and the database out of step. Calls on one `Upload` run in the
 order they arrived, so chunks may be sent without waiting for each answer (mutation-tested).
 
-**Open points of the server** (to the strategy session): (1) the problem types above are not in the contract; (2) `file.subscribe` sends the envelope of a
+**Open points of the server** (to the strategy session): (1) (closed by v0.35.0: problem types, paging, `failedMissing`); (2) `file.subscribe` sends the envelope of a
 file marked sensitive (ADR 0029) like any other: the names and categories leave; whether they should only on release (as in `fs-people`) is a decision;
 (3) `backend.add` is not persisted (the core's decision): after a restart the binary has the `main` local backend only; (4) the `Registry` of the feed is the
 same code as in `fs-tasks` and `fs-maps` and wants to live once in `fs-interfaces` or `fs-store`; (5) the cursor is a place in a list and shifts when an entry is
@@ -208,7 +206,7 @@ wants remote backends needs the client side (`RemoteBackend`), not built; (7) a 
 
 ## Crates
 
-* `fs-store` (v0.2.0), `fs-interfaces` (v0.33.0): git tags.
+* `fs-store` (v0.2.0), `fs-interfaces` (v0.35.0): git tags.
 * `rustix` 1 (MIT OR Apache-2.0, Linux only, features `std` + `fs`): `renameat2` with `RENAME_NOREPLACE`, the atomic no-replace rename that `std` lacks. No C code with its default backend, already in the lock file through other crates.
 * `blake3` 1.8 (CC0-1.0 OR Apache-2.0): checksums, with the `pure` feature (no C / assembly). Fast enough for a first version.
 * `infer` 0.22 (MIT): media type from the first bytes when the caller gives none; pure Rust, no dependencies.
@@ -223,7 +221,7 @@ wants remote backends needs the client side (`RemoteBackend`), not built; (7) a 
 
 ## Contract
 
-`files.capnp` in `fs-interfaces` v0.33.0 (draft 0.2). Appended for real names: `Folders.rescan @13` and `RescanReport`; `BlobBackend`
+`files.capnp` in `fs-interfaces` v0.35.0 (draft 0.2). Appended in v0.35.0: problem-type constants, `cursor` / `next` on `Transfer.pendingUploads` and `BlobBackend.scan`, `TrashReport.failedMissing`. Appended for real names: `Folders.rescan @13` and `RescanReport`; `BlobBackend`
 `naming`, `publish`, `relocate`, `discard`, `makeDir`, `removeDir`, `scan` (@7 to @13) with `Spot`, `Scanned`, `ScanKind`; the problem types
 `nameConflictProblemType` (409), `invalidNameProblemType` (422), `changedOutsideProblemType` (409); and the statement that `Envelope.name` of a
 file and a folder IS its real name (not derived). In the core `Error::problem()` makes the mapping; a name clash is still `Error::Conflict`.

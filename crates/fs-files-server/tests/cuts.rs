@@ -6,7 +6,6 @@ mod common;
 use common::stub::{Stub, entries, heavy_file};
 use common::{caps, with_stub};
 use fs_files_core::{RescanReport, UploadInfo};
-use fs_interfaces::rpc::MAX_PAGE_BYTES;
 use fs_store::ObjectId;
 
 #[tokio::test(flavor = "current_thread")]
@@ -90,12 +89,36 @@ async fn a_trash_report_arrives_whole_with_the_count_of_the_purged() {
             .map(|u| fs_interfaces::rpc::read_uuid(u).unwrap())
             .collect();
         assert_eq!(failed, expected);
+        assert_eq!(report.get_failed_missing(), 0, "all listed");
     })
     .await;
 }
 
 #[tokio::test(flavor = "current_thread")]
-async fn pending_uploads_beyond_a_message_come_oldest_first_as_many_as_fit() {
+async fn a_trash_report_longer_than_a_message_lists_the_most_and_counts_the_rest() {
+    let bound = 1_398_101; // 32 MiB at 24 bytes an id, as the contract says
+    let stub = Stub {
+        failed: (0..bound + 5).map(|_| ObjectId::new()).collect(),
+        ..Stub::default()
+    };
+    with_stub(stub, |root| async move {
+        let c = caps(&root).await;
+        let answer = c
+            .folders
+            .empty_trash_request()
+            .send()
+            .promise
+            .await
+            .expect("it arrives");
+        let report = answer.get().unwrap().get_report().unwrap();
+        assert_eq!(report.get_failed().unwrap().len() as usize, bound);
+        assert_eq!(report.get_failed_missing(), 5);
+    })
+    .await;
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn pending_uploads_come_oldest_first_in_pages_and_none_is_lost() {
     let uploads: Vec<UploadInfo> = (0..40_000)
         .map(|i| UploadInfo {
             id: format!("{i:08}"),
@@ -113,24 +136,33 @@ async fn pending_uploads_beyond_a_message_come_oldest_first_as_many_as_fit() {
     };
     with_stub(stub, |root| async move {
         let c = caps(&root).await;
-        let answer = c
-            .transfer
-            .pending_uploads_request()
-            .send()
-            .promise
-            .await
-            .expect("it arrives");
-        let items = answer.get().unwrap().get_items().unwrap();
-        let shown = items.len() as usize;
-        assert!(shown > 1000 && shown < 40_000, "{shown} uploads shown");
-        assert!(shown * 1500 < MAX_PAGE_BYTES * 2);
-        for (i, item) in items.iter().enumerate() {
-            assert_eq!(
-                item.get_id().unwrap().to_str().unwrap(),
-                format!("{i:08}"),
-                "oldest first, none skipped"
-            );
+        let (mut seen, mut cursor, mut pages) = (0usize, vec![], 0);
+        loop {
+            let mut call = c.transfer.pending_uploads_request();
+            call.get().init_cursor().set_opaque(&cursor);
+            let answer = call.send().promise.await.expect("a page arrives");
+            let r = answer.get().unwrap();
+            let items = r.get_items().unwrap();
+            assert!(items.len() <= 100 && !items.is_empty());
+            for item in items.iter() {
+                let id = item.get_id().unwrap().to_str().unwrap();
+                assert_eq!(id, format!("{seen:08}"), "oldest first, none skipped");
+                seen += 1;
+            }
+            pages += 1;
+            cursor = r.get_next().unwrap().get_opaque().unwrap().to_vec();
+            if cursor.is_empty() {
+                break;
+            }
         }
+        assert_eq!((seen, pages), (40_000, 400));
+        let mut bad = c.transfer.pending_uploads_request();
+        bad.get().init_cursor().set_opaque(b"bad");
+        common::is(
+            &bad.send().promise.await.err().unwrap(),
+            fs_interfaces::rpc::INVALID_REQUEST,
+            422,
+        );
     })
     .await;
 }

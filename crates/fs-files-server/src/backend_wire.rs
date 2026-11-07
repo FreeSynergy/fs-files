@@ -6,9 +6,8 @@
 
 use fs_files_core::{BlobInfo, ScanKind, Scanned, Spot};
 use fs_interfaces::files_capnp::{blob_info, scanned, spot};
-use fs_interfaces::rpc::{check_answer, invalid_request};
+use fs_interfaces::rpc::invalid_request;
 
-use crate::wire::count;
 use crate::wire::text::{MAX_TERM, limited};
 
 /// A key or a path.
@@ -54,15 +53,23 @@ pub(crate) fn write_scanned(
     }
 }
 
-/// What a listing weighs, and the length for its list; refused if it cannot be sent.
-pub(crate) fn scanned_len(items: &[Scanned]) -> capnp::Result<u32> {
-    let weight = items.iter().map(|s| {
-        let why = match &s.kind {
-            ScanKind::Skipped(why) => why.len(),
-            _ => 0,
-        };
-        96 + s.name.len() + why
-    });
-    check_answer(weight.sum())?;
-    count(items.len())
+/// What one entry of a listing weighs in a message.
+pub(crate) fn scanned_weight(s: &Scanned) -> usize {
+    let why = match &s.kind {
+        ScanKind::Skipped(why) => why.len(),
+        _ => 0,
+    };
+    96 + s.name.len() + why
+}
+
+/// The keys to keep when sweeping; all of them together stay within what a request may carry.
+pub(crate) fn read_keep(list: capnp::text_list::Reader<'_>) -> capnp::Result<Vec<String>> {
+    let (mut keep, mut bytes) = (Vec::new(), 0);
+    for k in list {
+        let k = key(k?)?;
+        bytes += k.len();
+        fs_interfaces::rpc::check_intake(bytes)?;
+        keep.push(k.to_string());
+    }
+    Ok(keep)
 }

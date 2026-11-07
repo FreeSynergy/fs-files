@@ -2,8 +2,8 @@
 //!
 //! Pattern: Adapter — each error the core can name becomes a typed RFC 9457 problem, so a consumer
 //! can tell "name taken" from "not found" from "not possible" without reading a message. The three
-//! problem types of `files.capnp` come from the core's own mapping (`Error::problem`); the others
-//! are named here because the contract names none for them (reported, see `DESIGN.md`). What fails
+//! problem types of `files.capnp` come from the core's own mapping (`Error::problem`) and from the
+//! constants of the contract (since `fs-interfaces` v0.35.0). What fails
 //! on data already stored is not the caller's fault, so it is never a 422.
 
 use std::future::Future;
@@ -12,14 +12,12 @@ use fs_files_core::Error;
 use fs_interfaces::rpc::{Problem, failed, run_to_end, unsupported};
 use fs_store::Error as Store;
 
-pub(crate) const NOT_FOUND: &str = "https://freesynergy.net/problems/files/not-found";
-pub(crate) const CONFLICT: &str = "https://freesynergy.net/problems/files/conflict";
-pub(crate) const WRONG_OFFSET: &str = "https://freesynergy.net/problems/files/wrong-offset";
-pub(crate) const INVALID: &str = "https://freesynergy.net/problems/files/invalid";
-pub(crate) const ENCRYPTION_REQUIRED: &str =
-    "https://freesynergy.net/problems/files/encryption-required";
-pub(crate) const STORED_DATA: &str = "https://freesynergy.net/problems/files/stored-data-invalid";
-pub(crate) const BACKEND_FAILED: &str = "https://freesynergy.net/problems/files/backend-failed";
+use fs_interfaces::files_capnp::{
+    BACKEND_FAILED_PROBLEM_TYPE as BACKEND_FAILED, CONFLICT_PROBLEM_TYPE as CONFLICT,
+    ENCRYPTION_REQUIRED_PROBLEM_TYPE as ENCRYPTION_REQUIRED, INVALID_PROBLEM_TYPE as INVALID,
+    NOT_FOUND_PROBLEM_TYPE as NOT_FOUND, STORED_DATA_PROBLEM_TYPE as STORED_DATA,
+    WRONG_OFFSET_PROBLEM_TYPE as WRONG_OFFSET,
+};
 
 fn problem(kind: &str, title: &str, detail: String, status: u16) -> capnp::Error {
     Problem::new(kind, title, detail, status).into_error()

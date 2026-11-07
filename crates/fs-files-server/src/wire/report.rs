@@ -16,7 +16,8 @@ use super::ids::write_optional;
 /// Room kept for the lines that say a list was cut.
 const NOTES: usize = 4096;
 const TEXT_BYTES: usize = 16;
-const ID_BYTES: usize = 24;
+/// Ids a trash report lists: a page of 32 MiB at 24 bytes an id (the contract states this number).
+const MAX_FAILED: usize = MAX_PAGE_BYTES / 24;
 const UPLOAD_BYTES: usize = 160;
 
 /// How many of `items` fit `budget`, taking what they use from it.
@@ -118,13 +119,14 @@ pub(crate) fn write_rescan(
     Ok(())
 }
 
-/// Write what `emptyTrash` did. The failed ids are at most what a message holds.
+/// Write what `emptyTrash` did. The failed ids are at most [`MAX_FAILED`]; `failedMissing` counts the rest.
 pub(crate) fn write_trash(
     mut out: trash_report::Builder<'_>,
     report: &TrashReport,
 ) -> capnp::Result<()> {
     out.set_purged(report.purged);
-    let shown = report.failed.len().min(MAX_PAGE_BYTES / ID_BYTES);
+    let shown = report.failed.len().min(MAX_FAILED);
+    out.set_failed_missing(u32::try_from(report.failed.len() - shown).unwrap_or(u32::MAX));
     let mut list = out.init_failed(count(shown)?);
     for (i, id) in (0u32..).zip(&report.failed[..shown]) {
         write_uuid(list.reborrow().get(i), Some(id.as_uuid()));
@@ -142,25 +144,19 @@ fn write_upload(mut out: upload_info::Builder<'_>, u: &UploadInfo) {
     out.init_started().set_unix_millis(to_millis(u.started));
 }
 
-/// Write the unfinished uploads, oldest first, as many as fit a message. A consumer that deals with
-/// these and asks again gets the rest.
+/// Write unfinished uploads (one page, oldest first).
 pub(crate) fn write_uploads(
-    out: capnp::struct_list::Builder<'_, upload_info::Owned>,
+    mut out: capnp::struct_list::Builder<'_, upload_info::Owned>,
     items: &[UploadInfo],
-    shown: usize,
 ) {
-    let mut out = out;
-    for (i, u) in (0u32..).zip(&items[..shown]) {
+    for (i, u) in (0u32..).zip(items) {
         write_upload(out.reborrow().get(i), u);
     }
 }
 
-/// How many of the uploads fit a message.
-pub(crate) fn uploads_fitting(items: &[UploadInfo]) -> usize {
-    let mut budget = MAX_PAGE_BYTES;
-    fitting(items, &mut budget, |u| {
-        UPLOAD_BYTES + u.id.len() + u.name.len() + u.media_type.len()
-    })
+/// What one unfinished upload weighs in a message.
+pub(crate) fn upload_weight(u: &UploadInfo) -> usize {
+    UPLOAD_BYTES + u.id.len() + u.name.len() + u.media_type.len()
 }
 
 /// Write one backend.

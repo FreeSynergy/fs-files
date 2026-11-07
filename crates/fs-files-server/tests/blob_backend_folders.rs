@@ -117,3 +117,43 @@ async fn folders_scan_relocate_discard_inspect_and_sweep() {
     })
     .await;
 }
+
+#[tokio::test(flavor = "current_thread")]
+async fn a_scan_of_a_long_folder_comes_in_pages_sorted_and_whole() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir(dir.path().join("many")).unwrap();
+    for n in 0..250 {
+        std::fs::write(dir.path().join(format!("many/f-{n:03}")), "x").unwrap();
+    }
+    let backend = Arc::new(LocalFolder::open(dir.path()).await.unwrap());
+    with_backend(backend, |b| async move {
+        let (mut names, mut cursor, mut pages) = (vec![], vec![], 0);
+        loop {
+            let mut scan = b.scan_request();
+            scan.get().set_dir("many");
+            scan.get().init_cursor().set_opaque(&cursor);
+            let answer = scan.send().promise.await.unwrap();
+            let r = answer.get().unwrap();
+            for item in r.get_items().unwrap().iter() {
+                names.push(item.get_name().unwrap().to_str().unwrap().to_string());
+            }
+            pages += 1;
+            cursor = r.get_next().unwrap().get_opaque().unwrap().to_vec();
+            if cursor.is_empty() {
+                break;
+            }
+        }
+        let expected: Vec<String> = (0..250).map(|n| format!("f-{n:03}")).collect();
+        assert_eq!(pages, 3);
+        assert!(names == expected, "the entries, sorted and whole");
+        let mut bad = b.scan_request();
+        bad.get().set_dir("many");
+        bad.get().init_cursor().set_opaque(b"bad");
+        is(
+            &bad.send().promise.await.err().unwrap(),
+            fs_interfaces::rpc::INVALID_REQUEST,
+            422,
+        );
+    })
+    .await;
+}

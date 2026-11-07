@@ -6,18 +6,17 @@
 //! Writes run to their end. A read is clamped to what a message carries (fewer bytes than asked is
 //! allowed, an empty answer is the end); a chunk to write above that is refused whole.
 
-use std::rc::Rc;
-use std::sync::Arc;
+use std::{rc::Rc, sync::Arc};
 
 use capnp_rpc::new_client;
 use fs_files_core::{BlobBackend, Naming};
 use fs_interfaces::files_capnp::blob_backend as b;
-use fs_interfaces::rpc::{check_intake, clamp_read};
+use fs_interfaces::rpc::{DEFAULT_PAGE_SIZE, Page, check_intake, clamp_read};
 
-use crate::backend_wire::{key, read_spot, scanned_len, write_info, write_scanned};
+use crate::backend_wire::{key, read_keep, read_spot, scanned_weight, write_info, write_scanned};
 use crate::errors::{finish, rpc_error};
-use crate::wire::CONTRACT_VERSION;
 use crate::wire::text::{MAX_SHORT, limited};
+use crate::wire::{CONTRACT_VERSION, count};
 
 /// A backend served over the socket.
 pub struct BlobBackendServer {
@@ -145,12 +144,24 @@ impl b::Server for BlobBackendServer {
     }
 
     async fn scan(self: Rc<Self>, p: b::ScanParams, mut r: b::ScanResults) -> Done {
-        let items = self
+        let p = p.get()?;
+        let all = self
             .backend
-            .scan(key(p.get()?.get_dir()?)?)
+            .scan(key(p.get_dir()?)?)
             .await
             .map_err(rpc_error)?;
-        write_scanned(r.get().init_items(scanned_len(&items)?), &items);
+        let page = Page::of_weighted(
+            all,
+            p.get_cursor()?.get_opaque()?,
+            DEFAULT_PAGE_SIZE,
+            scanned_weight,
+        )?;
+        let mut out = r.get();
+        write_scanned(
+            out.reborrow().init_items(count(page.items.len())?),
+            &page.items,
+        );
+        out.init_next().set_opaque(&page.next);
         Ok(())
     }
 
@@ -166,13 +177,7 @@ impl b::Server for BlobBackendServer {
         mut r: b::SweepPendingResults,
     ) -> Done {
         let p = p.get()?;
-        let (mut keep, mut bytes) = (Vec::new(), 0);
-        for k in p.get_keep()? {
-            let k = key(k?)?;
-            bytes += k.len();
-            check_intake(bytes)?;
-            keep.push(k.to_string());
-        }
+        let keep = read_keep(p.get_keep()?)?;
         let (older, backend) = (p.get_older_than_secs(), self.backend.clone());
         let removed = finish(async move { backend.sweep_pending(&keep, older).await }).await?;
         r.get().set_removed(removed);
