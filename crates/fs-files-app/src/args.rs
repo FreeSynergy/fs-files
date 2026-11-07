@@ -1,20 +1,23 @@
 //! The command line.
 //!
-//! Pattern: Builder-like parser — plain `std::env::args`, no extra crate for a few options.
+//! Pattern: none — a small pure function over the argument list (plain `std::env::args`, no extra crate
+//! for a few options). The words it says are in `words.rs`.
 
 use std::path::PathBuf;
 
 use fs_components_app::parse_size;
 use fs_components_workbenches::file_manager::FileView;
 
+use crate::words::{cli, fill};
+
+pub use crate::words::cli::HELP;
+
 /// What was asked for on the command line.
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, PartialEq, Eq)]
 pub struct Args {
-    /// Store file; `None` = in memory, gone when the program ends.
-    pub store: Option<PathBuf>,
-    /// The folder the local backend keeps the files in.
-    pub root: Option<PathBuf>,
+    /// The socket of a running `fs-files-server`.
+    pub socket: Option<PathBuf>,
     /// Draw a picture to this file instead of opening a window.
     pub snapshot: Option<PathBuf>,
     /// Size of the window or picture.
@@ -42,8 +45,7 @@ pub struct Args {
 impl Default for Args {
     fn default() -> Self {
         Self {
-            store: None,
-            root: None,
+            socket: None,
             snapshot: None,
             size: (1300, 800),
             view: None,
@@ -70,11 +72,11 @@ pub fn parse(args: &[String]) -> Result<Args, String> {
         let mut value = |name: &str| {
             it.next()
                 .cloned()
-                .ok_or_else(|| format!("{name} needs a value"))
+                .ok_or_else(|| fill(cli::NEEDS_VALUE, &[("option", name)]))
         };
         match arg.as_str() {
-            "--store" => out.store = Some(PathBuf::from(value("--store")?)),
-            "--root" => out.root = Some(PathBuf::from(value("--root")?)),
+            "--socket" => out.socket = Some(PathBuf::from(value("--socket")?)),
+            "--root" | "--store" => return Err(fill(cli::KEEPS_NOTHING, &[("option", arg)])),
             "--snapshot" => out.snapshot = Some(PathBuf::from(value("--snapshot")?)),
             "--size" => out.size = parse_size(&value("--size")?)?,
             "--view" => out.view = Some(view(&value("--view")?)?),
@@ -86,7 +88,7 @@ pub fn parse(args: &[String]) -> Result<Args, String> {
             "--to" => out.to = Some(value("--to")?),
             "--release-sensitive" => out.release_sensitive = true,
             "-h" | "--help" => out.help = true,
-            other => return Err(format!("unknown option {other}")),
+            other => return Err(fill(cli::UNKNOWN_OPTION, &[("option", other)])),
         }
     }
     check(&out)?;
@@ -97,17 +99,17 @@ fn check(out: &Args) -> Result<(), String> {
     if out.help {
         return Ok(());
     }
-    if out.root.is_none() {
-        return Err("--root <folder> is needed: the folder that holds the files".into());
+    if out.socket.is_none() {
+        return Err(cli::NEEDS_SOCKET.into());
     }
     if out.download.is_some() != out.to.is_some() {
-        return Err("--download <id> and --to <path> go together".into());
+        return Err(cli::DOWNLOAD_TOGETHER.into());
     }
     if out.release_sensitive && out.download.is_none() {
-        return Err("--release-sensitive needs --download".into());
+        return Err(cli::RELEASE_NEEDS_DOWNLOAD.into());
     }
     if out.into.is_some() && out.upload.is_empty() {
-        return Err("--into needs --upload".into());
+        return Err(cli::INTO_NEEDS_UPLOAD.into());
     }
     Ok(())
 }
@@ -116,26 +118,6 @@ fn view(text: &str) -> Result<FileView, String> {
     match text {
         "list" => Ok(FileView::List),
         "grid" => Ok(FileView::Grid),
-        other => Err(format!("--view wants list or grid, not {other}")),
+        other => Err(fill(cli::BAD_VIEW, &[("value", other)])),
     }
 }
-
-/// The help text.
-pub const HELP: &str = "fs-files-app: the files program
-
-  --root <folder>    the folder that holds the files (needed); files there keep their real names
-  --store <file>     keep what is known about the files in this store file (default: in memory, gone
-                     at the end)
-  --no-rescan        do not look at the folder when starting: only what the store knows shows
-  --snapshot <png>   draw a picture instead of opening a window
-  --size <WxH>       window or picture size (default 1300x800)
-  --view <list|grid> the view to start with (default list)
-  --upload <path>    upload this file and stop; repeat for more; a symbolic link is refused
-  --into <id>        the folder to upload into (default: the top)
-  --keep-both        on a taken name keep both: the upload gets a free name; nothing is replaced
-  --download <id>    write this file and stop
-  --to <path>        where to write it: a new file, or a folder to put it in; nothing is replaced
-  --release-sensitive
-                     this download may write a file marked sensitive
-
-Changes made in the folder from outside only come in by a rescan: at the start, or the Rescan button.";

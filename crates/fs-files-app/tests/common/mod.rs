@@ -6,6 +6,8 @@
 //! Pattern: Facade over the real thing. Nothing here pretends to be the core or the server.
 #![allow(dead_code)] // each test file uses a different subset
 
+mod server;
+
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -13,8 +15,6 @@ use fs_components_workbenches::file_manager::{FileManagerWidget, FilesState, PAG
 use fs_files_app::{FileAdapter, labels};
 use fs_files_client::RpcFiles;
 use fs_files_core::{File, FileRepo, Files, Folder, LocalFolder, Transfer};
-use fs_files_server::FilesServer;
-use fs_interfaces::rpc::{bind_socket, serve};
 use fs_store::{
     Cipher, EncryptionKey, ObjectId, OpenOptions, StaticKeyProvider, Store, TursoStore,
 };
@@ -95,27 +95,7 @@ impl World {
             .block_on(LocalFolder::open(dir.path().join("root")))
             .unwrap();
         let repo = FileRepo::new(store.clone(), ME, "local", Arc::new(folder)).with_page_size(PAGE);
-        let socket = dir.path().join("files.sock");
-        let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
-        let (ready, listening) = std::sync::mpsc::channel();
-        let (path, provider) = (socket.clone(), repo.clone());
-        let thread = std::thread::spawn(move || {
-            let runtime = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .unwrap();
-            tokio::task::LocalSet::new().block_on(&runtime, async move {
-                let bound = bind_socket(&path).await.unwrap();
-                let (a, b, c) = (provider.clone(), provider.clone(), provider.clone());
-                let root = FilesServer::new(Arc::new(a), Arc::new(b), Arc::new(c), Arc::new(provider));
-                ready.send(()).unwrap();
-                let shutdown = async {
-                    let _ = stopped.await;
-                };
-                serve(bound, root.into_client().client, shutdown).await.unwrap();
-            });
-        });
-        listening.recv().unwrap();
+        let (socket, stop, thread) = server::start(dir.path(), &repo);
         let client = Arc::new(RpcFiles::connect(&socket).unwrap());
         let adapter = Arc::new(FileAdapter::new(
             client.clone(),

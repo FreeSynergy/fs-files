@@ -1,6 +1,6 @@
 //! The binary: wiring only.
 //!
-//! Pattern: Facade consumer — parse arguments, open the store and the folder, look at the folder, then
+//! Pattern: Facade consumer — parse arguments, connect to the server, ask it to look at its folder, then
 //! transfer or show. The runtime lives as long as the window: the workbench's calls run on it.
 
 use std::path::Path;
@@ -8,16 +8,10 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use fs_components_app::{Status, WindowOptions, launch};
-use fs_components_workbenches::file_manager::{FileManagerWidget, FileSource, PAGE};
+use fs_components_workbenches::file_manager::{FileManagerWidget, FileSource};
 use fs_files_app::args::{Args, HELP, parse};
-use fs_files_app::{FileAdapter, commands, labels, screen_widget};
-use fs_files_core::{FileRepo, LocalFolder};
-use fs_store::{Store, TursoStore};
-
-/// Who acts on this store. Provisional: there is no sign-in yet.
-const ACTOR: &str = "https://localhost/actors/owner";
-/// The name of the only backend. Provisional: more come with `backend.add`.
-const BACKEND: &str = "local";
+use fs_files_app::{FileAdapter, cli, commands, fill, labels, screen_widget};
+use fs_files_client::RpcFiles;
 
 fn main() {
     if let Err(message) = run() {
@@ -33,9 +27,9 @@ fn run() -> Result<(), String> {
         println!("{HELP}");
         return Ok(());
     }
-    let root = args.root.as_deref().ok_or("--root is needed")?;
+    let socket = args.socket.as_deref().ok_or(cli::NEEDS_SOCKET)?;
     let runtime = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
-    let source = open(&args, root, runtime.handle())?;
+    let source = open(socket, runtime.handle())?;
     let mut status = None;
     if !args.no_rescan {
         status = Some(look_at_folder(source.as_ref()));
@@ -60,49 +54,45 @@ fn run() -> Result<(), String> {
     show(&args, source, status)
 }
 
-fn open(
-    args: &Args,
-    root: &Path,
-    runtime: &tokio::runtime::Handle,
-) -> Result<Arc<dyn FileSource>, String> {
-    let store: Arc<dyn Store> = runtime
-        .block_on(async {
-            match &args.store {
-                Some(file) => TursoStore::open(file).await,
-                None => TursoStore::open_in_memory().await,
-            }
-        })
-        .map(|s| Arc::new(s) as Arc<dyn Store>)
-        .map_err(|e| format!("cannot open the store: {e}"))?;
-    let folder = runtime
-        .block_on(LocalFolder::open(root))
-        .map_err(|e| format!("cannot open {}: {e}", root.display()))?;
-    // One read per page of the workbench: each costs in proportion to the store (`DESIGN.md`).
-    let repo = FileRepo::new(store, ACTOR, BACKEND, Arc::new(folder)).with_page_size(PAGE);
+fn open(socket: &Path, runtime: &tokio::runtime::Handle) -> Result<Arc<dyn FileSource>, String> {
+    let client = RpcFiles::connect(socket).map_err(|e| {
+        fill(
+            cli::CANNOT_REACH,
+            &[
+                ("socket", &socket.display().to_string()),
+                ("why", &e.to_string()),
+            ],
+        )
+    })?;
+    let client = Arc::new(client);
     Ok(Arc::new(FileAdapter::new(
-        Arc::new(repo.clone()),
-        Arc::new(repo),
+        client.clone(),
+        client,
         runtime.clone(),
     )))
 }
 
-/// The core keeps no watch and has no start hook: after a crash the program must look itself.
+/// The server keeps no watch and has no start hook: after a crash the program must look itself.
 fn look_at_folder(source: &dyn FileSource) -> Status {
     let began = Instant::now();
     match source.rescan(None) {
         Ok(report) => {
-            let line = format!(
-                "Looked at the folder in {:.1} s: {} taken over, {} changed, {} missing, {} not taken over. Changes made outside appear after Rescan.",
-                began.elapsed().as_secs_f32(),
-                report.added.len(),
-                report.updated.len(),
-                report.missing.len(),
-                report.skipped.len(),
+            let seconds = format!("{:.1}", began.elapsed().as_secs_f32());
+            let count = |n: usize| n.to_string();
+            let line = fill(
+                cli::LOOKED,
+                &[
+                    ("seconds", &seconds),
+                    ("added", &count(report.added.len())),
+                    ("updated", &count(report.updated.len())),
+                    ("missing", &count(report.missing.len())),
+                    ("skipped", &count(report.skipped.len())),
+                ],
             );
             eprintln!("{line}");
             Status::Info(line)
         }
-        Err(e) => Status::Problem(format!("Could not look at the folder: {e}")),
+        Err(e) => Status::Problem(fill(cli::LOOK_FAILED, &[("why", &e.to_string())])),
     }
 }
 

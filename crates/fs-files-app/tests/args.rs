@@ -58,5 +58,9 @@ fn the_app_keeps_no_files_and_says_where_they_are_kept() {
         assert!(said.contains(option), "{said}");
         assert!(said.contains("fs-files-server"), "{said}");
     }
-    assert!(parse(&args(&["--root", "/x"])).unwrap_err().contains("fs-files-server"));
+    assert!(
+        parse(&args(&["--root", "/x"]))
+            .unwrap_err()
+            .contains("fs-files-server")
+    );
 }

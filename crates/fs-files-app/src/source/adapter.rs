@@ -1,8 +1,8 @@
 //! `FileAdapter`: `dyn Files` and `dyn Transfer` for the workbench.
 //!
 //! Pattern: Adapter over the program's contract, driven with a tokio handle from the interface thread.
-//! Provisional: in process, not RPC, until a client of the core's server exists (`DESIGN.md`). Errors
-//! keep their kind: the contract's named problems are read from `Error::problem`, never from the words.
+//! Over the socket: the providers are `RpcFiles` of `fs-files-client`, a call blocks the interface thread until
+//! the server has answered (`DESIGN.md`). Errors keep their kind: the contract's named problems are read from `Error::problem`, never from the words.
 
 use std::future::Future;
 use std::sync::Arc;

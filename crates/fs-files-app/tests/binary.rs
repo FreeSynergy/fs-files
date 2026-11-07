@@ -42,7 +42,11 @@ fn nobody_listening_is_a_message_and_exit_code_1() {
     let socket = dir.path().join("none.sock");
     let out = app(&["--socket", socket.to_str().unwrap(), "--no-rescan"]);
     assert_eq!(out.status.code(), Some(1));
-    assert!(said(&out).contains("cannot reach the files server"), "{}", said(&out));
+    assert!(
+        said(&out).contains("cannot reach the files server"),
+        "{}",
+        said(&out)
+    );
 }
 
 #[test]
@@ -51,18 +55,32 @@ fn a_file_goes_up_and_comes_down_by_command_line_through_the_server() {
     let socket = w.socket.to_str().unwrap().to_string();
     let source = w.outside().join("up.txt");
     std::fs::write(&source, b"through the wire").unwrap();
-    let up = app(&["--socket", &socket, "--no-rescan", "--upload", source.to_str().unwrap()]);
+    let up = app(&[
+        "--socket",
+        &socket,
+        "--no-rescan",
+        "--upload",
+        source.to_str().unwrap(),
+    ]);
     assert_eq!(up.status.code(), Some(0), "{}", said(&up));
     let on_disk = std::fs::read(w.root().join("up.txt")).unwrap();
     assert_eq!(on_disk, b"through the wire");
-    let page = w.runtime.block_on(fs_files_core::Files::list(&w.repo, None, None)).unwrap();
+    let page = w
+        .runtime
+        .block_on(fs_files_core::Files::list(&w.repo, None, None))
+        .unwrap();
     let fs_files_core::Entry::File(file) = &page.items[0] else {
         panic!("{page:?}")
     };
     let target = w.outside().join("down.txt");
     let down = app(&[
-        "--socket", &socket, "--no-rescan",
-        "--download", &file.id.to_string(), "--to", target.to_str().unwrap(),
+        "--socket",
+        &socket,
+        "--no-rescan",
+        "--download",
+        &file.id.to_string(),
+        "--to",
+        target.to_str().unwrap(),
     ]);
     assert_eq!(down.status.code(), Some(0), "{}", said(&down));
     assert_eq!(std::fs::read(&target).unwrap(), b"through the wire");

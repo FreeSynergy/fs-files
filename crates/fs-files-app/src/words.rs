@@ -46,6 +46,53 @@ pub(crate) mod say {
     pub const BAD_DAY: &str = "A date could not be read.";
 }
 
+/// What the command line and the start say. A sentence has named places (`{option}`), never pieces
+/// joined: word order differs between languages (`coding.md` 2a).
+#[allow(missing_docs)] // each sentence is its own documentation
+pub mod cli {
+    pub const NEEDS_VALUE: &str = "{option} needs a value";
+    pub const UNKNOWN_OPTION: &str = "unknown option {option}";
+    pub const BAD_VIEW: &str = "--view wants list or grid, not {value}";
+    pub const NEEDS_SOCKET: &str =
+        "--socket <path> is needed: the socket of a running fs-files-server";
+    pub const KEEPS_NOTHING: &str = "{option} is not an option of the app: it keeps no files and no store. Start fs-files-server (it takes FS_FILES_ROOT for the folder and --data for its store) and give the app its --socket.";
+    pub const DOWNLOAD_TOGETHER: &str = "--download <id> and --to <path> go together";
+    pub const RELEASE_NEEDS_DOWNLOAD: &str = "--release-sensitive needs --download";
+    pub const INTO_NEEDS_UPLOAD: &str = "--into needs --upload";
+    pub const CANNOT_REACH: &str = "cannot reach the files server at {socket}: {why}";
+    pub const LOOKED: &str = "Looked at the folder in {seconds} s: {added} taken over, {updated} changed, {missing} missing, {skipped} not taken over. Changes made outside appear after Rescan.";
+    pub const LOOK_FAILED: &str = "Could not look at the folder: {why}";
+
+    /// The help text.
+    pub const HELP: &str = "fs-files-app: the files program
+
+  --socket <path>    the socket of a running fs-files-server (needed). The app keeps no files and no
+                     store of its own: the folder and the store belong to the server
+  --no-rescan        do not ask the server to look at its folder when starting
+  --snapshot <png>   draw a picture instead of opening a window
+  --size <WxH>       window or picture size (default 1300x800)
+  --view <list|grid> the view to start with (default list)
+  --upload <path>    upload this file and stop; repeat for more; a symbolic link is refused
+  --into <id>        the folder to upload into (default: the top)
+  --keep-both        on a taken name keep both: the upload gets a free name; nothing is replaced
+  --download <id>    write this file and stop
+  --to <path>        where to write it: a new file, or a folder to put it in; nothing is replaced
+  --release-sensitive
+                     this download may write a file marked sensitive
+
+Changes made in the folder from outside only come in by a rescan: at the start, or the Rescan button.";
+}
+
+/// A sentence with its named places filled in: `{name}` becomes the value given for `name`. A place
+/// without a value stays as it is.
+pub fn fill(sentence: &str, values: &[(&str, &str)]) -> String {
+    let mut out = sentence.to_string();
+    for (name, value) in values {
+        out = out.replace(&format!("{{{name}}}"), value);
+    }
+    out
+}
+
 /// The words of the workbench.
 pub fn labels() -> FileLabels {
     let mut labels = FileLabels::default();
