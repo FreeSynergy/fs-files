@@ -1,7 +1,9 @@
-//! The world of the tests: the real core, a real local folder in a temporary directory, and a store in
-//! memory (or, for marked files, an encrypted one in that directory: the store refuses them otherwise).
+//! The world of the tests: the real `fs-files-server` on a real Unix socket over the real core, a real
+//! local folder in a temporary directory, and a store in memory (or, for marked files, an encrypted one in
+//! that directory: the store refuses them otherwise). The app's adapter reaches it through the real
+//! `RpcFiles`; `repo` is the provider behind the server, for set-up and for comparing only.
 //!
-//! Pattern: Facade over the real thing. Nothing here pretends to be the core.
+//! Pattern: Facade over the real thing. Nothing here pretends to be the core or the server.
 #![allow(dead_code)] // each test file uses a different subset
 
 use std::path::{Path, PathBuf};
@@ -9,7 +11,10 @@ use std::sync::Arc;
 
 use fs_components_workbenches::file_manager::{FileManagerWidget, FilesState, PAGE, Variant};
 use fs_files_app::{FileAdapter, labels};
+use fs_files_client::RpcFiles;
 use fs_files_core::{File, FileRepo, Files, Folder, LocalFolder, Transfer};
+use fs_files_server::FilesServer;
+use fs_interfaces::rpc::{bind_socket, serve};
 use fs_store::{
     Cipher, EncryptionKey, ObjectId, OpenOptions, StaticKeyProvider, Store, TursoStore,
 };
@@ -29,6 +34,22 @@ pub struct World {
     pub store: Arc<dyn Store>,
     pub repo: FileRepo,
     pub adapter: Arc<FileAdapter>,
+    /// The socket of the server, for a program that is started as a process.
+    pub socket: PathBuf,
+    stop: Option<tokio::sync::oneshot::Sender<()>>,
+    thread: Option<std::thread::JoinHandle<()>>,
+}
+
+impl Drop for World {
+    fn drop(&mut self) {
+        // The client first: the server stops when its last connection has gone.
+        if let Some(stop) = self.stop.take() {
+            let _ = stop.send(());
+        }
+        if let Some(thread) = self.thread.take() {
+            let _ = thread.join();
+        }
+    }
 }
 
 impl World {
@@ -74,9 +95,31 @@ impl World {
             .block_on(LocalFolder::open(dir.path().join("root")))
             .unwrap();
         let repo = FileRepo::new(store.clone(), ME, "local", Arc::new(folder)).with_page_size(PAGE);
+        let socket = dir.path().join("files.sock");
+        let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
+        let (ready, listening) = std::sync::mpsc::channel();
+        let (path, provider) = (socket.clone(), repo.clone());
+        let thread = std::thread::spawn(move || {
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
+            tokio::task::LocalSet::new().block_on(&runtime, async move {
+                let bound = bind_socket(&path).await.unwrap();
+                let (a, b, c) = (provider.clone(), provider.clone(), provider.clone());
+                let root = FilesServer::new(Arc::new(a), Arc::new(b), Arc::new(c), Arc::new(provider));
+                ready.send(()).unwrap();
+                let shutdown = async {
+                    let _ = stopped.await;
+                };
+                serve(bound, root.into_client().client, shutdown).await.unwrap();
+            });
+        });
+        listening.recv().unwrap();
+        let client = Arc::new(RpcFiles::connect(&socket).unwrap());
         let adapter = Arc::new(FileAdapter::new(
-            Arc::new(repo.clone()),
-            Arc::new(repo.clone()),
+            client.clone(),
+            client,
             runtime.handle().clone(),
         ));
         Self {
@@ -85,6 +128,9 @@ impl World {
             store,
             repo,
             adapter,
+            socket,
+            stop: Some(stop),
+            thread: Some(thread),
         }
     }
 

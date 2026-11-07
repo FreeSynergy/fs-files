@@ -7,7 +7,8 @@ license.workspace = true
 rust-version = "1.89"
 
 [dependencies]
-fs-files-core = { path = "../fs-files-core" }
+fs-files-core = { path = "../fs-files-core", default-features = false }
+fs-files-client = { path = "../fs-files-client" }
 fs-store = { git = "https://github.com/FreeSynergy/fs-store", tag = "v0.2.0" }
 fs-interfaces = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.35.0" }
 # provisional: becomes a tag once reviewed
@@ -18,6 +19,7 @@ chrono = { version = "0.4", default-features = false, features = ["std", "clock"
 tokio = { version = "1", features = ["rt-multi-thread"] }
 
 [dev-dependencies]
+fs-files-server = { path = "../fs-files-server" }
 tempfile = "3"
 # provisional: becomes a tag once reviewed
 fs-components-widgets = { git = "https://github.com/FreeSynergy/fs-components", rev = "8c38a3b17f6b723ef625046a271c5564f5d7aa26" }
