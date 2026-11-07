@@ -1,13 +1,13 @@
 # fs-files – Design
 
-`fs-files` is the files program of FreeSynergy. This repo holds the **program core** (`crates/fs-files-core`, no GUI).
+`fs-files` is the files program of FreeSynergy. This repo holds the **program core** (`crates/fs-files-core`, no GUI) and the **server** (`crates/fs-files-server`, the contract over a Unix socket).
 **Metadata** (name, media type, size, checksum, folder, trash flag) is an object in `fs-store`; the **bytes** are in a
 backend behind `BlobBackend`. Other programs refer to a file by its object id and read through the `Blob` trait; they never
 see a path or a backend. Contract: `files.capnp` in `fs-interfaces` v0.33.0 (draft, consumers: 0 of 2).
 
 ## State
 
-Version 0.2.1 (stage 1: local folder, stage 2: S3, stage 3: real names). Built on fs-store 0.2.0 and fs-interfaces 0.33.0 (git tags).
+Version 0.4.0, not tagged (stage 1: local folder, stage 2: S3, stage 3: real names, stage 4: the server). Built on fs-store 0.2.0 and fs-interfaces 0.33.0 (git tags). Interface status: draft, provisional, consumers 0 of 2.
 
 | Area | State |
 |---|---|
@@ -33,8 +33,11 @@ Version 0.2.1 (stage 1: local folder, stage 2: S3, stage 3: real names). Built o
 | `S3Backend` behind the same `BlobBackend` (feature `s3`, default on): multipart upload that survives a restart (state in the bucket), tail pieces so any chunk size works, plain put for files under one part; `S3Factory` for `backend.add`; credentials never in `Debug` or errors | done |
 | One behaviour suite as functions over `&dyn BlobBackend` (`tests/common/{suite,stream}.rs`), run on `LocalFolder`, `S3Backend` over a strict fake S3, `S3Backend` over the `object_store` in-memory store, and (ignored) a live server | done |
 | Live S3: official RustFS image 1.0.4 with podman, localhost only, throwaway credentials: both live tests passed; container removed | verified once (2026-11-06), not part of CI |
-| `sharing`, `file.subscribe`: `Unsupported` with the plain reason; versions, encryption, sync, WebDAV, previews: not built | as agreed |
-| Tests | 127 run by default (103 without the `s3` feature) + 2 ignored live tests |
+| `FileFeed` (Observer, `file.subscribe`): `Created` / `Updated` / `Deleted` of files and folders; one Decorator over the object repository tells every write, upload sessions never | done |
+| `File` and `Folder` carry the envelope as stored; every write answers the object as stored (the store sets the times), so an answer equals what `get` says afterwards | done |
+| Server `fs-files-server`: every method of `Files`, `Folders`, `Transfer`, `Upload`, `Blob` (common), `Search`, `Backends` and `BlobBackend` (provider side), `subscribe` with `ended`, `supportReport`; errors as typed problems; binary with `--socket --data --actor --instance` and `FS_FILES_ROOT` | done, draft |
+| `sharing` (empty placeholder interface): `Unsupported` (`share.create`); versions, encryption, sync, WebDAV, previews: not built | as agreed |
+| Tests | 182 run by default: core 131 (103 + 4 without the `s3` feature), server 51; 2 ignored live tests. The server tests run over a real socket against a real `FileRepo`, compare values, and run the real binary across a restart |
 
 ## Structure and pattern map (ADR 0043)
 
@@ -65,6 +68,15 @@ Version 0.2.1 (stage 1: local folder, stage 2: S3, stage 3: real names). Built o
 | `repo/manage.rs` | Factory + Registry | `backend.add` / `backend.remove` |
 | `repo/names.rs` | Specification | what a name may be (two names are the same only if equal byte for byte) |
 | `model/*` | Value objects | `File`, `Folder`, `Page`, `FileFilter`, ... |
+| `feed.rs` | Observer | `FileFeed`, `FileListener`, `Registry` (subject), `Subscription` (drop = unsubscribe); the trait first |
+| `repo/notify.rs`, `repo/subscribe.rs` | Decorator, Observer (subject) | `Notifying` wraps the `ObjectRepository` and tells each write, so no operation can forget it |
+| `fs-files-server/{files,folders,transfer,search,backends}_service.rs` | Adapter + Factory / Facade | wire in, one trait call, wire out; the root hands out the capabilities; depends on the traits only |
+| `fs-files-server/{folder,file,trash}_ops.rs` | Adapter | the methods of `Folders` by concern, behind the one-line trait impl in `folders_service.rs` |
+| `fs-files-server/{upload,blob}_service.rs` | Adapter + State, Proxy | `Upload` (calls in arrival order, writes run to their end) and `Blob` (clamped ranges) in front of the core's objects |
+| `fs-files-server/backend_service.rs`, `backend_wire.rs` | Adapter | the provider interface `BlobBackend` in front of a core `BlobBackend`; for a backend that runs as a program |
+| `fs-files-server/feed.rs` | Observer + Adapter | `FileFeed` into the shared forwarder; the envelope is read when the change is told |
+| `fs-files-server/errors.rs` | Adapter | core errors as RFC 9457 problems; `finish` = `run_to_end` |
+| `fs-files-server/wire/*` | Adapter, Specification | ids, texts with limits, cursor, entries and pages, filter, reports |
 
 ## Decisions (the owner may want to change these)
 
@@ -141,6 +153,46 @@ before the database changes. Residual risk: a local attacker who can write into 
 (the check is by path, not `openat2(RESOLVE_BENEATH)`); the root must not be writable by untrusted users. Hard-link and case-only
 renames on case-insensitive file systems are not special-cased.
 
+## Server (`crates/fs-files-server`)
+
+The contract `files.capnp` over a Unix socket (`fs_interfaces::rpc`), in front of `Files`, `Transfer`, `Backends` and `FileFeed`
+(`FilesServer::new(files, transfer, backends, feed)`; a program passes its one `FileRepo` for all four). It translates and nothing
+else. Binary: `fs-files-server [--socket] [--data] [--actor] [--instance]`; the folder the files live in is `FS_FILES_ROOT` (absolute;
+default `<data>/files`), kept under real names. The store is `<data>/objects.db`. Nothing runs at start (no rescan); a program calls `rescan`.
+
+**Everything the contract names is built or answers `Unsupported`.** Built: all 7 methods of `Files`, all 17 of `Folders`, `Transfer`
+(4), `Upload` (4), `Blob` (2), `Search` (1), `Backends` (3), `BlobBackend` (17, as `BlobBackendServer`, not handed out by the `Files` root: a
+backend that runs as its own program serves it). `Unsupported` (501, `share.create` in `detail`): `Files.sharing`, because `Sharing` has no
+methods yet, and `file.sort` descending by media type (the contract says so). A provider that lacks `file.subscribe` answers `subscribe` with its own
+reason; a backend that cannot do a method answers its own `Unsupported`.
+
+**Problem types.** The three of the contract come from the core (`Error::problem`). The contract names no others, so these are
+provisional and reported: `files/not-found` 404, `files/conflict` 409, `files/wrong-offset` 409, `files/invalid` 422 (bad backend
+configuration), `files/encryption-required` 409 (ADR 0029: the store has no key), `files/stored-data-invalid` 500, `files/backend-failed`
+500; from `fs_interfaces::rpc`: `invalid-request` 422 (a text or id that cannot be right), `too-large` 413, `feed-ended` 410.
+
+**Limits (no unbounded reading, no answer beyond a message).**
+* Bytes: a `Blob.read` and a backend `get` answer at most 32 MiB (`clamp_read`; fewer is allowed, empty is the end). An `Upload.write` or `put` above
+  16 MiB (`MAX_INTAKE_BYTES`) is `too-large` and writes nothing; the core streams the checksum, so a file of any size goes in by chunks. Tested with 34 MiB.
+* Pages: the core cuts at 100 entries; a page is also checked against 32 MiB (`check_answer`). A cursor is the form of `rpc::Page` (version byte, place);
+  a place beyond 2^32 is no cursor of ours and is refused (as an offset it would wrap to the start in the store).
+* Texts: a name above 4096 bytes is the contract's `invalid-name` (the core decides the 255); a search text or key above 8 KiB, a media type, id or
+  category above 1 KiB, all categories of one file above 64 KiB, a configuration above 64 KiB: `invalid-request`, before the core sees them.
+* Reports: a `RescanReport` is held to 32 MiB; the lists share it (a short list is never crowded out) and **what is left out is named in `skipped`**
+  (`... N more added entries (they are taken over) are not listed here`). `pendingUploads` comes **oldest first, as many as fit** (about 20 000 of the largest); the contract
+  has no marker, a consumer deals with those and asks again. `TrashReport.failed` is cut at 1.3 million ids. `BlobBackend.scan` is one level and is refused
+  whole as `too-large` if it does not fit (the contract has no paging for it).
+
+**Writes run to their end** (`run_to_end`): a client that drops the call or the connection cannot leave the disk and the database out of step. Calls on one `Upload` run in the
+order they arrived, so chunks may be sent without waiting for each answer (mutation-tested).
+
+**Open points of the server** (to the strategy session): (1) the problem types above are not in the contract; (2) `file.subscribe` sends the envelope of a
+file marked sensitive (ADR 0029) like any other: the names and categories leave; whether they should only on release (as in `fs-people`) is a decision;
+(3) `backend.add` is not persisted (the core's decision): after a restart the binary has the `main` local backend only; (4) the `Registry` of the feed is the
+same code as in `fs-tasks` and `fs-maps` and wants to live once in `fs-interfaces` or `fs-store`; (5) the cursor is a place in a list and shifts when an entry is
+added between two pages (the shared limit of `fs-interfaces`); (6) the `Files` root has no way to hand out `BlobBackend`, correct for the contract, but a program that
+wants remote backends needs the client side (`RemoteBackend`), not built; (7) a person who changes the folder from outside is seen only by `rescan`, no watcher.
+
 ## Crates
 
 * `fs-store` (v0.2.0), `fs-interfaces` (v0.33.0): git tags.
@@ -152,7 +204,8 @@ renames on case-insensitive file systems are not special-cased.
   trait, which exposes the multipart id and the part etags. That is what a resumable upload needs (state is persisted, so a new process
   can go on). It also gives us signing, retries and the in-memory store for tests. Its TLS comes via `reqwest` + `rustls` + `aws-lc-rs`, which
   contains C code: not pure Rust. Hence the feature: `--no-default-features` is a pure-Rust build with the local folder only. `bytes` for its payloads.
-* Dev: `tempfile`.
+* Server: `capnp` 0.27, `capnp-rpc` 0.27 (MIT), `tokio` (sync); `fs-interfaces` with feature `rpc` (socket, problems, pages, feed, `run_to_end`).
+* Dev: `tempfile`, `uuid`, `async-trait`, `serde_json`, `chrono`, `blake3`.
 * Not taken: `opendal` (broad, many services we do not use; its writer hides the multipart id, so an upload could not be resumed after a restart). `rusty-s3` + an own HTTP layer would be pure sans-IO but means writing the client.
 
 ## Contract
@@ -161,5 +214,5 @@ renames on case-insensitive file systems are not special-cased.
 `naming`, `publish`, `relocate`, `discard`, `makeDir`, `removeDir`, `scan` (@7 to @13) with `Spot`, `Scanned`, `ScanKind`; the problem types
 `nameConflictProblemType` (409), `invalidNameProblemType` (422), `changedOutsideProblemType` (409); and the statement that `Envelope.name` of a
 file and a folder IS its real name (not derived). In the core `Error::problem()` makes the mapping; a name clash is still `Error::Conflict`.
-`OnConflict` is a last parameter of rename, move, copy and `startUpload` (0 = refuse, so old callers keep working; the wire `copyFile` now refuses by default, the Rust `copy_file` without `_as` still keeps both). `Sort` is a last parameter of `list` and `find`. Capabilities: `file.sort`, `file.conflictRule`, `folder.rescan` (Files), `blob.rename` and `blob.scan` (backend). Also appended since v0.8.0: `OnConflict` (v0.9.0), `Sort` (v0.10.0), size and date filters (v0.11.0), `emptyTrash`, `restoreTo`, `TrashReport` (v0.12.0), `getFolder` (v0.13.0), `pendingUploads`, `UploadInfo` (v0.14.0). `moveFolder`, `pending`, `FileFilter.trashed` exist since v0.5.0. The Rust
-`subscribe` placeholder still takes no listener; it comes with the feed.
+`OnConflict` is a last parameter of rename, move, copy and `startUpload` (0 = refuse, so old callers keep working; the wire `copyFile` now refuses by default, the Rust `copy_file` without `_as` still keeps both). `Sort` is a last parameter of `list` and `find`. Capabilities: `file.sort`, `file.conflictRule`, `folder.rescan` (Files), `blob.rename` and `blob.scan` (backend). Also appended since v0.8.0: `OnConflict` (v0.9.0), `Sort` (v0.10.0), size and date filters (v0.11.0), `emptyTrash`, `restoreTo`, `TrashReport` (v0.12.0), `getFolder` (v0.13.0), `pendingUploads`, `UploadInfo` (v0.14.0). `moveFolder`, `pending`, `FileFilter.trashed` exist since v0.5.0. `Files.subscribe @6` takes a `ChangeListener`
+(common.capnp); the Rust form is `FileFeed` (the placeholder `Files::subscribe` is gone).

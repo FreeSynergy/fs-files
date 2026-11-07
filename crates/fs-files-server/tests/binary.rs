@@ -157,6 +157,23 @@ fn it_refuses_an_instance_that_is_no_domain() {
 }
 
 #[test]
+fn it_refuses_a_relative_root_before_it_opens_anything() {
+    let dir = tempfile::tempdir().unwrap();
+    let code = Command::new(env!("CARGO_BIN_EXE_fs-files-server"))
+        .arg("--socket")
+        .arg(dir.path().join("x.sock"))
+        .arg("--data")
+        .arg(dir.path().join("data"))
+        .env("FS_FILES_ROOT", "relative/files")
+        .stderr(Stdio::null())
+        .status()
+        .unwrap()
+        .code();
+    assert_eq!(code, Some(2));
+    assert!(!dir.path().join("data").exists(), "nothing was opened");
+}
+
+#[test]
 fn it_refuses_bad_arguments_and_a_data_directory_others_can_read() {
     let run = |args: &[&str]| {
         Command::new(env!("CARGO_BIN_EXE_fs-files-server"))

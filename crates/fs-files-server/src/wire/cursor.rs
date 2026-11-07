@@ -8,6 +8,9 @@ use fs_files_core::Cursor;
 use fs_interfaces::rpc::invalid_request;
 
 const V1: u8 = 1;
+/// No list this program holds has more entries; a place beyond is no cursor of ours, and as an offset it
+/// could wrap to a negative one in the store, which reads as the start.
+const LAST_PLACE: usize = u32::MAX as usize;
 
 /// The cursor a consumer handed back; empty is the start.
 pub(crate) fn read(opaque: &[u8]) -> capnp::Result<Option<Cursor>> {
@@ -21,6 +24,9 @@ pub(crate) fn read(opaque: &[u8]) -> capnp::Result<Option<Cursor>> {
         return Err(invalid());
     }
     let place = usize::try_from(u64::from_le_bytes(bytes)).map_err(|_| invalid())?;
+    if place > LAST_PLACE {
+        return Err(invalid());
+    }
     Ok(Some(Cursor::at(place)))
 }
 

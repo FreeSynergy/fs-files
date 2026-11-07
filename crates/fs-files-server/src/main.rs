@@ -16,8 +16,28 @@ const ROOT: &str = "FS_FILES_ROOT";
 /// The id files record for the backend this program starts with.
 const BACKEND_ID: &str = "main";
 
+/// The folder the files live in. A relative path would mean another folder for every working directory.
+fn root_of_env() -> Result<Option<PathBuf>, String> {
+    let Some(root) = std::env::var_os(ROOT).filter(|v| !v.is_empty()) else {
+        return Ok(None);
+    };
+    let root = PathBuf::from(root);
+    if root.is_absolute() {
+        Ok(Some(root))
+    } else {
+        Err(format!(
+            "{ROOT} must be an absolute path, not {}",
+            root.display()
+        ))
+    }
+}
+
 fn main() {
     let options = ServerOptions::from_env_or_exit("files");
+    let root = root_of_env().unwrap_or_else(|problem| {
+        eprintln!("fs-files-server: {problem}");
+        std::process::exit(2);
+    });
     let ServerOptions {
         socket,
         data,
@@ -26,9 +46,7 @@ fn main() {
     } = options;
     let served = run_until_signal(&socket, || async move {
         let data = prepare_data_dir(&data)?;
-        let root = std::env::var_os(ROOT)
-            .filter(|v| !v.is_empty())
-            .map_or_else(|| data.join("files"), PathBuf::from);
+        let root = root.unwrap_or_else(|| data.join("files"));
         let store = TursoStore::open(data.join("objects.db"))
             .await
             .map_err(std::io::Error::other)?;
