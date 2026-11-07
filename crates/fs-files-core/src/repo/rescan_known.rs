@@ -1,6 +1,6 @@
 //! The parts of `rescan` that deal with one record or one file: known, new, gone.
 //!
-//! Pattern: Visitor-like walk (see `rescan.rs`) — what to do when the disk and the records agree,
+//! Pattern: Visitor (see `rescan.rs`) — what to do when the disk and the records agree,
 //! when the disk has something new, and when a record has nothing at its place.
 
 use fs_store::{ObjectId, StoredObject};
@@ -8,6 +8,7 @@ use fs_store::{ObjectId, StoredObject};
 use super::handle::FileRepo;
 use super::rescan::{Item, SNIFF, Walk};
 use super::steps::{Disk, Step};
+use super::verify::InTrash;
 use super::verify::checksum_at;
 use crate::backend::{ScanKind, Scanned, Spot};
 use crate::error::Result;
@@ -34,17 +35,18 @@ impl FileRepo {
         // A crash after "move to the trash", before the record: the recorded bytes are in the trash
         // folder, and what is at the path now is somebody else's. Finish the trash move for the old
         // record (restorable) and take the stranger's file over as a new one; never rebind.
-        if walk
-            .backend
-            .has(&Spot::Trash(o.envelope.id.to_string()))
-            .await?
-        {
+        let in_trash = self.in_trash(&*walk.backend, o.envelope.id, &r).await?;
+        if matches!(in_trash, InTrash::Stray) {
+            report.skipped.push(format!(
+                "{} in the trash folder is not the recorded file; left alone",
+                o.envelope.id
+            ));
+        }
+        if matches!(in_trash, InTrash::Ours) {
             r.trashed = true;
             let mut o = o.clone();
             super::build::set_file(&mut o, &r);
-            let old = File::of(&o)?;
-            self.save(o).await?;
-            report.updated.push(old);
+            report.updated.push(self.save_file(o).await?);
             return self.adopt(walk, item.folder, entry, at, report).await;
         }
         if r.size == entry.size && r.modified == Some(entry.modified) {
@@ -55,9 +57,7 @@ impl FileRepo {
         r.modified = Some(entry.modified);
         let mut o = o.clone();
         super::build::set_file(&mut o, &r);
-        let file = File::of(&o)?;
-        self.save(o).await?;
-        report.updated.push(file);
+        report.updated.push(self.save_file(o).await?);
         Ok(())
     }
 
@@ -86,9 +86,7 @@ impl FileRepo {
             upload: None,
         };
         let o = self.file_object(&entry.name, &r);
-        let file = File::of(&o)?;
-        self.save(o).await?;
-        report.added.push(Entry::File(file));
+        report.added.push(Entry::File(self.save_file(o).await?));
         Ok(())
     }
 
@@ -110,6 +108,13 @@ impl FileRepo {
         }
         let r = FileRecord::of(o)?;
         if r.backend != walk.id || !r.named {
+            return Ok(());
+        }
+        if !matches!(
+            self.in_trash(&*walk.backend, o.envelope.id, &r).await?,
+            InTrash::Ours
+        ) {
+            report.missing.push(File::of(o)?); // nothing, or a stray file: not ours, not moved
             return Ok(());
         }
         let back = Step::new(

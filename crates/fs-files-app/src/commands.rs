@@ -25,10 +25,7 @@ pub fn upload(
         let done = source
             .upload(path, into, rule)
             .map_err(|e| format!("{path}: {e}"))?;
-        lines.push(format!(
-            "uploaded {path} as {} ({} bytes)",
-            done.name, done.bytes
-        ));
+        lines.push(format!("uploaded {path} as {done}"));
     }
     Ok(lines)
 }
@@ -45,6 +42,6 @@ pub fn download(
 ) -> Result<String, String> {
     source
         .download(id, to, release)
-        .map(|done| format!("wrote {} ({} bytes)", done.name, done.bytes))
+        .map(|done| format!("wrote {done}"))
         .map_err(|e| e.to_string())
 }

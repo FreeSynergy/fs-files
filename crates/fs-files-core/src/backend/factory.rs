@@ -1,6 +1,6 @@
 //! Building backends from a configuration, and checking them before use.
 //!
-//! Pattern: Factory + Chain of checks — a [`BackendFactory`] per kind turns the JSON configuration
+//! Pattern: Factory — a [`BackendFactory`] per kind turns the JSON configuration
 //! into a backend; `check_backend` then writes, reads and deletes a probe blob, so a wrong path or
 //! wrong credentials are found before anything is swapped in (ADR 0045).
 
@@ -19,6 +19,24 @@ pub trait BackendFactory: Send + Sync {
     fn kind(&self) -> &'static str;
     /// Build a backend from the configuration object (without `id`, `kind` and `active`).
     async fn build(&self, config: &Value) -> Result<Arc<dyn BlobBackend>>;
+    /// The folder `build` would use, checked, and nothing made. `None`: this kind has no folder of this
+    /// machine, or does not say. `backend.add` refuses a folder that another backend has or lies in.
+    async fn place(&self, _config: &Value) -> Result<Option<Place>> {
+        Ok(None)
+    }
+    /// Remove what `build` made for `place`, after a failed add: only what this add made.
+    fn forget(&self, _place: &Place) {}
+}
+
+/// A folder a backend will use, and what making it will add to the disk.
+#[derive(Clone, Debug)]
+pub struct Place {
+    /// The folder.
+    pub path: std::path::PathBuf,
+    /// The folders that do not exist yet and that `build` makes, outermost first (`path` is the last, if it is new).
+    pub made: Vec<std::path::PathBuf>,
+    /// `path` exists but has no program folder (`.fs-files`) yet: `build` makes it.
+    pub marker_new: bool,
 }
 
 /// `{"kind": "local", "path": "/data/files"}`.

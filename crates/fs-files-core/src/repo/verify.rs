@@ -6,7 +6,7 @@
 //! checksum. Anything else is somebody else's file, and nothing is touched ("changed outside").
 
 use super::handle::FileRepo;
-use crate::backend::{BlobBackend, hash_chunks};
+use crate::backend::{BlobBackend, Spot, hash_chunks};
 use crate::error::{Error, Result};
 use crate::model::FileRecord;
 
@@ -24,7 +24,31 @@ pub(super) async fn checksum_at(backend: &dyn BlobBackend, key: &str, size: u64)
     hash_chunks(size, |o, l| backend.get(key, o, l.min(READ))).await
 }
 
+/// What lies in the trash folder under a file's id.
+pub(super) enum InTrash {
+    /// Nothing.
+    Absent,
+    /// The recorded bytes (size and checksum agree).
+    Ours,
+    /// Something else: not ours, never to be moved or deleted by a record.
+    Stray,
+}
+
 impl FileRepo {
+    /// Look into the trash folder for the file `id` and compare with its record.
+    pub(super) async fn in_trash(
+        &self,
+        backend: &dyn BlobBackend,
+        id: fs_store::ObjectId,
+        r: &FileRecord,
+    ) -> Result<InTrash> {
+        Ok(match backend.inspect(&Spot::Trash(id.to_string())).await? {
+            None => InTrash::Absent,
+            Some(i) if i.size == r.size && i.checksum == r.checksum => InTrash::Ours,
+            Some(_) => InTrash::Stray,
+        })
+    }
+
     /// Check that `key` holds the bytes of `r`. `deep`: when the modification time is not the
     /// recorded one, read the bytes and compare the checksum (needed before anything is moved or
     /// deleted). Not deep (reading a file): size and modification time only, which is cheap.
@@ -54,7 +78,7 @@ impl FileRepo {
         // bytes: a stranger's file of the same size whose modification time was copied (`touch -r`) must
         // not pass. Above that size the time is trusted (reading a file of that size on every trash
         // would be too slow); DESIGN states the limit.
-        let same_time = r.modified == Some(info.modified) || info.modified == 0;
+        let same_time = info.modified != 0 && r.modified == Some(info.modified); // no or epoch time: changed
         if same_time && !(deep && info.size <= ALWAYS_HASH) {
             return Ok(());
         }

@@ -113,45 +113,40 @@ impl FileRepo {
         }))
     }
 
-    /// Every upload that was started and not finished or aborted, oldest first.
+    /// Every upload that was started and not finished or aborted, oldest first. One query (no paging, so
+    /// stale rows that are removed on the way cannot shift a page).
     pub(super) async fn do_pending_uploads(&self) -> Result<Vec<UploadInfo>> {
+        let q = Query::new()
+            .in_context(CONTEXT)
+            .with_index("kind", "upload")
+            .ordered(Order::PublishedAsc);
         let (mut out, mut stale) = (Vec::new(), Vec::new());
-        loop {
-            let mut q = Query::new()
-                .in_context(CONTEXT)
-                .with_index("kind", "upload")
-                .ordered(Order::PublishedAsc)
-                .limit(self.page);
-            q.offset = out.len();
-            let rows = self.reads.query(&q).await?;
-            let n = rows.len();
-            for o in rows {
-                if self.file_of_upload(o.envelope.id).await?.is_some() {
-                    // stale: the file exists, only deleting the session failed; tidy up, bytes untouched
-                    stale.push(o.envelope.id);
-                    continue;
-                }
-                let rec: SessionRecord = serde_json::from_value(o.content.clone())?;
-                let received = match self.backends.get(&rec.backend) {
-                    Ok(b) => b.pending(&rec.key).await.unwrap_or(0),
-                    Err(_) => 0, // the backend was removed: the upload cannot go on, but it is still listed
-                };
-                out.push(UploadInfo {
-                    id: o.envelope.id.to_string(),
-                    folder: rec.folder,
-                    name: rec.name,
-                    media_type: rec.media_type,
-                    received,
-                    started: o.envelope.published,
-                });
+        for o in self.reads.query(&q).await? {
+            if self.file_of_upload(o.envelope.id).await?.is_some() {
+                stale.push(o.envelope.id); // the file exists, only deleting the session failed
+                continue;
             }
-            if n < self.page {
-                for id in stale {
-                    let _ = self.objects.delete(id, &self.actor).await;
-                }
-                return Ok(out);
+            let rec: SessionRecord = serde_json::from_value(o.content.clone())?;
+            let received = match self.backends.get(&rec.backend) {
+                Ok(b) => b.pending(&rec.key).await.unwrap_or(0),
+                Err(_) => 0, // the backend was removed: the upload cannot go on, but it is still listed
+            };
+            out.push(UploadInfo {
+                id: o.envelope.id.to_string(),
+                folder: rec.folder,
+                name: rec.name,
+                media_type: rec.media_type,
+                received,
+                started: o.envelope.published,
+            });
+        }
+        if !stale.is_empty() {
+            let _w = self.lock.lock().await;
+            for id in stale {
+                let _ = self.objects.delete(id, &self.actor).await; // bytes untouched
             }
         }
+        Ok(out)
     }
 
     /// Keys of the pending blobs of every unfinished upload on `backend`.
@@ -230,7 +225,11 @@ impl UploadSession {
         &self,
         backend: &dyn crate::backend::BlobBackend,
     ) -> Result<Option<u64>> {
-        if backend.pending(&self.rec.key).await? != 0 {
+        // Only a backend that names by id has a committed blob under the upload's key; on one that keeps
+        // real names that key is no path (a person's file may have that name), so it is not probed.
+        if backend.naming() != crate::backend::Naming::ById
+            || backend.pending(&self.rec.key).await? != 0
+        {
             return Ok(None);
         }
         Ok(backend.stat(&self.rec.key).await?.map(|i| i.size))

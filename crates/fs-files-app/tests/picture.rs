@@ -157,7 +157,8 @@ fn the_question_on_a_taken_name_and_the_trash_are_drawn() {
     widget.with_state(|s| s.name_taken_back());
     assert!(draw(&app, "files-rename.png", (1300, 800)).is_some());
     widget.with_state(|s| {
-        s.discard_after_failure();
+        s.cancel_input();
+        s.discard_input();
         s.ask_delete();
         s.really();
     });

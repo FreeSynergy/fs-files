@@ -9,17 +9,18 @@ rust-version = "1.89"
 [dependencies]
 fs-files-core = { path = "../fs-files-core" }
 fs-store = { git = "https://github.com/FreeSynergy/fs-store", tag = "v0.2.0" }
-fs-interfaces = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.28.0" }
+fs-interfaces = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.35.0" }
 # provisional: becomes a tag once reviewed
-fs-components-app = { git = "https://github.com/FreeSynergy/fs-components", rev = "19b6d0df2ae1dd8b8f2d40c7604c27932e18a75e" }
+fs-components-app = { git = "https://github.com/FreeSynergy/fs-components", rev = "8c38a3b17f6b723ef625046a271c5564f5d7aa26" }
 # provisional: becomes a tag once reviewed
-fs-components-workbenches = { git = "https://github.com/FreeSynergy/fs-components", rev = "19b6d0df2ae1dd8b8f2d40c7604c27932e18a75e" }
+fs-components-workbenches = { git = "https://github.com/FreeSynergy/fs-components", rev = "8c38a3b17f6b723ef625046a271c5564f5d7aa26" }
 chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
 tokio = { version = "1", features = ["rt-multi-thread"] }
 
 [dev-dependencies]
 tempfile = "3"
 # provisional: becomes a tag once reviewed
-fs-components-render = { git = "https://github.com/FreeSynergy/fs-components", rev = "19b6d0df2ae1dd8b8f2d40c7604c27932e18a75e" }
+fs-components-widgets = { git = "https://github.com/FreeSynergy/fs-components", rev = "8c38a3b17f6b723ef625046a271c5564f5d7aa26" }
+fs-components-render = { git = "https://github.com/FreeSynergy/fs-components", rev = "8c38a3b17f6b723ef625046a271c5564f5d7aa26" }
 serde_json = "1"
 image = { version = "0.25", default-features = false, features = ["png"] }

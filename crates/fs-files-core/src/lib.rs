@@ -20,15 +20,16 @@
 mod backend;
 mod backends;
 mod error;
+mod feed;
 mod files;
 mod model;
 mod repo;
 mod transfer;
 
 pub use backend::{
-    BackendConfig, BackendFactory, BackendRegistry, BlobBackend, BlobInfo, CHUNK, LocalFactory,
-    LocalFolder, MAX_KEY, MAX_SEGMENT, Naming, RESERVED_NAME, ScanKind, Scanned, Spot,
-    check_backend, check_key, format_checksum,
+    BackendConfig, BackendFactory, BackendRegistry, BlobBackend, BlobInfo, CHUNK,
+    ConfinedLocalFactory, LocalFactory, LocalFolder, MAX_KEY, MAX_SEGMENT, Naming, Place,
+    RESERVED_NAME, ScanKind, Scanned, Spot, check_backend, check_key, format_checksum,
 };
 #[cfg(feature = "s3")]
 pub use backend::{
@@ -37,6 +38,7 @@ pub use backend::{
 };
 pub use backends::Backends;
 pub use error::{Error, Problem, Result};
+pub use feed::{FileChange, FileFeed, FileListener, Registry, Subscription};
 pub use files::Files;
 pub use model::{
     BackendInfo, Cursor, Entry, File, FileFilter, Folder, OnConflict, Page, RescanReport, Sort,

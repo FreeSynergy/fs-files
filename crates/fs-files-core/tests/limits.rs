@@ -104,8 +104,15 @@ async fn leftover_pending_blobs_are_swept_but_live_uploads_are_kept() {
 
 #[tokio::test]
 async fn moving_a_folder_whose_subtree_would_not_fit_is_refused_up_front() {
-    let e = env().await;
-    let r = &e.repo;
+    // A short root of our own (the temp folder of a test run can be long, and the root counts).
+    let dir = tempfile::tempdir_in("/tmp").unwrap();
+    let blobs = dir.path().join("blobs");
+    let store: std::sync::Arc<dyn fs_store::Store> =
+        std::sync::Arc::new(fs_store::TursoStore::open_in_memory().await.unwrap());
+    let backend = std::sync::Arc::new(LocalFolder::open(&blobs).await.unwrap());
+    let repo = fs_files_core::FileRepo::new(store, common::ME, "main", backend);
+    let r = &repo;
+    let blobs = blobs.canonicalize().unwrap();
     // a chain of 38 folders of 100 bytes: about 3.8 KB of path, fine on its own
     let mut parent = None;
     let mut top = None;
@@ -132,9 +139,9 @@ async fn moving_a_folder_whose_subtree_would_not_fit_is_refused_up_front() {
     );
     // nothing changed, in the records or on the disk
     assert_eq!(r.get_folder(top).await.unwrap().unwrap().parent, None);
-    assert!(root(&e).join(format!("00{}", "c".repeat(98))).is_dir());
+    assert!(blobs.join(format!("00{}", "c".repeat(98))).is_dir());
     assert!(
-        !root(&e)
+        !blobs
             .join(format!("{}/{}", "t".repeat(200), "u".repeat(200)))
             .join(format!("00{}", "c".repeat(98)))
             .exists()

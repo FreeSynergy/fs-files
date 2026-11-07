@@ -1,6 +1,6 @@
 //! The name-based operations of the local folder: publish, relocate, discard, folders, scan.
 //!
-//! Pattern: Command-like small steps — each is: validate the spot, create missing parent folders,
+//! Pattern: none (small steps, no command objects) — each is: validate the spot, create missing parent folders,
 //! do **one** atomic no-replace rename (or one create/remove), then fsync the directories touched.
 //! Nothing here ever replaces a file: a taken target is `Error::Conflict`.
 
@@ -96,6 +96,19 @@ impl LocalFolder {
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
             Err(e) => Err(io::named(e, &format!("remove folder {key}"))),
         }
+    }
+
+    pub(super) async fn do_inspect(&self, spot: &Spot) -> Result<Option<BlobInfo>> {
+        let p = path::spot_path(&self.root, spot)?;
+        let Some((size, modified)) = io::stat_of(&p).await? else {
+            return Ok(None);
+        };
+        let checksum = hash_chunks(size, |o, l| io::read_range(&p, o, l)).await?;
+        Ok(Some(BlobInfo {
+            size,
+            checksum,
+            modified,
+        }))
     }
 
     pub(super) fn do_has(&self, spot: &Spot) -> Result<bool> {

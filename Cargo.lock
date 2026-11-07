@@ -817,6 +817,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "capnp-futures"
+version = "0.27.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c3a1724aec0e9587f267bf19708934afa545113a44f20acac4b3db9a92857056"
+dependencies = [
+ "capnp",
+ "futures-channel",
+ "futures-util",
+]
+
+[[package]]
+name = "capnp-rpc"
+version = "0.27.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "629b0af76bb3b4073694783338d1844d993b13848d9b8618f67e2ed39870b4ca"
+dependencies = [
+ "capnp",
+ "capnp-futures",
+ "futures",
+]
+
+[[package]]
 name = "cc"
 version = "1.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1292,7 +1314,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1454,6 +1476,7 @@ dependencies = [
 [[package]]
 name = "fs-components-app"
 version = "0.2.0"
+source = "git+https://github.com/FreeSynergy/fs-components?rev=8c38a3b17f6b723ef625046a271c5564f5d7aa26#8c38a3b17f6b723ef625046a271c5564f5d7aa26"
 dependencies = [
  "blinc_app",
  "blinc_cn",
@@ -1467,6 +1490,7 @@ dependencies = [
 [[package]]
 name = "fs-components-primitives"
 version = "0.2.0"
+source = "git+https://github.com/FreeSynergy/fs-components?rev=8c38a3b17f6b723ef625046a271c5564f5d7aa26#8c38a3b17f6b723ef625046a271c5564f5d7aa26"
 dependencies = [
  "blinc_cn",
  "blinc_core",
@@ -1476,6 +1500,7 @@ dependencies = [
 [[package]]
 name = "fs-components-render"
 version = "0.2.0"
+source = "git+https://github.com/FreeSynergy/fs-components?rev=8c38a3b17f6b723ef625046a271c5564f5d7aa26#8c38a3b17f6b723ef625046a271c5564f5d7aa26"
 dependencies = [
  "blinc_app",
  "blinc_cn",
@@ -1490,6 +1515,7 @@ dependencies = [
 [[package]]
 name = "fs-components-widgets"
 version = "0.2.0"
+source = "git+https://github.com/FreeSynergy/fs-components?rev=8c38a3b17f6b723ef625046a271c5564f5d7aa26#8c38a3b17f6b723ef625046a271c5564f5d7aa26"
 dependencies = [
  "blinc_cn",
  "blinc_core",
@@ -1505,6 +1531,7 @@ dependencies = [
 [[package]]
 name = "fs-components-workbenches"
 version = "0.2.0"
+source = "git+https://github.com/FreeSynergy/fs-components?rev=8c38a3b17f6b723ef625046a271c5564f5d7aa26#8c38a3b17f6b723ef625046a271c5564f5d7aa26"
 dependencies = [
  "blinc_app",
  "blinc_cn",
@@ -1518,15 +1545,17 @@ dependencies = [
 
 [[package]]
 name = "fs-files-app"
-version = "0.2.1"
+version = "0.4.0"
 dependencies = [
  "chrono",
  "fs-components-app",
  "fs-components-render",
+ "fs-components-widgets",
  "fs-components-workbenches",
  "fs-files-core",
  "fs-interfaces",
  "fs-store",
+ "image",
  "serde_json",
  "tempfile",
  "tokio",
@@ -1534,7 +1563,7 @@ dependencies = [
 
 [[package]]
 name = "fs-files-core"
-version = "0.2.1"
+version = "0.4.0"
 dependencies = [
  "async-trait",
  "blake3",
@@ -1553,11 +1582,37 @@ dependencies = [
 ]
 
 [[package]]
+name = "fs-files-server"
+version = "0.4.0"
+dependencies = [
+ "async-trait",
+ "blake3",
+ "capnp",
+ "capnp-rpc",
+ "chrono",
+ "fs-files-core",
+ "fs-interfaces",
+ "fs-store",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "fs-interfaces"
-version = "0.28.0"
-source = "git+https://github.com/FreeSynergy/fs-interfaces?tag=v0.28.0#0ee634f39f1bcc4714856a10a4ae97cc941b05f0"
+version = "0.35.0"
+source = "git+https://github.com/FreeSynergy/fs-interfaces?tag=v0.35.0#6ba1584e2e896ae2d3664de0df4318287f292ef1"
 dependencies = [
  "capnp",
+ "capnp-rpc",
+ "chrono",
+ "fs-store",
+ "futures",
+ "rustix 1.1.6",
+ "tokio",
+ "tokio-util",
+ "uuid",
 ]
 
 [[package]]
@@ -1590,6 +1645,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e6d5a32815ae3f33302d95fdcb2ce17862f8c65363dcfd29360480ba1001fc9c"
 
 [[package]]
+name = "futures"
+version = "0.3.34"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9a31d2a3fbaaeb2af2368bbdd904aa8e812d3c04a1ee10d3171f52d556e5d0a3"
+dependencies = [
+ "futures-channel",
+ "futures-core",
+ "futures-executor",
+ "futures-io",
+ "futures-sink",
+ "futures-task",
+ "futures-util",
+]
+
+[[package]]
 name = "futures-channel"
 version = "0.3.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1604,6 +1674,17 @@ name = "futures-core"
 version = "0.3.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "92d699e522242e69e3003b94ecc1f960f3a5e015aa7c5d7486e65ad01dd94f5e"
+
+[[package]]
+name = "futures-executor"
+version = "0.3.34"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "031b47cf1a3c6cc8bc2fc76cd437f521619387907d469316e7c0bc278f1f5432"
+dependencies = [
+ "futures-core",
+ "futures-task",
+ "futures-util",
+]
 
 [[package]]
 name = "futures-io"
@@ -1640,6 +1721,7 @@ version = "0.3.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0d50a92467f8ba5dd6e3ee5d4bd04d73ab2e4e1c44474a0674821dfce14b79bc"
 dependencies = [
+ "futures-channel",
  "futures-core",
  "futures-io",
  "futures-macro",
@@ -3692,7 +3774,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -4042,7 +4124,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.4.15",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -4055,7 +4137,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -4112,7 +4194,7 @@ dependencies = [
  "security-framework",
  "security-framework-sys",
  "webpki-root-certs",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -4672,7 +4754,7 @@ dependencies = [
  "getrandom 0.4.3",
  "once_cell",
  "rustix 1.1.6",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -4852,7 +4934,9 @@ checksum = "e464cf451ba96ebfc6f9b6542f17ee8b8956e33f1e40d9690624e59d7a7f8a4b"
 dependencies = [
  "bytes",
  "futures-core",
+ "futures-io",
  "futures-sink",
+ "futures-util",
  "libc",
  "pin-project-lite",
  "tokio",
@@ -5900,7 +5984,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -6090,15 +6174,6 @@ name = "windows-sys"
 version = "0.52.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "282be5f36a8ce781fad8c8ae18fa3f9beff57ec1b52cb3de0789201425d9a33d"
-dependencies = [
- "windows-targets",
-]
-
-[[package]]
-name = "windows-sys"
-version = "0.59.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e38bc4d79ed67fd075bcc251a1c39b32a1776bbe92e5bef1f0bf1f8c531853b"
 dependencies = [
  "windows-targets",
 ]

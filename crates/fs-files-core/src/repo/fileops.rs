@@ -1,6 +1,6 @@
 //! Moving, renaming and copying files; trash, restore, purge; classification.
 //!
-//! Pattern: Repository (write side) with Command-like small steps — each operation is: check the
+//! Pattern: Repository (write side) — each operation is: check the
 //! rules, do the disk step if the file lives under its real name (`steps.rs`: disk first, undone if
 //! the database fails), change the record, rewrite the index, store. Trash moves the bytes to the
 //! program's own trash folder; purge deletes bytes first (repeatable), metadata second.
@@ -11,6 +11,7 @@ use super::build::set_file;
 use super::handle::FileRepo;
 use super::names::check_name;
 use super::steps::{Disk, Step};
+use super::verify::InTrash;
 use crate::backend::Spot;
 use crate::error::{Error, Result};
 use crate::model::{File, FileRecord, OnConflict, TrashReport};
@@ -116,6 +117,12 @@ impl FileRepo {
         }
         let backend = self.backends.get(&r.backend)?;
         let key = self.path_in(r.folder, &o.envelope.name).await?;
+        if matches!(self.in_trash(&*backend, id, &r).await?, InTrash::Stray) {
+            return Err(super::verify::changed(&format!(
+                "the trash entry of {:?} is not the recorded file, it is left alone",
+                o.envelope.name
+            )));
+        }
         let step = Step::new(
             backend.clone(),
             Disk::Move(Spot::Trash(id.to_string()), Spot::Path(key.clone())),
@@ -123,9 +130,8 @@ impl FileRepo {
         );
         r.trashed = false;
         set_file(&mut o, &r);
-        let file = File::of(&o)?;
         match step.apply().await {
-            Ok(_) => Self::then_db(&[step], self.save(o)).await?,
+            Ok(_) => Self::then_db(&[step], self.save_file(o)).await,
             // The bytes are not in the trash. After a crash between the two steps of an earlier
             // restore they are already at their place: then only the record is missing.
             // Only if they are the recorded bytes (the checksum decides): a stranger's file of the
@@ -136,16 +142,13 @@ impl FileRepo {
                     .await
                     .is_ok() =>
             {
-                self.save(o).await?;
+                self.save_file(o).await
             }
-            Err(Error::NotFound(_)) => {
-                return Err(Error::NotFound(format!(
-                    "changed outside: the bytes of file {id} are neither in the trash nor at {key:?}, or other bytes are there; run rescan"
-                )));
-            }
-            Err(e) => return Err(e),
+            Err(Error::NotFound(_)) => Err(Error::NotFound(format!(
+                "changed outside: the bytes of file {id} are neither in the trash nor at {key:?}, or other bytes are there; run rescan"
+            ))),
+            Err(e) => Err(e),
         }
-        Ok(file)
     }
 
     pub(super) async fn do_purge(&self, id: ObjectId) -> Result<()> {
@@ -160,6 +163,12 @@ impl FileRepo {
         // Bytes first: deleting is repeatable, so a failure leaves a file that can be purged again.
         let backend = self.backends.get(&r.backend)?;
         if r.named {
+            if matches!(self.in_trash(&*backend, id, &r).await?, InTrash::Stray) {
+                return Err(super::verify::changed(&format!(
+                    "the trash entry of {:?} is not the recorded file, it is left alone",
+                    o.envelope.name
+                )));
+            }
             backend.discard(&Spot::Trash(id.to_string())).await?;
         } else {
             backend.delete(&r.key).await?;
@@ -212,16 +221,12 @@ impl FileRepo {
         r: &FileRecord,
     ) -> Result<File> {
         set_file(o, r);
-        let file = File::of(o)?;
-        self.transact(steps, self.save(o.clone())).await?;
-        Ok(file)
+        self.transact(steps, self.save_file(o.clone())).await
     }
 
     async fn store_file(&self, o: &mut fs_store::StoredObject, r: &FileRecord) -> Result<File> {
         set_file(o, r);
-        let file = File::of(o)?;
-        self.save(o.clone()).await?;
-        Ok(file)
+        self.save_file(o.clone()).await
     }
 }
 

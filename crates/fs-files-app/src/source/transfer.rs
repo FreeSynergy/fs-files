@@ -8,9 +8,7 @@
 use std::io::{Read, Seek, SeekFrom};
 
 use fs_components_app::{write_new_file, write_new_private_file};
-use fs_components_workbenches::file_manager::{
-    FileError, FileProblem, NameRule, PendingUpload, Transferred,
-};
+use fs_components_workbenches::file_manager::{FileError, FileProblem, NameRule, PendingUpload};
 use fs_files_core::{CHUNK, Upload};
 
 use super::adapter::{FileAdapter, folder_of, id_of};
@@ -31,7 +29,7 @@ impl FileAdapter {
         path: &str,
         folder: Option<&str>,
         rule: NameRule,
-    ) -> Result<Transferred, FileError> {
+    ) -> Result<String, FileError> {
         let (file, size, name) = open_source(path)?;
         let folder = folder_of(folder)?;
         let (upload, _) =
@@ -50,7 +48,7 @@ impl FileAdapter {
         size: u64,
         from: u64,
         upload: &dyn Upload,
-    ) -> Result<Transferred, FileError> {
+    ) -> Result<String, FileError> {
         let mut buffer = vec![0; CHUNK];
         let mut at = from;
         loop {
@@ -65,7 +63,7 @@ impl FileAdapter {
             return Err(FileError::failed(say::GREW));
         }
         let file = self.wait(upload.finish())?;
-        Ok(Transferred::new(file.name, file.size))
+        Ok(file.name)
     }
 
     pub(super) fn do_pending(&self) -> Result<Vec<PendingUpload>, FileError> {
@@ -78,7 +76,7 @@ impl FileAdapter {
 
     /// The core cannot tell whether a file is the one an upload started from. All that can be checked
     /// here: its name and that it is not smaller (see "Data-loss paths" in `DESIGN.md`).
-    pub(super) fn do_resume(&self, id: &str, path: &str) -> Result<Transferred, FileError> {
+    pub(super) fn do_resume(&self, id: &str, path: &str) -> Result<String, FileError> {
         let (mut file, size, name) = open_source(path)?;
         let pending = self.wait(self.transfer.pending_uploads())?;
         let info = pending
@@ -107,7 +105,7 @@ impl FileAdapter {
         key: &str,
         path: &str,
         release_marked: bool,
-    ) -> Result<Transferred, FileError> {
+    ) -> Result<String, FileError> {
         let id = id_of(key)?;
         let file = self
             .wait(self.files.get(id))?
@@ -128,7 +126,7 @@ impl FileAdapter {
             write_new_file
         };
         write(&target, &bytes).map_err(FileError::failed)?;
-        Ok(Transferred::new(target.display().to_string(), file.size))
+        Ok(target.display().to_string())
     }
 
     fn read_all(&self, blob: &dyn fs_files_core::Blob, size: u64) -> Result<Vec<u8>, FileError> {

@@ -1,6 +1,6 @@
 //! Reading a file (`Blob`) and copying bytes between keys.
 //!
-//! Pattern: Proxy — a [`FileBlob`] stands in for the bytes: size and ranges, no path, no backend.
+//! Pattern: Adapter — a [`FileBlob`] presents the bytes under one key of a backend as the `Blob` trait: size and ranges, no path, no backend.
 //! Copying streams chunk by chunk, so memory stays one chunk whatever the file size.
 
 use std::sync::Arc;

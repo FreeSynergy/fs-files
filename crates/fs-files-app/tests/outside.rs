@@ -57,7 +57,8 @@ fn a_file_changed_outside_is_refused_shown_as_such_and_rescan_clears_it() {
         s.notice(),
         Some(Notice::Problem(FileProblem::ChangedOutside, _))
     ));
-    s.discard_after_failure();
+    s.cancel_input();
+    s.discard_input();
     s.rescan();
     assert_eq!(s.report().unwrap().updated, ["a.txt"]);
     assert!(

@@ -1,6 +1,6 @@
 //! The backends currently in use, swapped atomically.
 //!
-//! Pattern: Registry + Memento-like snapshots — readers take an `Arc` snapshot and see either the old
+//! Pattern: Registry + Memento (snapshots) — readers take an `Arc` snapshot and see either the old
 //! or the new set, never a mix; `add` and `remove` build a new snapshot and replace it in one step.
 
 use std::sync::{Arc, RwLock};
@@ -62,6 +62,13 @@ impl BackendRegistry {
         let snap = self.snapshot();
         let by_name = |e: &&(String, Arc<dyn BlobBackend>)| e.1.naming() == super::Naming::ByName;
         snap.entries.iter().filter(by_name).cloned().collect()
+    }
+
+    /// The folders of the backends that live on this machine.
+    pub fn local_roots(&self) -> Vec<std::path::PathBuf> {
+        let snap = self.snapshot();
+        let root = |e: &(String, Arc<dyn BlobBackend>)| e.1.local_root().map(Into::into);
+        snap.entries.iter().filter_map(root).collect()
     }
 
     /// Id and backend that take new files.

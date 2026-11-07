@@ -5,8 +5,8 @@
 mod common;
 
 use common::World;
+use fs_components_widgets::transfer_list::{Action as TransferAction, Outcome as TransferOutcome};
 use fs_components_workbenches::file_manager::{Ask, Confirm, FileProblem, FileSource, NameRule};
-use fs_components_workbenches::file_manager::{TransferAction, TransferOutcome};
 use fs_files_core::Transfer;
 
 fn retry(key: &str) -> TransferOutcome {
@@ -87,8 +87,7 @@ fn a_download_never_replaces_and_a_folder_means_inside_it() {
     let place = w
         .adapter
         .download(&key, out.to_str().unwrap(), false)
-        .unwrap()
-        .name;
+        .unwrap();
     assert_eq!(std::fs::read(&place).unwrap(), b"bytes");
     assert!(place.ends_with("a.txt"));
     assert!(

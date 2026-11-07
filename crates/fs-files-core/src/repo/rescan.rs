@@ -1,6 +1,6 @@
 //! `folder.rescan`: bring the records in line with a folder that people can change from outside.
 //!
-//! Pattern: Visitor-like walk — the disk tree and the record tree are walked together, one folder at
+//! Pattern: Visitor — the disk tree and the record tree are walked together, one folder at
 //! a time, with a work list instead of recursion (a deep tree cannot overflow the stack). Rules
 //! (provisional, owner to confirm): new files and folders are taken over (size and checksum read from
 //! the bytes); a file whose size or modification time differs gets new size and checksum; a file that
@@ -21,13 +21,11 @@ use super::names::check_name;
 use super::rescan_known::{is_folder, is_legacy_key};
 use crate::backend::{BlobBackend, ScanKind, Scanned};
 use crate::error::{Error, Result};
-use crate::model::{Entry, Folder, RescanReport};
+use crate::model::{Entry, RescanReport};
 
 pub(super) const SNIFF: u32 = 8192;
 /// Folders nested deeper than this are not entered (reported as skipped).
 const MAX_DEPTH: usize = 512;
-/// Records are read this many at a time.
-const BATCH: usize = 1000;
 
 /// One backend being walked.
 pub(super) struct Walk {
@@ -88,24 +86,15 @@ impl FileRepo {
     /// walk reads everything once and filters here.)
     async fn load_tree(&self) -> Result<HashMap<String, Vec<StoredObject>>> {
         let mut tree: HashMap<String, Vec<StoredObject>> = HashMap::new();
-        let mut seen = 0;
-        loop {
-            let mut q = Query::new().in_context(CONTEXT).limit(BATCH);
-            q.offset = seen;
-            let rows = self.reads.query(&q).await?;
-            seen += rows.len();
-            let n = rows.len();
-            for o in rows {
-                let one = |k: &str| o.index.get(k).and_then(|v| v.first()).cloned();
-                let live = one("trashed").as_deref() == Some("false");
-                if let (true, Some(folder)) = (live, one("folder")) {
-                    tree.entry(folder).or_default().push(o);
-                }
-            }
-            if n < BATCH {
-                return Ok(tree);
+        // One query, no paging: records cannot move between pages while they are read (a page boundary
+        // plus a deleted or added record would skip or repeat one). The global lock is held anyway.
+        for o in self.reads.query(&Query::new().in_context(CONTEXT)).await? {
+            let one = |k: &str| o.index.get(k).and_then(|v| v.first()).cloned();
+            if let (Some("false"), Some(folder)) = (one("trashed").as_deref(), one("folder")) {
+                tree.entry(folder).or_default().push(o);
             }
         }
+        Ok(tree)
     }
 
     /// Look at one folder: its entries on the disk against its records. Folders found go on `todo`.
@@ -185,8 +174,7 @@ impl FileRepo {
                     return Ok(());
                 }
                 let o = self.folder_object(&entry.name, item.folder);
-                let f = Folder::of(&o)?;
-                self.save(o).await?;
+                let f = self.save_folder(o).await?;
                 report.added.push(Entry::Folder(f.clone()));
                 Self::enter(item, Some(f.id), at, todo, report);
             }

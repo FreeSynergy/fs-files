@@ -6,7 +6,7 @@
 use super::{Entry, File};
 
 /// What `rescan` did and found (`RescanReport` in the contract).
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct RescanReport {
     /// Files and folders that were on the disk but unknown; now taken over.
     pub added: Vec<Entry>,

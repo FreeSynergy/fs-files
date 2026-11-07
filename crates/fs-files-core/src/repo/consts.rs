@@ -1,6 +1,6 @@
 //! Constants of the files objects.
 //!
-//! Pattern: Registry (constants) — AS2 types, context and content types of this program in one place.
+//! Pattern: Constants — AS2 types, context and content types of this program in one place.
 
 /// `context` of all objects of this program.
 pub const CONTEXT: &str = "files";

@@ -84,7 +84,8 @@ fn a_name_that_looks_like_a_path_or_cannot_be_held_is_said_and_nothing_moves() {
             Ask::Input(input) => assert_eq!(input.value, name, "what was typed stays"),
             other => panic!("{other:?}"),
         }
-        s.discard_after_failure();
+        s.cancel_input();
+        s.discard_input();
         assert_eq!(w.get(file.id).unwrap().name, "start.txt");
         assert_eq!(w.tree(), ["start.txt"], "{name:?}");
         assert!(!outside.exists());

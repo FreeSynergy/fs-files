@@ -20,7 +20,7 @@ use crate::model::{
 };
 use crate::transfer::{Blob, Transfer, Upload};
 
-const SUPPORTED: [&str; 26] = [
+const SUPPORTED: [&str; 27] = [
     "file.resolve",
     "folder.resolve",
     "folder.list",
@@ -43,13 +43,14 @@ const SUPPORTED: [&str; 26] = [
     "file.classify",
     "file.search",
     "file.upload",
+    "file.subscribe",
     "file.download",
     "backend.list",
     "backend.add",
     "backend.remove",
 ];
 
-const NOT_BUILT: [(&str, &str); 6] = [
+const NOT_BUILT: [(&str, &str); 5] = [
     (
         "share.create",
         "one specification for all programs, not written yet",
@@ -58,7 +59,6 @@ const NOT_BUILT: [(&str, &str); 6] = [
         "share.revoke",
         "one specification for all programs, not written yet",
     ),
-    ("file.subscribe", "not built yet; it is possible"),
     ("file.versions", "not built yet"),
     ("file.encrypt", "not built yet"),
     ("sync.configure", "not built yet"),

@@ -6,7 +6,7 @@
 use fs_components_workbenches::file_manager::{
     EmptyReport, EntryPage, EntryRef, FileCapabilities, FileEntry, FileError, FileSource,
     FolderInfo, ListRequest, NameRule, PageMark, PendingUpload, PreviewBytes, RescanSummary,
-    Transferred, TrashCount,
+    TrashCount,
 };
 
 use super::adapter::{FileAdapter, id_of};
@@ -134,7 +134,7 @@ impl FileSource for FileAdapter {
         path: &str,
         folder: Option<&str>,
         rule: NameRule,
-    ) -> Result<Transferred, FileError> {
+    ) -> Result<String, FileError> {
         self.do_upload(path, folder, rule)
     }
 
@@ -142,7 +142,7 @@ impl FileSource for FileAdapter {
         self.do_pending()
     }
 
-    fn resume_upload(&self, id: &str, path: &str) -> Result<Transferred, FileError> {
+    fn resume_upload(&self, id: &str, path: &str) -> Result<String, FileError> {
         self.do_resume(id, path)
     }
 
@@ -150,12 +150,7 @@ impl FileSource for FileAdapter {
         self.do_drop(id)
     }
 
-    fn download(
-        &self,
-        key: &str,
-        path: &str,
-        release_marked: bool,
-    ) -> Result<Transferred, FileError> {
+    fn download(&self, key: &str, path: &str, release_marked: bool) -> Result<String, FileError> {
         self.do_download(key, path, release_marked)
     }
 }

@@ -51,11 +51,7 @@ async fn a_missing_method_says_not_possible() {
     };
     assert_eq!((u.capability(), u.status()), ("folder.create", 501));
     assert!(!p.capabilities().is_supported("folder.create"));
-    for r in [
-        p.trash(ObjectId::new()).await,
-        p.sharing().await,
-        p.subscribe().await,
-    ] {
+    for r in [p.trash(ObjectId::new()).await, p.sharing().await] {
         assert!(matches!(r, Err(Error::Unsupported(_))));
     }
     let b: Arc<dyn Backends> = Arc::new(ReadOnly);
@@ -70,7 +66,7 @@ async fn a_missing_method_says_not_possible() {
 }
 
 #[tokio::test]
-async fn sharing_and_subscribe_give_their_plain_reasons() {
+async fn sharing_gives_its_plain_reason_and_subscribe_is_offered() {
     let p: Arc<dyn Files> = Arc::new(env().await.repo);
     let Err(Error::Unsupported(s)) = p.sharing().await else {
         panic!()
@@ -79,15 +75,8 @@ async fn sharing_and_subscribe_give_their_plain_reasons() {
         s.reason(),
         "one specification for all programs, not written yet"
     );
-    let Err(Error::Unsupported(s)) = p.subscribe().await else {
-        panic!()
-    };
-    assert_eq!(s.reason(), "not built yet; it is possible");
     let caps = p.capabilities();
-    assert_eq!(
-        caps.why_not("file.subscribe").unwrap().reason(),
-        "not built yet; it is possible"
-    );
+    assert!(caps.is_supported("file.subscribe"));
     assert!(caps.why_not("share.create").is_some() && caps.why_not("file.versions").is_some());
     for id in [
         "file.upload",

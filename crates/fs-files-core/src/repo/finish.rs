@@ -46,7 +46,9 @@ impl FileRepo {
         Ok(file)
     }
 
+    /// Delete the session record. Under the global lock: a rescan reads the records and must not see them change.
     async fn drop_session(&self, id: ObjectId) -> Result<()> {
+        let _w = self.lock.lock().await;
         match self.objects.delete(id, &self.actor).await {
             Ok(_) | Err(fs_store::Error::NotFound(_)) => Ok(()),
             Err(e) => Err(e.into()),
@@ -185,8 +187,6 @@ impl FileRepo {
         self.require_folder(s.folder).await?; // the world may have changed during the upload
         self.require_free(s.folder, name, None).await?;
         let o = self.file_object(name, &record);
-        let file = File::of(&o)?;
-        self.save(o).await?;
-        Ok(file)
+        self.save_file(o).await
     }
 }

@@ -72,6 +72,10 @@ impl BlobBackend for LocalFolder {
         c
     }
 
+    fn local_root(&self) -> Option<&Path> {
+        Some(&self.root)
+    }
+
     fn kind(&self) -> &'static str {
         "local"
     }
@@ -163,6 +167,10 @@ impl BlobBackend for LocalFolder {
 
     async fn discard(&self, spot: &Spot) -> Result<()> {
         self.do_discard(spot).await
+    }
+
+    async fn inspect(&self, spot: &Spot) -> Result<Option<BlobInfo>> {
+        self.do_inspect(spot).await
     }
 
     async fn has(&self, spot: &Spot) -> Result<bool> {

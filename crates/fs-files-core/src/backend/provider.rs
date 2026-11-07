@@ -63,6 +63,11 @@ pub trait BlobBackend: Send + Sync {
 
     // ---- Backends that keep real names (`Naming::ByName`). Defaults answer `Unsupported`. ----
 
+    /// The folder this backend keeps its bytes in, if it is a folder of this machine. `backend.add` uses
+    /// it to keep two backends from sharing a folder.
+    fn local_root(&self) -> Option<&std::path::Path> {
+        None
+    }
     /// How this backend names what it stores. Decides whether the repository keeps the disk in step
     /// with folders and names (`ByName`) or only the database (`ById`).
     fn naming(&self) -> Naming {
@@ -85,6 +90,11 @@ pub trait BlobBackend: Send + Sync {
             Spot::Path(key) | Spot::Pending(key) => self.delete(key).await,
             Spot::Trash(_) => no("blob.rename"),
         }
+    }
+    /// `blob.read`: size, checksum (read from the bytes) and modification time of the blob at a spot, `None`
+    /// if nothing is there. The only way to look into the trash folder; costs a read of the whole blob.
+    async fn inspect(&self, _spot: &Spot) -> Result<Option<BlobInfo>> {
+        Ok(None)
     }
     /// `blob.read`: is something at this spot? (Used to find bytes left in the trash by a crash.)
     async fn has(&self, _spot: &Spot) -> Result<bool> {

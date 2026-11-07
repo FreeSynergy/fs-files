@@ -15,7 +15,7 @@ use crate::error::{Error, Result};
 /// Longest segment (a file name) in bytes: what Linux file systems accept.
 pub(super) const MAX_NAME: usize = 255;
 /// Longest key in bytes (`PATH_MAX`).
-pub(super) const MAX_PATH: usize = 4096;
+pub(super) const MAX_PATH: usize = 4095;
 const PENDING: &str = "pending";
 const TRASH: &str = "trash";
 

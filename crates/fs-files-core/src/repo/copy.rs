@@ -79,13 +79,11 @@ impl FileRepo {
         }
         let mut o = self.file_object(&name, &r);
         o.envelope.sensitive.clone_from(&src.envelope.sensitive);
-        let file = File::of(&o)?;
-        let db = self.save(o);
+        let db = self.save_file(o);
         match undo {
-            Some(step) => Self::then_db(&[step], db).await?,
-            None => db.await?,
+            Some(step) => Self::then_db(&[step], db).await,
+            None => db.await,
         }
-        Ok(file)
     }
 
     pub(super) fn same_bytes(info: &BlobInfo, r: &FileRecord) -> Result<()> {

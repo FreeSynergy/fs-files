@@ -9,7 +9,7 @@ use super::consts::CONTEXT;
 use super::handle::FileRepo;
 use super::names::{copy_name, numbered_name};
 use crate::error::{Error, Result};
-use crate::model::{FolderRecord, OnConflict};
+use crate::model::{File, Folder, FolderRecord, OnConflict};
 
 fn is_kind(o: &StoredObject, kind: &str) -> bool {
     o.index
@@ -58,24 +58,12 @@ impl FileRepo {
         name: &str,
         except: Option<ObjectId>,
     ) -> Result<()> {
-        // One index condition only (the store's cost grows with every condition); the folder and the
-        // trash flag are looked at here, on the few entries that have this name.
+        // One index condition: `live_place` holds folder and name together and exists for live entries only.
         let q = Query::new()
             .in_context(CONTEXT)
-            .with_index("name_exact", name);
-        let (folder, live) = (folder_key(folder), ["false".to_string()]);
-        let has = |o: &fs_store::StoredObject, k: &str, v: &[String]| {
-            o.index.get(k).is_some_and(|x| x.as_slice() == v)
-        };
+            .with_index("live_place", format!("{}/{name}", folder_key(folder)));
         let taken = self.reads.query(&q).await?;
-        let clash = |o: &&fs_store::StoredObject| {
-            has(o, "folder", std::slice::from_ref(&folder)) && has(o, "trashed", &live)
-        };
-        if taken
-            .iter()
-            .filter(clash)
-            .any(|o| Some(o.envelope.id) != except)
-        {
+        if taken.iter().any(|o| Some(o.envelope.id) != except) {
             return Err(Error::name_taken(format!(
                 "the name {name:?} is taken in this folder"
             )));
@@ -162,5 +150,30 @@ impl FileRepo {
     pub(super) async fn save(&self, o: StoredObject) -> Result<()> {
         self.objects.put(o, &self.actor).await?;
         Ok(())
+    }
+
+    /// Store a file object and answer the file as stored: the store sets the times of the envelope,
+    /// so what the caller gets back equals what `get` answers afterwards.
+    /// The write is done when this reads again; if the reading fails, the file as built stands (the
+    /// write must not be undone for a failed read).
+    pub(super) async fn save_file(&self, o: StoredObject) -> Result<File> {
+        let (id, built) = (o.envelope.id, File::of(&o)?);
+        self.save(o).await?;
+        Ok(match self.file_obj(id).await.and_then(|s| File::of(&s)) {
+            Ok(stored) => stored,
+            Err(_) => built,
+        })
+    }
+
+    /// Store a folder object and answer the folder as stored (see `save_file`).
+    pub(super) async fn save_folder(&self, o: StoredObject) -> Result<Folder> {
+        let (id, built) = (o.envelope.id, Folder::of(&o)?);
+        self.save(o).await?;
+        Ok(
+            match self.folder_obj(id).await.and_then(|s| Folder::of(&s)) {
+                Ok(stored) => stored,
+                Err(_) => built,
+            },
+        )
     }
 }

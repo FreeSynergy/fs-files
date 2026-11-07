@@ -44,24 +44,36 @@ async fn a_forged_modification_time_does_not_hide_a_strangers_file() {
 }
 
 #[tokio::test]
-async fn a_quiet_upload_survives_a_rescan_unless_the_limit_is_set_short() {
+async fn a_quiet_upload_survives_a_rescan_and_the_limit_has_a_floor() {
     let e = env().await;
     let b = LocalFolder::open(root(&e)).await.unwrap();
     b.put("someone-elses/upload", 0, b"quiet").await.unwrap();
     e.repo.rescan(None).await.unwrap(); // default limit: 30 days
     assert_eq!(b.pending("someone-elses/upload").await.unwrap(), 5);
+    // even "zero" keeps a young blob: the limit has a floor of one hour
     let short = e.repo.clone().with_orphan_after(Duration::ZERO);
     short.rescan(None).await.unwrap();
-    assert_eq!(b.pending("someone-elses/upload").await.unwrap(), 0);
+    assert_eq!(b.pending("someone-elses/upload").await.unwrap(), 5);
+    // the backend itself removes what is old enough
+    assert_eq!(b.sweep_pending(&[], 0).await.unwrap(), 1);
 }
 
 #[tokio::test]
 async fn a_root_that_leaves_little_room_gives_invalid_name_not_io() {
     let dir = tempfile::tempdir().unwrap();
     let mut deep = dir.path().to_path_buf();
-    while deep.as_os_str().len() < 3900 {
+    // About 3900 bytes in all, whatever the temporary directory is called (PATH_MAX is 4096).
+    while deep.as_os_str().len() + 201 <= 3900 {
         deep.push("d".repeat(200));
     }
+    let left = 3900usize.saturating_sub(deep.as_os_str().len() + 1);
+    if left > 0 {
+        deep.push("e".repeat(left.min(255)));
+    }
+    assert!(
+        deep.as_os_str().len() < 4000,
+        "the temporary directory itself is too long for this test"
+    );
     std::fs::create_dir_all(&deep).unwrap();
     let b = LocalFolder::open(&deep).await.unwrap();
     let key = format!("{}/{}", "k".repeat(100), "l".repeat(100));
@@ -75,9 +87,11 @@ async fn a_root_that_leaves_little_room_gives_invalid_name_not_io() {
 async fn a_folder_move_counts_the_root_of_the_disk_too() {
     let dir = tempfile::tempdir().unwrap();
     let mut deep = dir.path().join("blobs");
-    while deep.as_os_str().len() < 3600 {
+    // Exactly 3600 bytes, whatever the temp folder is: the moves below depend on it.
+    while deep.as_os_str().len() < 3350 {
         deep.push("d".repeat(200));
     }
+    deep.push("d".repeat(3599 - deep.as_os_str().len()));
     std::fs::create_dir_all(&deep).unwrap();
     let store: std::sync::Arc<dyn fs_store::Store> =
         std::sync::Arc::new(fs_store::TursoStore::open_in_memory().await.unwrap());

@@ -1,14 +1,14 @@
 //! Entries, pages, cursors and the search filter.
 //!
-//! Pattern: Iterator-style paging — a [`Page`] carries a [`Cursor`] to ask for the next one;
-//! the cursor is opaque to callers.
+//! Pattern: Value object — a [`Page`] carries a [`Cursor`] to ask for the next one (the caller loops;
+//! no iterator is offered); the cursor is opaque to callers.
 
 use fs_store::ObjectId;
 
 use super::{File, Folder};
 
 /// A file or a folder (`Entry` in `files.capnp`).
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Entry {
     /// A file.
     File(File),
@@ -20,8 +20,20 @@ pub enum Entry {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Cursor(pub(crate) usize);
 
+impl Cursor {
+    /// The place in the ordered list this cursor marks (for a wire form of the cursor).
+    pub fn position(self) -> usize {
+        self.0
+    }
+
+    /// The cursor that marks `position`; the inverse of [`Cursor::position`].
+    pub fn at(position: usize) -> Self {
+        Self(position)
+    }
+}
+
 /// One page of entries (`EntryPage`); `next` is `None` on the last page.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Page {
     /// The entries, in name order.
     pub items: Vec<Entry>,
