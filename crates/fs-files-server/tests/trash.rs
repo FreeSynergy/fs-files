@@ -90,9 +90,10 @@ async fn restore_into_a_taken_name_is_refused_keep_both_or_another_folder_helps(
         let answer = both.send().promise.await.unwrap();
         let kept = read_file(answer.get().unwrap().get_file().unwrap());
         assert_eq!(kept.name, "a (2).txt");
+        assert_eq!(kept.folder, Some(dir), "restored to its original folder");
         assert_eq!(
-            kept.folder, None,
-            "restored to its original place, the top level"
+            std::fs::read(fx.root.join("Back/a (2).txt")).unwrap(),
+            b"old"
         );
     })
     .await;

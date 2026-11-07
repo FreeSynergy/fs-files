@@ -307,3 +307,27 @@ pub fn read_uuid_of(r: wire_uuid::Reader<'_>) -> Option<Uuid> {
 pub fn unknown_id() -> Uuid {
     Envelope::new("Document", "x").id.as_uuid()
 }
+
+/// The checksum the contract names for these bytes.
+pub fn checksum(data: &[u8]) -> String {
+    fs_files_core::format_checksum(&blake3::hash(data))
+}
+
+/// Start an upload; the capability and its id.
+pub async fn start(
+    c: &Caps,
+    folder: Option<Uuid>,
+    name: &str,
+) -> capnp::Result<(fs_interfaces::files_capnp::upload::Client, String)> {
+    let mut call = c.transfer.start_upload_request();
+    write_uuid(call.get().init_folder(), folder);
+    call.get().set_name(name);
+    let answer = call.send().promise.await?;
+    let r = answer.get()?;
+    Ok((r.get_upload()?, r.get_id()?.to_string()?))
+}
+
+pub async fn received(upload: &fs_interfaces::files_capnp::upload::Client) -> u64 {
+    let answer = upload.received_request().send().promise.await.unwrap();
+    answer.get().unwrap().get_bytes()
+}

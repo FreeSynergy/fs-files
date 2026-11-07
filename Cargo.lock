@@ -741,6 +741,7 @@ name = "fs-files-server"
 version = "0.3.0"
 dependencies = [
  "async-trait",
+ "blake3",
  "capnp",
  "capnp-rpc",
  "fs-files-core",
