@@ -8,6 +8,7 @@ use std::path::Path;
 use tokio::io::{AsyncReadExt, AsyncSeekExt};
 
 use crate::error::{Error, Result};
+use crate::note::Note;
 
 /// Flush a directory entry to disk (Unix; elsewhere a no-op).
 pub(super) async fn sync_dir(dir: &Path) -> Result<()> {
@@ -105,16 +106,22 @@ pub(super) fn named(e: std::io::Error, what: &str) -> Error {
             "{what}: the name is taken on the disk (by something fs-files does not know, or the file system \
              treats the names as the same); run rescan to take it over"
         )),
-        K::DirectoryNotEmpty | K::NotADirectory | K::IsADirectory => Error::Conflict(format!(
-            "{what}: a file is in the way or the folder holds things fs-files does not know (run rescan): {e}"
-        )),
-        K::NotFound => Error::NotFound(what.to_string()),
+        K::DirectoryNotEmpty | K::NotADirectory | K::IsADirectory => Error::Conflict(
+            format!(
+                "{what}: a file is in the way or the folder holds things fs-files does not know (run rescan): {e}"
+            )
+            .into(),
+        ),
+        K::NotFound => Error::NotFound(what.into()),
         K::InvalidFilename => {
-            Error::InvalidName(format!("{what}: the file system refuses this name"))
+            Error::InvalidName(
+                Note::from(format!("{what}: the file system refuses this name")).because("refused-by-disk"),
+            )
         }
-        _ if e.raw_os_error() == Some(36) => Error::InvalidName(format!(
-            "{what}: name or path too long for this file system"
-        )),
+        _ if e.raw_os_error() == Some(36) => Error::InvalidName(
+            Note::from(format!("{what}: name or path too long for this file system"))
+                .because("too-long"),
+        ),
         _ => Error::Io(e),
     }
 }

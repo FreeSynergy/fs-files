@@ -12,6 +12,7 @@ use super::handle::FileRepo;
 use crate::backend::{BlobBackend, CHUNK, Spot};
 use crate::error::{Error, Result};
 use crate::model::FileRecord;
+use crate::note::{Kind, Note};
 use crate::transfer::Blob;
 
 /// A key for new bytes: two random hex digits as a folder (spreads files), then the id.
@@ -22,6 +23,7 @@ pub(super) fn new_key(id: ObjectId) -> String {
 
 /// The bytes of one file.
 pub(super) struct FileBlob {
+    id: ObjectId,
     backend: Arc<dyn BlobBackend>,
     key: String,
     size: u64,
@@ -43,7 +45,10 @@ impl Blob for FileBlob {
         let data = self.backend.get(&self.key, offset, length).await?;
         if data.len() < length as usize {
             return Err(Error::Backend(
-                "changed outside: the file is shorter than recorded; it was changed outside the program (run rescan)".into(),
+                Note::from(
+                    "changed outside: the file is shorter than recorded; it was changed outside the program (run rescan)",
+                )
+                .about(Kind::File, self.id),
             ));
         }
         Ok(data)
@@ -59,10 +64,11 @@ impl FileRepo {
         if r.named {
             // The folder can be changed from outside: never hand out bytes that are not the recorded ones.
             // Cheap check only (size, modification time); `rescan` brings the record up to date.
-            self.verify_bytes(&*backend, &key, &o.envelope.name, &r, false)
+            self.verify_bytes(&*backend, &key, &o, &r, false)
                 .await?;
         }
         Ok(Arc::new(FileBlob {
+            id,
             backend,
             key,
             size: r.size,

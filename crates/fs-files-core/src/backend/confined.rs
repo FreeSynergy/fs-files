@@ -18,6 +18,7 @@ use super::{BlobBackend, LocalFolder, RESERVED_NAME};
 use crate::backend::factory::{BackendFactory, Place};
 use crate::backend::nested;
 use crate::error::{Error, Result};
+use crate::note::Note;
 
 /// `{"kind": "local", "path": "second"}`: the path is relative to the base.
 pub struct ConfinedLocalFactory {
@@ -32,7 +33,7 @@ impl ConfinedLocalFactory {
 
     /// The place `path` names below the base, if it is one. Nothing is created here.
     fn place(base: &Path, path: &str) -> Result<PathBuf> {
-        let refused = |why: &str| Error::Config(format!("the path of a local backend {why}"));
+        let refused = |why: &str| Error::Config(Note::from(format!("the path of a local backend {why}")).because("path"));
         let relative = Path::new(path);
         let mut parts = Vec::new();
         for c in relative.components() {

@@ -17,7 +17,7 @@ use crate::error::{Error, Result};
 pub struct ObjectStoreApi<T>(pub T);
 
 fn fail(e: &object_store::Error) -> Error {
-    Error::Backend(e.to_string())
+    Error::Backend(e.to_string().into())
 }
 
 fn path(key: &str) -> Path {

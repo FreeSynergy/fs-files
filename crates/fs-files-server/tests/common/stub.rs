@@ -92,7 +92,7 @@ impl Files for Stub {
 #[async_trait]
 impl Transfer for Stub {
     async fn open(&self, id: ObjectId) -> Result<Arc<dyn Blob>> {
-        Err(fs_files_core::Error::NotFound(format!("file {id}")))
+        Err(fs_files_core::Error::NotFound(format!("file {id}").into()))
     }
     async fn pending_uploads(&self) -> Result<Vec<UploadInfo>> {
         Ok(self.uploads.clone())

@@ -7,6 +7,7 @@ use std::sync::{Arc, RwLock};
 
 use super::BlobBackend;
 use crate::error::{Error, Result};
+use crate::note::{Kind, Note};
 use crate::model::BackendInfo;
 
 /// An immutable set of backends. `active` takes new files.
@@ -54,7 +55,7 @@ impl BackendRegistry {
         let found = snap.entries.iter().find(|(i, _)| i == id);
         found
             .map(|(_, b)| b.clone())
-            .ok_or_else(|| Error::NotFound(format!("backend {id}")))
+            .ok_or_else(|| Error::missing(Kind::Backend, id))
     }
 
     /// Every backend that keeps real names, with its id (their folders must follow ours).
@@ -98,7 +99,7 @@ impl BackendRegistry {
     ) -> Result<BackendInfo> {
         let mut next = (*self.snapshot()).clone();
         if next.entries.iter().any(|(i, _)| i == id) {
-            return Err(Error::Conflict(format!("a backend {id} exists")));
+            return Err(Error::Conflict(Note::from(format!("a backend {id} exists")).about(Kind::Backend, id)));
         }
         let kind = backend.kind().to_string();
         next.entries.push((id.to_string(), backend));
@@ -121,11 +122,12 @@ impl BackendRegistry {
             .entries
             .iter()
             .position(|(i, _)| i == id)
-            .ok_or_else(|| Error::NotFound(format!("backend {id}")))?;
+            .ok_or_else(|| Error::missing(Kind::Backend, id))?;
         if at == next.active {
-            return Err(Error::Conflict(format!(
-                "backend {id} is the active one; activate another first"
-            )));
+            return Err(Error::Conflict(
+                Note::from(format!("backend {id} is the active one; activate another first"))
+                    .about(Kind::Backend, id),
+            ));
         }
         next.entries.remove(at);
         if at < next.active {

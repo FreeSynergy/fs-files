@@ -15,6 +15,7 @@ mod backend_wire;
 mod backends_service;
 mod blob_service;
 mod errors;
+mod facts;
 mod feed;
 mod file_ops;
 mod files_service;

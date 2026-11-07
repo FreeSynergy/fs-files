@@ -130,7 +130,7 @@ impl BlobBackend for S3Backend {
             .api
             .head(&name)
             .await?
-            .ok_or_else(|| Error::NotFound(format!("blob {key}")))?;
+            .ok_or_else(|| Error::NotFound(format!("blob {key}").into()))?;
         if offset >= size {
             return Ok(Vec::new());
         }
@@ -138,7 +138,7 @@ impl BlobBackend for S3Backend {
         self.api
             .get_range(&name, offset, end)
             .await?
-            .ok_or_else(|| Error::NotFound(format!("blob {key}")))
+            .ok_or_else(|| Error::NotFound(format!("blob {key}").into()))
     }
 
     async fn stat(&self, key: &str) -> Result<Option<BlobInfo>> {
@@ -213,7 +213,7 @@ impl BlobBackend for S3Backend {
         let mut p = self
             .take(key)
             .await?
-            .ok_or_else(|| Error::NotFound(format!("nothing pending for {key}")))?;
+            .ok_or_else(|| Error::NotFound(format!("nothing pending for {key}").into()))?;
         let size = if p.saved.completing {
             p.saved.size
         } else {

@@ -71,9 +71,9 @@ impl Step {
     async fn move_dir(&self, from: &str, to: &str) -> Result<()> {
         // A folder is expected at `from`: if it is a file now, it is somebody else's and stays.
         if matches!(self.backend.stat(from).await, Ok(Some(_))) {
-            return Err(Error::Backend(format!(
-                "changed outside: {from:?} is a file now, not a folder; run rescan"
-            )));
+            return Err(Error::Backend(
+                format!("changed outside: {from:?} is a file now, not a folder; run rescan").into(),
+            ));
         }
         let (src, dst) = (Spot::Path(from.to_string()), Spot::Path(to.to_string()));
         match self.backend.relocate(&src, &dst).await {

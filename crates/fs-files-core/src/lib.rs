@@ -23,6 +23,7 @@ mod error;
 mod feed;
 mod files;
 mod model;
+mod note;
 mod repo;
 mod transfer;
 
@@ -37,12 +38,13 @@ pub use backend::{
     S3Factory, S3Options,
 };
 pub use backends::Backends;
-pub use error::{Error, Problem, Result};
+pub use error::{Error, Facts, Problem, Result};
 pub use feed::{FileChange, FileFeed, FileListener, Registry, Subscription};
 pub use files::Files;
 pub use model::{
     BackendInfo, Cursor, Entry, File, FileFilter, Folder, OnConflict, Page, RescanReport, Sort,
     SortBy, TrashReport, UploadInfo,
 };
+pub use note::{Kind, Note, Subject};
 pub use repo::{CONTEXT, FOLDER_TYPE, FileRepo, MAX_NAME, UPLOAD_TYPE, check_name};
 pub use transfer::{Blob, Transfer, Upload};

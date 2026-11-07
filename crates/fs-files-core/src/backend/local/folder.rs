@@ -137,7 +137,7 @@ impl BlobBackend for LocalFolder {
         let _guard = self.locks.lock(key).await;
         let (size, modified) = io::stat_of(&from)
             .await?
-            .ok_or_else(|| Error::NotFound(format!("nothing pending for {key}")))?;
+            .ok_or_else(|| Error::NotFound(format!("nothing pending for {key}").into()))?;
         let checksum = match self.digests.finish(key, size) {
             Some(c) => c,
             None => hash_chunks(size, |o, l| io::read_range(&from, o, l)).await?,
@@ -206,7 +206,7 @@ impl BlobBackend for LocalFolder {
 fn missing(e: Error, key: &str) -> Error {
     match e {
         Error::Io(io) if io.kind() == std::io::ErrorKind::NotFound => {
-            Error::NotFound(format!("blob {key}"))
+            Error::NotFound(format!("blob {key}").into())
         }
         other => other,
     }

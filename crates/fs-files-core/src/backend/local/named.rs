@@ -36,7 +36,7 @@ impl LocalFolder {
         let _guard = self.locks.lock(pending).await;
         let (size, modified) = io::stat_of(&from)
             .await?
-            .ok_or_else(|| Error::NotFound(format!("nothing pending for {pending}")))?;
+            .ok_or_else(|| Error::NotFound(format!("nothing pending for {pending}").into()))?;
         let checksum = match self.digests.finish(pending, size) {
             Some(c) => c,
             None => hash_chunks(size, |o, l| io::read_range(&from, o, l)).await?,

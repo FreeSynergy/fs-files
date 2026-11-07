@@ -13,6 +13,7 @@ use super::names::check_name;
 use super::steps::{Disk, Step};
 use super::verify::InTrash;
 use crate::backend::Spot;
+use crate::note::{Kind, Note};
 use crate::error::{Error, Result};
 use crate::model::{File, FileRecord, OnConflict, TrashReport};
 use fs_store::{Query, StoredObject};
@@ -81,7 +82,7 @@ impl FileRepo {
             if backend.stat(&key).await.is_ok_and(|i| i.is_none()) {
                 // nothing to move
             } else {
-                self.verify_bytes(&*backend, &key, &o.envelope.name, &r, true)
+                self.verify_bytes(&*backend, &key, &o, &r, true)
                     .await?;
                 let (from, to) = (Spot::Path(key), Spot::Trash(id.to_string()));
                 steps.push(Step::new(backend, Disk::Move(from, to), false));
@@ -102,7 +103,7 @@ impl FileRepo {
         let mut o = self.file_obj(id).await?;
         let mut r = FileRecord::of(&o)?;
         if !r.trashed {
-            return Err(Error::Conflict(format!("file {id} is not in the trash")));
+            return Err(Error::Conflict(Note::from(format!("file {id} is not in the trash")).about(Kind::File, id)));
         }
         if let Target::Folder(f) = target {
             r.folder = f;
@@ -121,7 +122,8 @@ impl FileRepo {
             return Err(super::verify::changed(&format!(
                 "the trash entry of {:?} is not the recorded file, it is left alone",
                 o.envelope.name
-            )));
+            ))
+            .about(Kind::File, id));
         }
         let step = Step::new(
             backend.clone(),
@@ -138,15 +140,18 @@ impl FileRepo {
             // same size is not taken over.
             Err(Error::NotFound(_))
                 if self
-                    .verify_bytes(&*backend, &key, &o.envelope.name, &r, true)
+                    .verify_bytes(&*backend, &key, &o, &r, true)
                     .await
                     .is_ok() =>
             {
                 self.save_file(o).await
             }
-            Err(Error::NotFound(_)) => Err(Error::NotFound(format!(
-                "changed outside: the bytes of file {id} are neither in the trash nor at {key:?}, or other bytes are there; run rescan"
-            ))),
+            Err(Error::NotFound(_)) => Err(Error::NotFound(
+                Note::from(format!(
+                    "changed outside: the bytes of file {id} are neither in the trash nor at {key:?}, or other bytes are there; run rescan"
+                ))
+                .about(Kind::File, id),
+            )),
             Err(e) => Err(e),
         }
     }
@@ -157,7 +162,8 @@ impl FileRepo {
         let r = FileRecord::of(&o)?;
         if !r.trashed {
             return Err(Error::Conflict(
-                "only a file in the trash can be purged; trash it first".into(),
+                Note::from("only a file in the trash can be purged; trash it first")
+                    .about(Kind::File, id),
             ));
         }
         // Bytes first: deleting is repeatable, so a failure leaves a file that can be purged again.
@@ -167,7 +173,8 @@ impl FileRepo {
                 return Err(super::verify::changed(&format!(
                     "the trash entry of {:?} is not the recorded file, it is left alone",
                     o.envelope.name
-                )));
+                ))
+                .about(Kind::File, id));
             }
             backend.discard(&Spot::Trash(id.to_string())).await?;
         } else {
@@ -205,7 +212,7 @@ impl FileRepo {
             return Ok(Vec::new());
         }
         let backend = self.backends.get(&r.backend)?;
-        self.verify_bytes(&*backend, &from, &o.envelope.name, r, true)
+        self.verify_bytes(&*backend, &from, &o, r, true)
             .await?;
         Ok(vec![Step::new(
             backend,

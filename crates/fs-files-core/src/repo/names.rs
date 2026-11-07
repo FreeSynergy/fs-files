@@ -12,7 +12,7 @@ pub const MAX_NAME: usize = 255;
 /// On a backend that keeps real names a name is also a file name on the disk, so `.fs-files` (the program's
 /// own folder) is refused. Whether the disk accepts the rest is decided by the disk, and answered clearly.
 pub fn check_name(name: &str) -> Result<()> {
-    let bad = |why: &str| Err(Error::InvalidName(format!("{why}: {name:?}")));
+    let bad = |why: &str| Err(Error::bad_name(name, why));
     if name.trim().is_empty() || name.len() > MAX_NAME {
         return bad("empty or longer than 255 bytes");
     }

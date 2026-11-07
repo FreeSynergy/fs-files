@@ -10,6 +10,7 @@ use super::build::set_folder;
 use super::handle::FileRepo;
 use super::names::check_name;
 use super::steps::Disk;
+use crate::note::{Kind, Note};
 use crate::error::{Error, Result};
 use crate::model::OnConflict;
 use crate::model::{Folder, FolderRecord};
@@ -82,7 +83,10 @@ impl FileRepo {
         let o = self.folder_obj(id).await?;
         if self.count_in(id).await? > 0 {
             return Err(Error::Conflict(
-                "the folder is not empty (files in the trash count; purge them or move them out first)".into(),
+                Note::from(
+                    "the folder is not empty (files in the trash count; purge them or move them out first)",
+                )
+                .about(Kind::Folder, id),
             ));
         }
         let parent = FolderRecord::of(&o)?.parent;

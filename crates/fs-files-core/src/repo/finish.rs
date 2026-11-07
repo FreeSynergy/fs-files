@@ -88,10 +88,13 @@ impl FileRepo {
             let info = backend.commit(&s.key).await?;
             if info.size != received {
                 let _ = backend.delete(&s.key).await;
-                return Err(Error::Backend(format!(
-                    "size check failed: {received} bytes received, {} stored",
-                    info.size
-                )));
+                return Err(Error::Backend(
+                    format!(
+                        "size check failed: {received} bytes received, {} stored",
+                        info.size
+                    )
+                    .into(),
+                ));
             }
             info
         };
@@ -141,10 +144,13 @@ impl FileRepo {
         );
         if info.size != received {
             undo.undo().await;
-            return Err(Error::Backend(format!(
-                "size check failed: {received} bytes received, {} stored",
-                info.size
-            )));
+            return Err(Error::Backend(
+                format!(
+                    "size check failed: {received} bytes received, {} stored",
+                    info.size
+                )
+                .into(),
+            ));
         }
         let db = self.create_from_blob(backend, s, (&name, &key), true, info, upload);
         Self::then_db(&[undo], db).await

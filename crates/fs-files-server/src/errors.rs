@@ -9,8 +9,10 @@
 use std::future::Future;
 
 use fs_files_core::Error;
-use fs_interfaces::rpc::{Problem, failed, run_to_end, unsupported};
+use fs_interfaces::rpc::{Problem, failed, problem_keys, run_to_end, unsupported};
 use fs_store::Error as Store;
+
+use crate::facts::with_facts;
 
 use fs_interfaces::files_capnp::{
     BACKEND_FAILED_PROBLEM_TYPE as BACKEND_FAILED, CONFLICT_PROBLEM_TYPE as CONFLICT,
@@ -19,39 +21,48 @@ use fs_interfaces::files_capnp::{
     WRONG_OFFSET_PROBLEM_TYPE as WRONG_OFFSET,
 };
 
-fn problem(kind: &str, title: &str, detail: String, status: u16) -> capnp::Error {
-    Problem::new(kind, title, detail, status).into_error()
-}
-
 /// A core error as an RPC error.
+#[allow(clippy::needless_pass_by_value)] // used as `map_err(rpc_error)`
 pub(crate) fn rpc_error(e: Error) -> capnp::Error {
+    let make = |kind: &str, title: &str, detail: String, status: u16| {
+        with_facts(Problem::new(kind, title, detail, status), &e).into_error()
+    };
     if let Some(named) = e.problem() {
-        return problem(named.kind, named.title, named.detail, named.status);
+        return make(named.kind, named.title, named.detail, named.status);
     }
     let text = e.to_string();
-    match e {
-        Error::Unsupported(not_possible) => unsupported(&not_possible),
+    match &e {
+        Error::Unsupported(not_possible) => unsupported(not_possible),
         Error::NotFound(_) | Error::Store(Store::NotFound(_)) => {
-            problem(NOT_FOUND, "Not found", text, 404)
+            make(NOT_FOUND, "Not found", text, 404)
         }
-        Error::Offset { .. } => problem(WRONG_OFFSET, "Wrong offset", text, 409),
+        Error::Offset { .. } => make(WRONG_OFFSET, "Wrong offset", text, 409),
         Error::Conflict(_) | Error::Store(Store::Conflict(_) | Store::OriginalImmutable(_)) => {
-            problem(CONFLICT, "Conflict", text, 409)
+            make(CONFLICT, "Conflict", text, 409)
         }
         Error::Config(_) | Error::Store(Store::Invalid(_)) => {
-            problem(INVALID, "Invalid request", text, 422)
+            make(INVALID, "Invalid request", text, 422)
         }
-        Error::Store(Store::EncryptionRequired(_)) => problem(
+        Error::Store(Store::EncryptionRequired(_)) => make(
             ENCRYPTION_REQUIRED,
             "This store does not take sensitive files",
             text,
             409,
         ),
         Error::Json(_) | Error::Store(Store::Serde(_)) => {
-            problem(STORED_DATA, "Stored data cannot be read", text, 500)
+            make(STORED_DATA, "Stored data cannot be read", text, 500)
         }
         Error::Backend(_) | Error::Io(_) => {
-            problem(BACKEND_FAILED, "The backend failed", text, 500)
+            let named_already = e.facts().kind.is_some();
+            let failed = Problem::new(BACKEND_FAILED, "The backend failed", text, 500);
+            let failed = with_facts(failed, &e);
+            // A failure that names no object is the backend's own.
+            let failed = if named_already {
+                failed
+            } else {
+                failed.with_ext(problem_keys::KIND, "backend")
+            };
+            failed.into_error()
         }
         // The name problems were answered above; these are the same, should that ever change.
         Error::InvalidName(_) | Error::InvalidKey(_) | Error::Store(_) => failed(text),

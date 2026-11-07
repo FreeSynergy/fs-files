@@ -5,10 +5,13 @@
 //! that they still are those bytes: size first, then the modification time, and on doubt the
 //! checksum. Anything else is somebody else's file, and nothing is touched ("changed outside").
 
+use fs_store::StoredObject;
+
 use super::handle::FileRepo;
 use crate::backend::{BlobBackend, Spot, hash_chunks};
 use crate::error::{Error, Result};
 use crate::model::FileRecord;
+use crate::note::Kind;
 
 const READ: u32 = 1 << 20;
 /// Files up to this size are always checked by checksum before a destructive step (256 MiB).
@@ -16,7 +19,7 @@ pub(super) const ALWAYS_HASH: u64 = 256 << 20;
 
 /// The error for bytes that are not the recorded ones.
 pub(super) fn changed(why: &str) -> Error {
-    Error::Backend(format!("changed outside: {why}; run rescan"))
+    Error::Backend(format!("changed outside: {why}; run rescan").into())
 }
 
 /// `blake3:<hex>` of `size` bytes at `key`, read in chunks.
@@ -53,6 +56,20 @@ impl FileRepo {
     /// recorded one, read the bytes and compare the checksum (needed before anything is moved or
     /// deleted). Not deep (reading a file): size and modification time only, which is cheap.
     pub(super) async fn verify_bytes(
+        &self,
+        backend: &dyn BlobBackend,
+        key: &str,
+        o: &StoredObject,
+        r: &FileRecord,
+        deep: bool,
+    ) -> Result<()> {
+        let name = o.envelope.name.as_str();
+        self.check_bytes(backend, key, name, r, deep)
+            .await
+            .map_err(|e| e.about(Kind::File, o.envelope.id))
+    }
+
+    async fn check_bytes(
         &self,
         backend: &dyn BlobBackend,
         key: &str,

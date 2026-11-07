@@ -10,6 +10,7 @@ use super::handle::FileRepo;
 use super::names::{copy_name, numbered_name};
 use crate::error::{Error, Result};
 use crate::model::{File, Folder, FolderRecord, OnConflict};
+use crate::note::{Kind, Note};
 
 fn is_kind(o: &StoredObject, kind: &str) -> bool {
     o.index
@@ -22,7 +23,7 @@ impl FileRepo {
     pub(super) async fn file_obj(&self, id: ObjectId) -> Result<StoredObject> {
         match self.objects.get(id).await? {
             Some(o) if is_kind(&o, "file") => Ok(o),
-            _ => Err(Error::NotFound(format!("file {id}"))),
+            _ => Err(Error::missing(Kind::File, id)),
         }
     }
 
@@ -30,7 +31,7 @@ impl FileRepo {
     pub(super) async fn folder_obj(&self, id: ObjectId) -> Result<StoredObject> {
         match self.objects.get(id).await? {
             Some(o) if is_kind(&o, "folder") => Ok(o),
-            _ => Err(Error::NotFound(format!("folder {id}"))),
+            _ => Err(Error::missing(Kind::Folder, id)),
         }
     }
 
@@ -38,7 +39,7 @@ impl FileRepo {
     pub(super) async fn live_file_obj(&self, id: ObjectId) -> Result<StoredObject> {
         let o = self.file_obj(id).await?;
         if crate::model::FileRecord::of(&o)?.trashed {
-            return Err(Error::Conflict(format!("file {id} is in the trash")));
+            return Err(Error::Conflict(Note::from(format!("file {id} is in the trash")).about(Kind::File, id)));
         }
         Ok(o)
     }
@@ -64,9 +65,10 @@ impl FileRepo {
             .with_index("live_place", format!("{}/{name}", folder_key(folder)));
         let taken = self.reads.query(&q).await?;
         if taken.iter().any(|o| Some(o.envelope.id) != except) {
-            return Err(Error::name_taken(format!(
-                "the name {name:?} is taken in this folder"
-            )));
+            return Err(Error::name_taken_as(
+                name,
+                format!("the name {name:?} is taken in this folder"),
+            ));
         }
         Ok(())
     }
@@ -100,7 +102,7 @@ impl FileRepo {
                 return Ok(candidate);
             }
         }
-        Err(Error::name_taken("no free name to keep both"))
+        Err(Error::name_taken_as(name, "no free name to keep both"))
     }
 
     async fn free_on_disks(&self, folder: Option<ObjectId>, name: &str) -> bool {
@@ -138,7 +140,8 @@ impl FileRepo {
         while let Some(f) = at {
             if f == id {
                 return Err(Error::Conflict(
-                    "a folder cannot be moved into itself or below itself".into(),
+                    Note::from("a folder cannot be moved into itself or below itself")
+                        .about(Kind::Folder, id),
                 ));
             }
             at = FolderRecord::of(&self.folder_obj(f).await?)?.parent;

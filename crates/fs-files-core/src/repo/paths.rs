@@ -10,6 +10,7 @@ use super::consts::CONTEXT;
 
 use super::handle::FileRepo;
 use crate::backend::{BlobBackend, Naming};
+use crate::note::Note;
 use crate::error::{Error, Result};
 use crate::model::{FileRecord, FolderRecord};
 
@@ -29,7 +30,7 @@ impl FileRepo {
             names.push(o.envelope.name.clone());
             at = FolderRecord::of(&o)?.parent;
             if names.len() > MAX_DEPTH {
-                return Err(Error::InvalidName("folders are nested too deep".into()));
+                return Err(Error::InvalidName(Note::from("folders are nested too deep").because("nested-too-deep")));
             }
         }
         names.reverse();
@@ -66,9 +67,13 @@ impl FileRepo {
         let base = self.path_in(parent, name).await?;
         let depth = base.split('/').count();
         let too_long = || {
-            Error::InvalidName(format!(
-                "moving {name:?} here would make paths longer than the disk takes ({MAX_PATH} bytes, {MAX_DEPTH} levels)"
-            ))
+            Error::InvalidName(
+                Note::from(format!(
+                    "moving {name:?} here would make paths longer than the disk takes ({MAX_PATH} bytes, {MAX_DEPTH} levels)"
+                ))
+                .named(name)
+                .because("path-too-long"),
+            )
         };
         let mut longest = base.len();
         let mut level = vec![(id, base.len(), depth)];
@@ -132,9 +137,10 @@ impl FileRepo {
         let key = self.path_in(folder, name).await?;
         match backend.stat(&key).await {
             Ok(None) => Ok(()),
-            Ok(Some(_)) | Err(Error::Backend(_)) => Err(Error::name_taken(format!(
-                "{name:?} exists on the disk but is not known here; run rescan to take it over"
-            ))),
+            Ok(Some(_)) | Err(Error::Backend(_)) => Err(Error::name_taken_as(
+                name,
+                format!("{name:?} exists on the disk but is not known here; run rescan to take it over"),
+            )),
             Err(e) => Err(e),
         }
     }
