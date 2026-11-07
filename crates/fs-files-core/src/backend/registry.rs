@@ -64,6 +64,13 @@ impl BackendRegistry {
         snap.entries.iter().filter(by_name).cloned().collect()
     }
 
+    /// The folders of the backends that live on this machine.
+    pub fn local_roots(&self) -> Vec<std::path::PathBuf> {
+        let snap = self.snapshot();
+        let root = |e: &(String, Arc<dyn BlobBackend>)| e.1.local_root().map(Into::into);
+        snap.entries.iter().filter_map(root).collect()
+    }
+
     /// Id and backend that take new files.
     pub fn active(&self) -> (String, Arc<dyn BlobBackend>) {
         let snap = self.snapshot();

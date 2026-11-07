@@ -19,6 +19,13 @@ pub trait BackendFactory: Send + Sync {
     fn kind(&self) -> &'static str;
     /// Build a backend from the configuration object (without `id`, `kind` and `active`).
     async fn build(&self, config: &Value) -> Result<Arc<dyn BlobBackend>>;
+    /// The folder `build` would use, checked, and nothing made. `None`: this kind has no folder of this
+    /// machine, or does not say. `backend.add` refuses a folder that another backend has or lies in.
+    async fn place(&self, _config: &Value) -> Result<Option<std::path::PathBuf>> {
+        Ok(None)
+    }
+    /// Remove what `build` made for `place` (a folder that did not exist before) after a failed add.
+    fn forget(&self, _place: &std::path::Path) {}
 }
 
 /// `{"kind": "local", "path": "/data/files"}`.

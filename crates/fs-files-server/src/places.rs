@@ -2,8 +2,8 @@
 //!
 //! Pattern: Specification — one rule, checked before anything is opened: the folder the files live
 //! in must not hold the data directory. Else `objects.db` (and its journal) would lie among the
-//! files, a rescan would take the database for a file of the person, and `backend.add` below the
-//! root could reach it.
+//! files and a rescan would take the database for a file of the person. (Backends added later live
+//! in `<root>/.fs-files/backends`, which a rescan never lists; see `DESIGN.md`.)
 
 use std::path::{Component, Path, PathBuf};
 

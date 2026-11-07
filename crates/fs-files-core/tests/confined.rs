@@ -14,7 +14,8 @@ fn local(id: &str, path: &str) -> String {
 
 async fn confined(base: &std::path::Path) -> FileRepo {
     let store: Arc<dyn Store> = Arc::new(TursoStore::open_in_memory().await.unwrap());
-    let backend = Arc::new(LocalFolder::open(base).await.unwrap());
+    let main = base.parent().unwrap().join("main");
+    let backend = Arc::new(LocalFolder::open(main).await.unwrap());
     FileRepo::new(store, ME, "main", backend).with_local_base(base)
 }
 
@@ -23,6 +24,7 @@ async fn a_path_below_the_base_is_made_there_and_every_other_is_refused() {
     let e = env().await;
     let (base, outside) = (e.dir.path().join("base"), e.dir.path().join("outside"));
     std::fs::create_dir_all(&outside).unwrap();
+    std::fs::create_dir_all(&base).unwrap();
     let r = confined(&base).await;
     std::os::unix::fs::symlink(&outside, base.join("link")).unwrap();
 
@@ -101,4 +103,77 @@ async fn a_backend_added_below_the_base_is_no_part_of_the_main_one() {
         .await
         .unwrap_err();
     assert!(matches!(err, Error::Config(_)), "{err}");
+}
+
+async fn with_base(root: &std::path::Path) -> (FileRepo, std::path::PathBuf) {
+    let base = root.join(".fs-files/backends");
+    let store: Arc<dyn Store> = Arc::new(TursoStore::open_in_memory().await.unwrap());
+    let main = Arc::new(LocalFolder::open(root).await.unwrap());
+    (
+        FileRepo::new(store, ME, "main", main).with_local_base(&base),
+        base,
+    )
+}
+
+fn cfg(id: &str, path: &str) -> String {
+    serde_json::json!({ "id": id, "kind": "local", "path": path }).to_string()
+}
+
+#[tokio::test]
+async fn two_backends_never_share_a_folder_in_either_order_or_either_direction() {
+    let e = env().await;
+    let (r, base) = with_base(&e.dir.path().join("root")).await;
+    r.add_backend(&cfg("a", "X")).await.unwrap();
+    let same = r.add_backend(&cfg("b", "X")).await.unwrap_err();
+    assert!(matches!(same, Error::Config(_)), "{same}");
+    let inside = r.add_backend(&cfg("b", "X/Y")).await.unwrap_err();
+    assert!(matches!(inside, Error::Config(_)), "{inside}");
+
+    r.add_backend(&cfg("c", "A/B")).await.unwrap();
+    let above = r.add_backend(&cfg("d", "A")).await.unwrap_err();
+    assert!(matches!(above, Error::Config(_)), "{above}");
+    let ids: Vec<_> = r
+        .list_backends()
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|b| b.id)
+        .collect();
+    assert_eq!(ids, ["main", "a", "c"]);
+    assert!(!base.join("X/Y").exists(), "a refused add makes no folder");
+    assert!(base.join("A/B/.fs-files").is_dir() && !base.join("A/.fs-files").exists());
+
+    // A sibling is fine, and so is a folder whose name only starts like another.
+    r.add_backend(&cfg("e", "A/B2")).await.unwrap();
+    r.add_backend(&cfg("f", "XX")).await.unwrap();
+}
+
+#[tokio::test]
+async fn a_removed_backend_frees_its_folder_and_a_restart_may_add_it_again_under_its_id() {
+    let e = env().await;
+    let root = e.dir.path().join("root");
+    let (r, _) = with_base(&root).await;
+    r.add_backend(&cfg("a", "X")).await.unwrap();
+    r.add_backend(
+        &serde_json::json!({"id":"n","kind":"local","path":"N","active":true}).to_string(),
+    )
+    .await
+    .unwrap();
+    r.remove_backend("a").await.unwrap();
+    r.add_backend(&cfg("a2", "X")).await.unwrap();
+    let (again, _) = with_base(&root).await;
+    again.add_backend(&cfg("a", "X")).await.unwrap();
+}
+
+#[tokio::test]
+async fn a_failed_add_leaves_no_folder_behind() {
+    let e = env().await;
+    let (r, base) = with_base(&e.dir.path().join("root")).await;
+    r.add_backend(&cfg("a", "X")).await.unwrap();
+    let dup = r.add_backend(&cfg("a", "Y/Z")).await.unwrap_err();
+    assert!(
+        matches!(dup, Error::Conflict(_) | Error::Config(_)),
+        "{dup}"
+    );
+    assert!(!base.join("Y").exists(), "a taken id makes no folder");
 }

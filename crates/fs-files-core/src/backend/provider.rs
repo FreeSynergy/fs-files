@@ -63,6 +63,11 @@ pub trait BlobBackend: Send + Sync {
 
     // ---- Backends that keep real names (`Naming::ByName`). Defaults answer `Unsupported`. ----
 
+    /// The folder this backend keeps its bytes in, if it is a folder of this machine. `backend.add` uses
+    /// it to keep two backends from sharing a folder.
+    fn local_root(&self) -> Option<&std::path::Path> {
+        None
+    }
     /// How this backend names what it stores. Decides whether the repository keeps the disk in step
     /// with folders and names (`ByName`) or only the database (`ById`).
     fn naming(&self) -> Naming {

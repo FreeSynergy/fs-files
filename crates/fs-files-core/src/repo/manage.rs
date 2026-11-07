@@ -8,7 +8,7 @@ use fs_store::Query;
 
 use super::consts::CONTEXT;
 use super::handle::FileRepo;
-use crate::backend::{BackendConfig, check_backend};
+use crate::backend::{BackendConfig, check_backend, overlapping};
 use crate::error::{Error, Result};
 use crate::model::BackendInfo;
 
@@ -20,11 +20,38 @@ impl FileRepo {
             .iter()
             .find(|f| f.kind() == cfg.kind)
             .ok_or_else(|| Error::Config(format!("unknown backend kind {:?}", cfg.kind)))?;
+        let _w = self.lock.lock().await;
+        // Everything that can be refused is checked before anything is made.
+        if self.backends.get(&cfg.id).is_ok() {
+            return Err(Error::Conflict(format!("a backend {} exists", cfg.id)));
+        }
+        let place = factory.place(&cfg.raw).await?;
+        let roots = self.backends.local_roots();
+        if place
+            .as_ref()
+            .is_some_and(|at| overlapping(at, &roots).is_some())
+        {
+            return Err(Error::Config(
+                "the folder of a local backend is, holds, or lies in the folder of another backend"
+                    .into(),
+            ));
+        }
+        let new = place.as_ref().filter(|at| !at.exists());
+        let forget = |factory: &dyn crate::BackendFactory| {
+            if let Some(at) = new {
+                factory.forget(at);
+            }
+        };
         let backend = factory.build(&cfg.raw).await?;
-        check_backend(&*backend)
-            .await
-            .map_err(|e| Error::Config(format!("the backend failed its check: {e}")))?;
-        self.backends.add(&cfg.id, backend, cfg.active)
+        if let Err(e) = check_backend(&*backend).await {
+            forget(&**factory);
+            return Err(Error::Config(format!("the backend failed its check: {e}")));
+        }
+        let added = self.backends.add(&cfg.id, backend, cfg.active);
+        if added.is_err() {
+            forget(&**factory);
+        }
+        added
     }
 
     pub(super) async fn do_remove_backend(&self, id: &str) -> Result<()> {

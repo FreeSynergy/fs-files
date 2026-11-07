@@ -67,13 +67,9 @@ impl ConfinedLocalFactory {
     }
 }
 
-#[async_trait]
-impl BackendFactory for ConfinedLocalFactory {
-    fn kind(&self) -> &'static str {
-        "local"
-    }
-
-    async fn build(&self, config: &Value) -> Result<Arc<dyn BlobBackend>> {
+impl ConfinedLocalFactory {
+    /// The canonical base (made if it is not there: it is the program's own folder) and the place.
+    async fn resolve(&self, config: &Value) -> Result<(PathBuf, PathBuf)> {
         let path = config
             .get("path")
             .and_then(Value::as_str)
@@ -81,10 +77,39 @@ impl BackendFactory for ConfinedLocalFactory {
         tokio::fs::create_dir_all(&self.base).await?;
         let base = tokio::fs::canonicalize(&self.base).await?;
         let at = Self::place(&base, path)?;
+        Ok((base, at))
+    }
+}
+
+#[async_trait]
+impl BackendFactory for ConfinedLocalFactory {
+    fn kind(&self) -> &'static str {
+        "local"
+    }
+
+    async fn place(&self, config: &Value) -> Result<Option<PathBuf>> {
+        Ok(Some(self.resolve(config).await?.1))
+    }
+
+    fn forget(&self, place: &Path) {
+        let _ = std::fs::remove_dir_all(place);
+        // The parents made on the way, as far as they are empty; the base itself stays.
+        let mut parent = place.parent();
+        while let Some(dir) = parent.filter(|d| d.starts_with(&self.base) && *d != self.base) {
+            if std::fs::remove_dir(dir).is_err() {
+                break;
+            }
+            parent = dir.parent();
+        }
+    }
+
+    async fn build(&self, config: &Value) -> Result<Arc<dyn BlobBackend>> {
+        let (base, at) = self.resolve(config).await?;
         // `open` makes the folders it needs before the check below: a refusal found only there may
         // leave empty folders behind (a link swapped in between the check above and this open);
         // it never mounts the backend. The base must be a folder only this program writes to.
         let backend = LocalFolder::open(&at).await?;
+        // Belt and braces: a link made between the check and the open must not carry it out.
         if !backend.root().starts_with(&base) || backend.root() == base {
             return Err(Error::Config(
                 "the path of a local backend must stay below the base".into(),
@@ -92,4 +117,14 @@ impl BackendFactory for ConfinedLocalFactory {
         }
         Ok(Arc::new(backend))
     }
+}
+
+/// The mounted backend whose folder `place` is, holds, or lies in. A place inside the program's own
+/// folder of a backend (`.fs-files`) is no part of that backend.
+pub(crate) fn overlapping<'a>(place: &Path, mounted: &'a [PathBuf]) -> Option<&'a PathBuf> {
+    mounted.iter().find(|m| {
+        let below = place.strip_prefix(m).ok();
+        let inside = below.is_some_and(|rest| !rest.starts_with(RESERVED_NAME));
+        inside || m.starts_with(place)
+    })
 }

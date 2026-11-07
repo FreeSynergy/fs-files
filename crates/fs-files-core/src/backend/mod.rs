@@ -16,6 +16,7 @@ mod registry;
 mod s3;
 
 pub use confined::ConfinedLocalFactory;
+pub(crate) use confined::overlapping;
 pub(crate) use digest::hash_chunks;
 pub use digest::{CHUNK, format_checksum};
 pub use factory::{BackendConfig, BackendFactory, LocalFactory, check_backend};

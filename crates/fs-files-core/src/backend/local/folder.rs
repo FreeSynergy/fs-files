@@ -72,6 +72,10 @@ impl BlobBackend for LocalFolder {
         c
     }
 
+    fn local_root(&self) -> Option<&Path> {
+        Some(&self.root)
+    }
+
     fn kind(&self) -> &'static str {
         "local"
     }
