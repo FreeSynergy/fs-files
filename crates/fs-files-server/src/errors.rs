@@ -67,3 +67,68 @@ pub(crate) async fn finish<T: 'static>(
 ) -> capnp::Result<T> {
     run_to_end(work).await?.map_err(rpc_error)
 }
+
+#[cfg(test)]
+mod tests {
+    use fs_interfaces::UNSUPPORTED_PROBLEM_TYPE;
+    use fs_interfaces::Unsupported;
+    use fs_interfaces::files_capnp::{
+        CHANGED_OUTSIDE_PROBLEM_TYPE, INVALID_NAME_PROBLEM_TYPE, NAME_CONFLICT_PROBLEM_TYPE,
+    };
+    use fs_store::ObjectId;
+
+    use super::*;
+
+    fn seen(e: Error) -> (String, u16) {
+        let p = Problem::from_error(&rpc_error(e)).expect("a typed problem");
+        (p.problem_type, p.status)
+    }
+
+    fn is(kind: &str, status: u16) -> (String, u16) {
+        (kind.to_string(), status)
+    }
+
+    #[test]
+    fn every_error_of_the_core_keeps_its_type() {
+        let id = ObjectId::new();
+        let serde = serde_json::from_str::<u8>("x").unwrap_err();
+        let io = std::io::Error::other("disk");
+        assert_eq!(
+            seen(Error::Conflict("name taken: x".into())),
+            is(NAME_CONFLICT_PROBLEM_TYPE, 409)
+        );
+        assert_eq!(
+            seen(Error::InvalidName("x".into())),
+            is(INVALID_NAME_PROBLEM_TYPE, 422)
+        );
+        assert_eq!(
+            seen(Error::InvalidKey("x".into())),
+            is(INVALID_NAME_PROBLEM_TYPE, 422)
+        );
+        let outside = Error::NotFound("changed outside: x".into());
+        assert_eq!(seen(outside), is(CHANGED_OUTSIDE_PROBLEM_TYPE, 409));
+        assert_eq!(seen(Error::NotFound("x".into())), is(NOT_FOUND, 404));
+        assert_eq!(seen(Store::NotFound(id).into()), is(NOT_FOUND, 404));
+        assert_eq!(seen(Error::Conflict("x".into())), is(CONFLICT, 409));
+        assert_eq!(seen(Store::Conflict("x".into()).into()), is(CONFLICT, 409));
+        assert_eq!(seen(Store::OriginalImmutable(id).into()), is(CONFLICT, 409));
+        assert_eq!(
+            seen(Error::Offset {
+                expected: 1,
+                got: 2
+            }),
+            is(WRONG_OFFSET, 409)
+        );
+        assert_eq!(seen(Error::Config("x".into())), is(INVALID, 422));
+        assert_eq!(seen(Store::Invalid("x".into()).into()), is(INVALID, 422));
+        assert_eq!(
+            seen(Store::EncryptionRequired(id).into()),
+            is(ENCRYPTION_REQUIRED, 409)
+        );
+        assert_eq!(seen(Error::Json(serde)), is(STORED_DATA, 500));
+        assert_eq!(seen(Error::Backend("x".into())), is(BACKEND_FAILED, 500));
+        assert_eq!(seen(Error::Io(io)), is(BACKEND_FAILED, 500));
+        let no = Unsupported::new("file.versions", "not built");
+        assert_eq!(seen(no.into()), is(UNSUPPORTED_PROBLEM_TYPE, 501));
+    }
+}
