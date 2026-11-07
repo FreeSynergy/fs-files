@@ -10,9 +10,9 @@ use super::consts::CONTEXT;
 
 use super::handle::FileRepo;
 use crate::backend::{BlobBackend, Naming};
-use crate::note::Note;
 use crate::error::{Error, Result};
 use crate::model::{FileRecord, FolderRecord};
+use crate::note::Note;
 
 /// Folders nested deeper than this are refused (also stops a damaged parent loop).
 const MAX_DEPTH: usize = 512;
@@ -30,7 +30,9 @@ impl FileRepo {
             names.push(o.envelope.name.clone());
             at = FolderRecord::of(&o)?.parent;
             if names.len() > MAX_DEPTH {
-                return Err(Error::InvalidName(Note::from("folders are nested too deep").because("nested-too-deep")));
+                return Err(Error::InvalidName(
+                    Note::from("folders are nested too deep").because("nested-too-deep"),
+                ));
             }
         }
         names.reverse();
@@ -139,7 +141,9 @@ impl FileRepo {
             Ok(None) => Ok(()),
             Ok(Some(_)) | Err(Error::Backend(_)) => Err(Error::name_taken_as(
                 name,
-                format!("{name:?} exists on the disk but is not known here; run rescan to take it over"),
+                format!(
+                    "{name:?} exists on the disk but is not known here; run rescan to take it over"
+                ),
             )),
             Err(e) => Err(e),
         }

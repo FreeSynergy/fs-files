@@ -53,6 +53,22 @@ impl ObjectQuery for Counting {
     }
 }
 
+/// Follow `pendingUploads` to the end; how many uploads came.
+async fn pending_all(c: &common::Caps) -> usize {
+    let (mut seen, mut cursor) = (0, vec![]);
+    loop {
+        let mut call = c.transfer.pending_uploads_request();
+        call.get().init_cursor().set_opaque(&cursor);
+        let answer = call.send().promise.await.unwrap();
+        let r = answer.get().unwrap();
+        seen += r.get_items().unwrap().len() as usize;
+        cursor = r.get_next().unwrap().get_opaque().unwrap().to_vec();
+        if cursor.is_empty() {
+            return seen;
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
 enum Read {
     List,
@@ -75,8 +91,14 @@ async fn rows_for(n: usize, how: Read) -> (usize, usize) {
     });
     let backend = Arc::new(LocalFolder::open(dir.path().join("files")).await.unwrap());
     let repo = Arc::new(
-        FileRepo::with_backend(counting.clone(), counting.clone(), common::ME, "main", backend)
-            .with_page_size(8),
+        FileRepo::with_backend(
+            counting.clone(),
+            counting.clone(),
+            common::ME,
+            "main",
+            backend,
+        )
+        .with_page_size(8),
     );
     for i in 0..n {
         let name = name_of(i, n);
@@ -94,7 +116,7 @@ async fn rows_for(n: usize, how: Read) -> (usize, usize) {
         slot.set(match how {
             Read::List => list_all(&c, None).await.len(),
             Read::Find => find(&c, |_| {}, None).await.unwrap().len(),
-            Read::Uploads => common::pending_all(&c).await,
+            Read::Uploads => pending_all(&c).await,
         });
     })
     .await;
@@ -122,6 +144,9 @@ async fn reading_all_pages_costs_rows_in_proportion_to_the_data() {
             "{name}: {small} rows for {small_n}, {large} rows for {large_n}, ratio {ratio:.2}"
         );
         // Linear is about 2, a whole list read for every page is about 4.
-        assert!(ratio < 3.0, "{name}: {small} -> {large} rows, ratio {ratio:.2}");
+        assert!(
+            ratio < 3.0,
+            "{name}: {small} -> {large} rows, ratio {ratio:.2}"
+        );
     }
 }

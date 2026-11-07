@@ -725,7 +725,7 @@ dependencies = [
 
 [[package]]
 name = "fs-files-core"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "async-trait",
  "blake3",
@@ -745,7 +745,7 @@ dependencies = [
 
 [[package]]
 name = "fs-files-server"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "async-trait",
  "blake3",

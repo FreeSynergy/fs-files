@@ -20,6 +20,7 @@
 mod backend;
 mod backends;
 mod error;
+mod facts;
 mod feed;
 mod files;
 mod model;
@@ -38,7 +39,8 @@ pub use backend::{
     S3Factory, S3Options,
 };
 pub use backends::Backends;
-pub use error::{Error, Facts, Problem, Result};
+pub use error::{Error, Problem, Result};
+pub use facts::Facts;
 pub use feed::{FileChange, FileFeed, FileListener, Registry, Subscription};
 pub use files::Files;
 pub use model::{

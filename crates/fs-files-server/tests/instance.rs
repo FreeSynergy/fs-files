@@ -33,7 +33,9 @@ async fn the_report_carries_the_id_of_the_store_and_the_log_does_not() {
             let repo = repo_over(store.clone(), dir.path()).await;
             with_repo(repo, |root| async move {
                 let c = common::caps(&root).await;
-                let told = instance_of(&root).await.expect("the report names an instance");
+                let told = instance_of(&root)
+                    .await
+                    .expect("the report names an instance");
                 assert_eq!(told, store.identity().as_uuid());
                 assert_eq!(instance_of(&root).await, Some(told));
                 text_file(&c, None, "a.txt", "x").await;

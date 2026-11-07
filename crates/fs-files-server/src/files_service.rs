@@ -64,7 +64,10 @@ impl files::Server for FilesServer {
         let mut out = results.get().init_report();
         report.write(CONTRACT_VERSION, out.reborrow());
         // The store's id, as the store says it: empty where the provider has no store.
-        write_uuid(out.init_instance(), self.files.identity().map(|id| id.as_uuid()));
+        write_uuid(
+            out.init_instance(),
+            self.files.identity().map(|id| id.as_uuid()),
+        );
         Ok(())
     }
 

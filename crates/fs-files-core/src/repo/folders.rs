@@ -10,10 +10,10 @@ use super::build::set_folder;
 use super::handle::FileRepo;
 use super::names::check_name;
 use super::steps::Disk;
-use crate::note::{Kind, Note};
 use crate::error::{Error, Result};
 use crate::model::OnConflict;
 use crate::model::{Folder, FolderRecord};
+use crate::note::{Kind, Note};
 
 impl FileRepo {
     pub(super) async fn do_create_folder(

@@ -39,7 +39,9 @@ impl FileRepo {
     pub(super) async fn live_file_obj(&self, id: ObjectId) -> Result<StoredObject> {
         let o = self.file_obj(id).await?;
         if crate::model::FileRecord::of(&o)?.trashed {
-            return Err(Error::Conflict(Note::from(format!("file {id} is in the trash")).about(Kind::File, id)));
+            return Err(Error::Conflict(
+                Note::from(format!("file {id} is in the trash")).about(Kind::File, id),
+            ));
         }
         Ok(o)
     }

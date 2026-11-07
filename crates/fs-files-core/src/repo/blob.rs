@@ -64,8 +64,7 @@ impl FileRepo {
         if r.named {
             // The folder can be changed from outside: never hand out bytes that are not the recorded ones.
             // Cheap check only (size, modification time); `rescan` brings the record up to date.
-            self.verify_bytes(&*backend, &key, &o, &r, false)
-                .await?;
+            self.verify_bytes(&*backend, &key, &o, &r, false).await?;
         }
         Ok(Arc::new(FileBlob {
             id,

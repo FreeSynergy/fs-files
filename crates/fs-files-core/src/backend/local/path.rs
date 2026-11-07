@@ -22,7 +22,11 @@ const TRASH: &str = "trash";
 
 /// The segments of a key made of real names, or why it is refused.
 pub(super) fn check_path(key: &str) -> Result<Vec<&str>> {
-    let bad = |why: &str| Err(Error::InvalidKey(Note::from(format!("{why}: {key:?}")).because(why)));
+    let bad = |why: &str| {
+        Err(Error::InvalidKey(
+            Note::from(format!("{why}: {key:?}")).because(why),
+        ))
+    };
     if key.is_empty() || key.len() > MAX_PATH {
         return bad("empty or too long");
     }
@@ -99,7 +103,9 @@ pub(super) fn trash_path(root: &Path, id: &str) -> Result<PathBuf> {
             .bytes()
             .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_');
     if !ok {
-        return Err(Error::InvalidKey(format!("trash id not allowed: {id:?}").into()));
+        return Err(Error::InvalidKey(
+            format!("trash id not allowed: {id:?}").into(),
+        ));
     }
     let path = reserved_dir(root, Reserved::Trash).join(id);
     refuse_symlinks(root, &path)?;

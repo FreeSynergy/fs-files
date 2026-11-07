@@ -6,26 +6,22 @@
 //! `Search` in `files.capnp`; bytes are in [`Transfer`](crate::Transfer).
 
 use async_trait::async_trait;
-use fs_interfaces::{Capabilities, Unsupported};
+use fs_interfaces::Capabilities;
 use fs_store::{ObjectId, StoreId};
 
-use crate::error::Result;
+use crate::error::{Result, no};
 use crate::model::{
     Cursor, File, FileFilter, Folder, OnConflict, Page, RescanReport, Sort, TrashReport,
 };
 
 const NO_RULE: &str = "this provider only knows the refuse rule";
 
-fn no<T>(capability: &str, why: &str) -> Result<T> {
-    Err(Unsupported::new(capability, why).into())
-}
-
 /// Files and folders.
 ///
 /// Interface status: draft (ADR 0045).
 #[async_trait]
 pub trait Files: Send + Sync {
-    /// What this provider can do, per capability id (also for [`Transfer`](crate::Transfer) and [`Backends`](crate::Backends)).
+    /// What this provider can do, per capability id (also for `Transfer` and `Backends`).
     fn capabilities(&self) -> Capabilities;
     /// The identity of the store behind this provider, if it has one (never in the log); `None` for a fake.
     fn identity(&self) -> Option<StoreId> {
@@ -64,7 +60,7 @@ pub trait Files: Send + Sync {
     async fn move_folder(&self, _id: ObjectId, _parent: Option<ObjectId>) -> Result<Folder> {
         no("folder.move", "this provider cannot move folders")
     }
-    /// `folder.rename` with a rule for a taken name (`onConflict` in the contract). The default refuses.
+    /// `folder.rename` with a rule for a taken name. The default refuses.
     async fn rename_folder_as(&self, id: ObjectId, name: &str, on: OnConflict) -> Result<Folder> {
         match on {
             OnConflict::Refuse => self.rename_folder(id, name).await,

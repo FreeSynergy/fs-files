@@ -20,11 +20,13 @@ impl FileRepo {
             .factories
             .iter()
             .find(|f| f.kind() == cfg.kind)
-            .ok_or_else(|| Error::Config(
-                Note::from(format!("unknown backend kind {:?}", cfg.kind))
-                    .about(Kind::Backend, &cfg.id)
-                    .because("kind"),
-            ))?;
+            .ok_or_else(|| {
+                Error::Config(
+                    Note::from(format!("unknown backend kind {:?}", cfg.kind))
+                        .about(Kind::Backend, &cfg.id)
+                        .because("kind"),
+                )
+            })?;
         let _w = self.lock.lock().await;
         // Everything that can be refused is checked before anything is made.
         if self.backends.get(&cfg.id).is_ok() {

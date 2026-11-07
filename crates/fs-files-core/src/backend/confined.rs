@@ -33,7 +33,9 @@ impl ConfinedLocalFactory {
 
     /// The place `path` names below the base, if it is one. Nothing is created here.
     fn place(base: &Path, path: &str) -> Result<PathBuf> {
-        let refused = |why: &str| Error::Config(Note::from(format!("the path of a local backend {why}")).because("path"));
+        let refused = |why: &str| {
+            Error::Config(Note::from(format!("the path of a local backend {why}")).because("path"))
+        };
         let relative = Path::new(path);
         let mut parts = Vec::new();
         for c in relative.components() {

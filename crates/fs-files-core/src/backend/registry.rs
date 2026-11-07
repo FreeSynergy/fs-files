@@ -7,8 +7,8 @@ use std::sync::{Arc, RwLock};
 
 use super::BlobBackend;
 use crate::error::{Error, Result};
-use crate::note::{Kind, Note};
 use crate::model::BackendInfo;
+use crate::note::{Kind, Note};
 
 /// An immutable set of backends. `active` takes new files.
 #[derive(Clone)]
@@ -99,7 +99,9 @@ impl BackendRegistry {
     ) -> Result<BackendInfo> {
         let mut next = (*self.snapshot()).clone();
         if next.entries.iter().any(|(i, _)| i == id) {
-            return Err(Error::Conflict(Note::from(format!("a backend {id} exists")).about(Kind::Backend, id)));
+            return Err(Error::Conflict(
+                Note::from(format!("a backend {id} exists")).about(Kind::Backend, id),
+            ));
         }
         let kind = backend.kind().to_string();
         next.entries.push((id.to_string(), backend));
@@ -125,8 +127,10 @@ impl BackendRegistry {
             .ok_or_else(|| Error::missing(Kind::Backend, id))?;
         if at == next.active {
             return Err(Error::Conflict(
-                Note::from(format!("backend {id} is the active one; activate another first"))
-                    .about(Kind::Backend, id),
+                Note::from(format!(
+                    "backend {id} is the active one; activate another first"
+                ))
+                .about(Kind::Backend, id),
             ));
         }
         next.entries.remove(at);

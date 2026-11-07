@@ -130,7 +130,7 @@ impl FileRepo {
         let restored = matches!(back.apply().await, Ok(true));
         let ours = restored
             && self
-                .verify_bytes(&*walk.backend, at, &o, &r, true)
+                .verify_bytes(&*walk.backend, at, o, &r, true)
                 .await
                 .is_ok();
         if restored && !ours {

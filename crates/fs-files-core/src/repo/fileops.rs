@@ -13,9 +13,9 @@ use super::names::check_name;
 use super::steps::{Disk, Step};
 use super::verify::InTrash;
 use crate::backend::Spot;
-use crate::note::{Kind, Note};
 use crate::error::{Error, Result};
 use crate::model::{File, FileRecord, OnConflict, TrashReport};
+use crate::note::{Kind, Note};
 use fs_store::{Query, StoredObject};
 
 use super::consts::CONTEXT;
@@ -82,8 +82,7 @@ impl FileRepo {
             if backend.stat(&key).await.is_ok_and(|i| i.is_none()) {
                 // nothing to move
             } else {
-                self.verify_bytes(&*backend, &key, &o, &r, true)
-                    .await?;
+                self.verify_bytes(&*backend, &key, &o, &r, true).await?;
                 let (from, to) = (Spot::Path(key), Spot::Trash(id.to_string()));
                 steps.push(Step::new(backend, Disk::Move(from, to), false));
             }
@@ -103,7 +102,9 @@ impl FileRepo {
         let mut o = self.file_obj(id).await?;
         let mut r = FileRecord::of(&o)?;
         if !r.trashed {
-            return Err(Error::Conflict(Note::from(format!("file {id} is not in the trash")).about(Kind::File, id)));
+            return Err(Error::Conflict(
+                Note::from(format!("file {id} is not in the trash")).about(Kind::File, id),
+            ));
         }
         if let Target::Folder(f) = target {
             r.folder = f;
@@ -212,8 +213,7 @@ impl FileRepo {
             return Ok(Vec::new());
         }
         let backend = self.backends.get(&r.backend)?;
-        self.verify_bytes(&*backend, &from, &o, r, true)
-            .await?;
+        self.verify_bytes(&*backend, &from, o, r, true).await?;
         Ok(vec![Step::new(
             backend,
             Disk::Move(Spot::Path(from), Spot::Path(to)),

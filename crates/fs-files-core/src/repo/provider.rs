@@ -15,8 +15,8 @@ use crate::backends::Backends;
 use crate::error::Result;
 use crate::files::Files;
 use crate::model::{
-    BackendInfo, Cursor, File, FileFilter, Folder, OnConflict, Page, RescanReport, Sort, UploadPage,
-    TrashReport, UploadInfo,
+    BackendInfo, Cursor, File, FileFilter, Folder, OnConflict, Page, RescanReport, Sort,
+    TrashReport, UploadInfo, UploadPage,
 };
 use crate::transfer::{Blob, Transfer, Upload};
 
@@ -225,7 +225,11 @@ impl Transfer for FileRepo {
     async fn pending_uploads(&self) -> Result<Vec<UploadInfo>> {
         self.do_pending_uploads().await
     }
-    async fn pending_uploads_page(&self, cursor: Option<Cursor>, size: usize) -> Result<UploadPage> {
+    async fn pending_uploads_page(
+        &self,
+        cursor: Option<Cursor>,
+        size: usize,
+    ) -> Result<UploadPage> {
         self.do_pending_page(cursor, size).await
     }
     async fn resume_upload(&self, id: &str) -> Result<Arc<dyn Upload>> {

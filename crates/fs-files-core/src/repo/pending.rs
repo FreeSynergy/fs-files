@@ -17,7 +17,7 @@ use crate::model::{Cursor, UploadInfo, UploadPage};
 const SWEEP_BATCH: usize = 100;
 
 impl FileRepo {
-    fn sessions(&self) -> Query {
+    fn sessions() -> Query {
         Query::new()
             .in_context(super::consts::CONTEXT)
             .with_index("kind", "upload")
@@ -50,7 +50,7 @@ impl FileRepo {
         let mut at = cursor.map_or(0, Cursor::position);
         let mut items = Vec::new();
         while items.len() < size {
-            let mut q = self.sessions().limit(size - items.len());
+            let mut q = Self::sessions().limit(size - items.len());
             q.offset = at;
             let rows = self.reads.query(&q).await?;
             if rows.is_empty() {
@@ -76,7 +76,7 @@ impl FileRepo {
                 });
             }
         }
-        let mut more = self.sessions().limit(1);
+        let mut more = Self::sessions().limit(1);
         more.offset = at;
         let next = (!self.reads.query(&more).await?.is_empty()).then(|| Cursor::at(at));
         Ok(UploadPage { items, next })
@@ -86,7 +86,7 @@ impl FileRepo {
     async fn drop_stale_sessions(&self) -> Result<()> {
         let (mut stale, mut at) = (Vec::<ObjectId>::new(), 0);
         loop {
-            let mut q = self.sessions().limit(SWEEP_BATCH);
+            let mut q = Self::sessions().limit(SWEEP_BATCH);
             q.offset = at;
             let rows = self.reads.query(&q).await?;
             at += rows.len();

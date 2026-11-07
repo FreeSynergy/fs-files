@@ -4,10 +4,15 @@
 //! `From` conversions for the store, IO and JSON layers. The facts a consumer needs (which object,
 //! which name, which reasons) are in the [`Note`] of a variant and come out through [`Error::facts`].
 
-use crate::note::{Kind, Note, Subject};
+use crate::note::{Kind, Note};
 
 /// Result of every fallible operation of this crate.
 pub type Result<T> = std::result::Result<T, Error>;
+
+/// The explicit "not possible" of a provider that does not offer `capability` (ADR 0045).
+pub(crate) fn no<T>(capability: &str, why: &str) -> Result<T> {
+    Err(fs_interfaces::Unsupported::new(capability, why).into())
+}
 
 /// Everything that can go wrong in the files core.
 #[derive(Debug, thiserror::Error)]
@@ -57,32 +62,6 @@ const NAME_TAKEN: &str = "name taken: ";
 /// Prefix of the message of an error that is about changes made outside the program.
 const CHANGED_OUTSIDE: &str = "changed outside: ";
 
-/// The typed facts of an error ([`Error::facts`]). The server states them as problem extensions.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct Facts {
-    /// The id of the object the error is about.
-    pub id: Option<String>,
-    /// What that object is.
-    pub kind: Option<Kind>,
-    /// The name that is taken or not acceptable.
-    pub name: Option<String>,
-    /// Why a value was refused, one entry per reason.
-    pub issues: Vec<String>,
-    /// For a wrong offset: the bytes the backend holds and the offset the caller asked for.
-    pub offsets: Option<(u64, u64)>,
-}
-
-impl Facts {
-    fn take(&mut self, n: &Note) {
-        if let Some(Subject { kind, id }) = &n.subject {
-            self.id = Some(id.clone());
-            self.kind = Some(*kind);
-        }
-        self.name.clone_from(&n.name);
-        self.issues.clone_from(&n.issues);
-    }
-}
-
 /// An error in the RFC 9457 shape of the contract (`Problem` in `common.capnp`).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Problem {
@@ -115,7 +94,11 @@ impl Error {
 
     /// A name that is not acceptable, and why.
     pub(crate) fn bad_name(name: &str, why: &str) -> Self {
-        Self::InvalidName(Note::from(format!("{why}: {name:?}")).named(name).because(why))
+        Self::InvalidName(
+            Note::from(format!("{why}: {name:?}"))
+                .named(name)
+                .because(why),
+        )
     }
 
     /// This error about `kind` `id`, if it has no subject yet and is one that can name one.
@@ -130,36 +113,6 @@ impl Error {
             *n = std::mem::take(n).about(kind, id);
         }
         self
-    }
-
-    /// The facts of this error, typed: what a consumer used to cut out of the message.
-    pub fn facts(&self) -> Facts {
-        let mut facts = Facts::default();
-        match self {
-            Self::NotFound(n)
-            | Self::Conflict(n)
-            | Self::InvalidName(n)
-            | Self::InvalidKey(n)
-            | Self::Backend(n) => facts.take(n),
-            // The reason of a refused configuration is its text.
-            Self::Config(n) => {
-                facts.take(n);
-                if facts.issues.is_empty() {
-                    facts.issues.push(n.text.clone());
-                }
-            }
-            Self::Offset { expected, got } => facts.offsets = Some((*expected, *got)),
-            Self::Store(
-                fs_store::Error::NotFound(id) | fs_store::Error::EncryptionRequired(id),
-            ) => facts.id = Some(id.to_string()),
-            Self::Store(fs_store::Error::Invalid(why)) => facts.issues.push(why.clone()),
-            Self::Json(e) | Self::Store(fs_store::Error::Serde(e)) => {
-                facts.issues.push(e.to_string());
-            }
-            Self::Io(e) if e.raw_os_error() == Some(36) => facts.issues.push("too-long".into()),
-            _ => {}
-        }
-        facts
     }
 
     /// The named problem of the contract this error maps to, if it has one: name clash, invalid

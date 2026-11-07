@@ -3,11 +3,11 @@
 `fs-files` is the files program of FreeSynergy. This repo holds the **program core** (`crates/fs-files-core`, no GUI) and the **server** (`crates/fs-files-server`, the contract over a Unix socket).
 **Metadata** (name, media type, size, checksum, folder, trash flag) is an object in `fs-store`; the **bytes** are in a
 backend behind `BlobBackend`. Other programs refer to a file by its object id and read through the `Blob` trait; they never
-see a path or a backend. Contract: `files.capnp` in `fs-interfaces` v0.35.0 (draft, consumers: 0 of 2).
+see a path or a backend. Contract: `files.capnp` in `fs-interfaces` v0.44.0 (draft, consumers: 0 of 2).
 
 ## State
 
-Version 0.4.0, not tagged (stage 1: local folder, stage 2: S3, stage 3: real names, stage 4: the server). Built on fs-store 0.2.0 and fs-interfaces 0.35.0 (git tags). Interface status: draft, provisional, consumers 0 of 2.
+Version 0.5.0, not tagged (stage 1: local folder, stage 2: S3, stage 3: real names, stage 4: the server, 0.5.0: store identity, typed problem extensions, uploads paged in the store). Built on fs-store 0.4.0 and fs-interfaces 0.44.0 (git tags). Interface status: draft, provisional, consumers 0 of 2.
 
 | Area | State |
 |---|---|
@@ -27,6 +27,9 @@ Version 0.4.0, not tagged (stage 1: local folder, stage 2: S3, stage 3: real nam
 | `empty_trash` (purges all, reports `failed`), `restore_to(id, folder, on)` (another folder; unset = top level), `restore_as(id, on)` (keep both instead of failing on a taken name) | done |
 | `get_folder` (`folder.resolve`, `Folders.getFolder @16`): resolve a folder by id | done |
 | `pending_uploads` (`Transfer.pendingUploads @3`, `UploadInfo`): unfinished uploads oldest first, with `received`; survives a restart | done |
+| `SupportReport.instance` = `Files::identity()` = the id of the store (`StoreInfo`, set by `FileRepo::new`, `with_info` for the narrow constructor); empty for a provider without a store; never in the log | done, tested over the socket (same as `store.identity()`, same after a restart, other for a new store, empty for a stub) |
+| Typed problem extensions (`id`, `kind`, `issue`, `name`, `expected`, `got`; table below): the core error carries a `Note` (text + facts), `Error::facts()` gives them, the server states them next to the unchanged detail | done, one socket test per problem type that can be provoked |
+| Pages: `Folders.list`, `Files.list`/`query`, `Search.find` cut in the store (`limit` + offset, rows read stay linear); `pendingUploads` cut in the store since 0.5.0 (`Transfer::pending_uploads_page`); `BlobBackend.scan` still cuts the listing of the backend (see open points) | done, measured (`tests/counting.rs`) |
 | `Error::problem()`: name clash, invalid name, changed outside map to the named problem types of the contract | done |
 | `BackendRegistry`: add (built, probed, then swapped atomically), remove (refused while files / uploads are on it, and for the active one), a file records its backend | done |
 | Sensitive categories (`classify`) go to the envelope (ADR 0029); the store refuses them without encryption (`EncryptionRequired`), tested | done |
@@ -37,7 +40,7 @@ Version 0.4.0, not tagged (stage 1: local folder, stage 2: S3, stage 3: real nam
 | `File` and `Folder` carry the envelope as stored; every write answers the object as stored (the store sets the times), so an answer equals what `get` says afterwards | done |
 | Server `fs-files-server`: every method of `Files`, `Folders`, `Transfer`, `Upload`, `Blob` (common), `Search`, `Backends` and `BlobBackend` (provider side), `subscribe` with `ended`, `supportReport`; errors as typed problems; binary with `--socket --data --actor --instance` and `FS_FILES_ROOT` | done, draft |
 | `sharing` (empty placeholder interface): `Unsupported` (`share.create`); versions, encryption, sync, WebDAV, previews: not built | as agreed |
-| Tests | 201 run by default: core 141, server 60; 2 ignored live tests. The server tests run over a real socket against a real `FileRepo`, compare values, and run the real binary across a restart |
+| Tests | 213 run by default (core 142, server 71); 2 ignored live tests. The server tests run over a real socket against a real `FileRepo`, compare values, and run the real binary across a restart |
 
 ## Structure and pattern map (ADR 0043)
 
@@ -65,6 +68,10 @@ Version 0.4.0, not tagged (stage 1: local folder, stage 2: S3, stage 3: real nam
 | `repo/build.rs` | Adapter | our records to AS2 envelope + index fields |
 | `repo/{folders,fileops,list,lookup}.rs` | Repository | one concern each |
 | `repo/session.rs`, `repo/finish.rs` | State / Template method | upload session; the fixed finish flow |
+| `repo/pending.rs` | Iterator over the Repository | a page of unfinished uploads after a place, asked of the store with a limit; stale sessions removed once at the start |
+| `note.rs` | Value object | `Note` (message + facts), `Kind`, `Subject` |
+| `facts.rs` | none | `Error::facts()`: what an error knows, typed |
+| `fs-files-server/facts.rs` | none | facts as problem extensions |
 | `repo/blob.rs` | Adapter | `FileBlob` presents the bytes under a key of a backend as the `Blob` trait |
 | `repo/manage.rs` | Factory + Registry | `backend.add` / `backend.remove` |
 | `repo/names.rs` | Specification | what a name may be (two names are the same only if equal byte for byte) |
@@ -173,6 +180,22 @@ reason; a backend that cannot do a method answers its own `Unsupported`.
 configuration), `files/encryption-required` 409 (ADR 0029: the store has no key), `files/stored-data-invalid` 500, `files/backend-failed`
 500; and from `fs_interfaces::rpc`: `invalid-request` 422 (a text or id that cannot be right), `too-large` 413, `feed-ended` 410.
 
+**Problem extensions (since fs-interfaces v0.39; the detail text is unchanged).** Extensions are statements of the server; the keys `id`, `kind`, `issue` are the standard ones, `name`, `expected`, `got` belong to the files problem types. `kind` is `file`, `folder`, `upload` or `backend` (`id` of a backend is its name, not a uuid).
+
+| Problem type | Extensions |
+|---|---|
+| `not-found` | `id`, `kind` of what is missing (file, folder, upload, backend); a bare store miss gives `id` only |
+| `name-conflict` | `name` (the name that is taken) |
+| `invalid-name` | `name`, `issue` (the reason, one entry: `empty or longer than 255 bytes`, `reserved`, `refused-by-disk`, `too-long`, `path-too-long`, `nested-too-deep`, ...); a key error gives `issue` only |
+| `changed-outside` | `id`, `kind=file` |
+| `wrong-offset` | `expected` (what the backend holds, where the next chunk must start), `got` (what the caller sent), decimal |
+| `conflict` | `id`, `kind` where the call clashes with one object (a file not in the trash, a folder not empty, a folder moved into itself, a backend that is active, an upload whose bytes are all in) |
+| `invalid` | `issue` (the reason of a refused configuration or the store), `kind=backend` and `id` when it is about a backend.add |
+| `encryption-required` | `id` of the object the store refused |
+| `stored-data-invalid` | `issue` (the reader's reason) |
+| `backend-failed` | `kind=backend` when no object is named |
+| `too-large` | `size`, `limit` in bytes (from `rpc`, for a chunk above the intake; a page whose cursor goes on has none) |
+
 **Limits (no unbounded reading, no answer beyond a message).**
 * Bytes: a `Blob.read` and a backend `get` answer at most 32 MiB (`clamp_read`; fewer is allowed, empty is the end). An `Upload.write` or `put` above
   16 MiB (`MAX_INTAKE_BYTES`) is `too-large` and writes nothing; the core streams the checksum, so a file of any size goes in by chunks. Tested with 34 MiB.
@@ -181,8 +204,8 @@ configuration), `files/encryption-required` 409 (ADR 0029: the store has no key)
 * Texts: a name above 4096 bytes is the contract's `invalid-name` (the core decides the 255); a search text or key above 8 KiB, a media type, id or
   category above 1 KiB, all categories of one file above 64 KiB, a configuration above 64 KiB: `invalid-request`, before the core sees them.
 * Reports: a `RescanReport` is held to 32 MiB; the lists share it (a short list is never crowded out) and **what is left out is named in `skipped`**
-  (`... N more added entries (they are taken over) are not listed here`). `pendingUploads` and `BlobBackend.scan` are **paged** (since v0.35.0): 100 per page, by weight, oldest first / sorted by
-  name, the cursor of `rpc::Page`; the provider returns the whole list and the server cuts it. `TrashReport.failed` lists at most 1 398 101 ids and `failedMissing` counts the rest.
+  (`... N more added entries (they are taken over) are not listed here`). `pendingUploads` and `BlobBackend.scan` are **paged** (since v0.35.0): 100 per page, oldest first / sorted by
+  name. `pendingUploads` is cut in the store since 0.5.0 (the provider answers `pending_uploads_page`; a provider that only has the whole list gets the default cut); `scan` is still the whole listing of one folder cut by the server. `TrashReport.failed` lists at most 1 398 101 ids and `failedMissing` counts the rest.
 
 **Places.** The binary refuses to start (exit 1, before anything is opened or made) if `FS_FILES_ROOT` is, or lies above, `--data`: `objects.db` would lie
 among the files and a rescan would take it for one. Links are resolved first; a path with `..` is refused outright (after a part that does not exist yet it cannot
@@ -201,12 +224,12 @@ order they arrived, so chunks may be sent without waiting for each answer (mutat
 file marked sensitive (ADR 0029) like any other: the names and categories leave; whether they should only on release (as in `fs-people`) is a decision;
 (3) `backend.add` is not persisted (the core's decision): after a restart the binary has the `main` local backend only; (4) the `Registry` of the feed is the
 same code as in `fs-tasks` and `fs-maps` and wants to live once in `fs-interfaces` or `fs-store`; (5) the cursor is a place in a list and shifts when an entry is
-added between two pages (the shared limit of `fs-interfaces`); (6) the `Files` root has no way to hand out `BlobBackend`, correct for the contract, but a program that
+added between two pages (the shared limit of `fs-interfaces`); the pages of `list`/`find` are cut in the store with an offset, so a page costs the store a walk past the entries before it (rows read stay linear, measured), while a cursor as a key in the sort order (as in `fs-tasks`) would need one query shape per sort order (name, modified, size, type, both directions) and was not built; (5a) `BlobBackend.scan` reads the whole folder of the backend for every page (a file system has no sorted listing to continue from); `wrong-offset` and the upload errors from `write` carry no upload `id`; (6) the `Files` root has no way to hand out `BlobBackend`, correct for the contract, but a program that
 wants remote backends needs the client side (`RemoteBackend`), not built; (7) a person who changes the folder from outside is seen only by `rescan`, no watcher.
 
 ## Crates
 
-* `fs-store` (v0.2.0), `fs-interfaces` (v0.35.0): git tags.
+* `fs-store` (v0.4.0), `fs-interfaces` (v0.44.0): git tags.
 * `rustix` 1 (MIT OR Apache-2.0, Linux only, features `std` + `fs`): `renameat2` with `RENAME_NOREPLACE`, the atomic no-replace rename that `std` lacks. No C code with its default backend, already in the lock file through other crates.
 * `blake3` 1.8 (CC0-1.0 OR Apache-2.0): checksums, with the `pure` feature (no C / assembly). Fast enough for a first version.
 * `infer` 0.22 (MIT): media type from the first bytes when the caller gives none; pure Rust, no dependencies.
@@ -221,7 +244,7 @@ wants remote backends needs the client side (`RemoteBackend`), not built; (7) a 
 
 ## Contract
 
-`files.capnp` in `fs-interfaces` v0.35.0 (draft 0.2). Appended in v0.35.0: problem-type constants, `cursor` / `next` on `Transfer.pendingUploads` and `BlobBackend.scan`, `TrashReport.failedMissing`. Appended for real names: `Folders.rescan @13` and `RescanReport`; `BlobBackend`
+`files.capnp` in `fs-interfaces` v0.44.0 (draft 0.2; `files.capnp` itself is unchanged since v0.35.0, the steps after it are in `common.capnp` (`SupportReport.instance`) and in the problem extensions of `fs_interfaces::rpc`). Appended in v0.35.0: problem-type constants, `cursor` / `next` on `Transfer.pendingUploads` and `BlobBackend.scan`, `TrashReport.failedMissing`. Appended for real names: `Folders.rescan @13` and `RescanReport`; `BlobBackend`
 `naming`, `publish`, `relocate`, `discard`, `makeDir`, `removeDir`, `scan` (@7 to @13) with `Spot`, `Scanned`, `ScanKind`; the problem types
 `nameConflictProblemType` (409), `invalidNameProblemType` (422), `changedOutsideProblemType` (409); and the statement that `Envelope.name` of a
 file and a folder IS its real name (not derived). In the core `Error::problem()` makes the mapping; a name clash is still `Error::Conflict`.

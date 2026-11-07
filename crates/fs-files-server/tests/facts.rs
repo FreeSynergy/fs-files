@@ -4,7 +4,7 @@
 mod common;
 
 use common::stub::Stub;
-use common::{caps, is, mkdir, put_file, set_id, start, text_file, unknown_id, with_server, with_stub};
+use common::{caps, mkdir, put_file, set_id, start, text_file, unknown_id, with_server, with_stub};
 use fs_interfaces::files_capnp::{
     BACKEND_FAILED_PROBLEM_TYPE, CHANGED_OUTSIDE_PROBLEM_TYPE, CONFLICT_PROBLEM_TYPE,
     ENCRYPTION_REQUIRED_PROBLEM_TYPE, INVALID_NAME_PROBLEM_TYPE, INVALID_PROBLEM_TYPE,
@@ -28,7 +28,10 @@ async fn not_found_names_the_file_folder_upload_or_backend_that_is_missing() {
         let mut rename = c.folders.rename_file_request();
         set_id(rename.get().init_id(), unknown);
         rename.get().set_name("x.txt");
-        let p = typed(&rename.send().promise.await.err().unwrap(), NOT_FOUND_PROBLEM_TYPE);
+        let p = typed(
+            &rename.send().promise.await.err().unwrap(),
+            NOT_FOUND_PROBLEM_TYPE,
+        );
         assert_eq!(p.ext("id"), Some(unknown.to_string().as_str()));
         assert_eq!(p.ext("kind"), Some("file"));
 
@@ -39,13 +42,19 @@ async fn not_found_names_the_file_folder_upload_or_backend_that_is_missing() {
 
         let mut resume = c.transfer.resume_upload_request();
         resume.get().set_id(unknown.to_string().as_str());
-        let p = typed(&resume.send().promise.await.err().unwrap(), NOT_FOUND_PROBLEM_TYPE);
+        let p = typed(
+            &resume.send().promise.await.err().unwrap(),
+            NOT_FOUND_PROBLEM_TYPE,
+        );
         assert_eq!(p.ext("id"), Some(unknown.to_string().as_str()));
         assert_eq!(p.ext("kind"), Some("upload"));
 
         let mut remove = c.backends.remove_request();
         remove.get().set_id("nowhere");
-        let p = typed(&remove.send().promise.await.err().unwrap(), NOT_FOUND_PROBLEM_TYPE);
+        let p = typed(
+            &remove.send().promise.await.err().unwrap(),
+            NOT_FOUND_PROBLEM_TYPE,
+        );
         assert_eq!(p.ext("id"), Some("nowhere"));
         assert_eq!(p.ext("kind"), Some("backend"));
     })
@@ -104,8 +113,14 @@ async fn a_wrong_offset_says_where_the_upload_stands_and_where_the_chunk_started
         let mut wrong = upload.write_request();
         wrong.get().set_offset(7);
         wrong.get().set_data(b"nope");
-        let p = typed(&wrong.send().promise.await.err().unwrap(), WRONG_OFFSET_PROBLEM_TYPE);
-        assert_eq!((p.ext_u64("expected"), p.ext_u64("got")), (Some(100), Some(7)));
+        let p = typed(
+            &wrong.send().promise.await.err().unwrap(),
+            WRONG_OFFSET_PROBLEM_TYPE,
+        );
+        assert_eq!(
+            (p.ext_u64("expected"), p.ext_u64("got")),
+            (Some(100), Some(7))
+        );
         assert!(p.detail.contains("100"), "{}", p.detail);
     })
     .await;
@@ -118,13 +133,19 @@ async fn a_clash_with_the_state_an_invalid_backend_and_a_chunk_too_large_carry_t
         let file = text_file(&c, None, "live.txt", "x").await;
         let mut purge = c.folders.purge_request();
         set_id(purge.get().init_id(), file.id);
-        let p = typed(&purge.send().promise.await.err().unwrap(), CONFLICT_PROBLEM_TYPE);
+        let p = typed(
+            &purge.send().promise.await.err().unwrap(),
+            CONFLICT_PROBLEM_TYPE,
+        );
         assert_eq!(p.ext("id"), Some(file.id.to_string().as_str()));
         assert_eq!(p.ext("kind"), Some("file"));
 
         let mut add = c.backends.add_request();
         add.get().set_config(r#"{"id":"odd","kind":"tape"}"#);
-        let p = typed(&add.send().promise.await.err().unwrap(), INVALID_PROBLEM_TYPE);
+        let p = typed(
+            &add.send().promise.await.err().unwrap(),
+            INVALID_PROBLEM_TYPE,
+        );
         assert_eq!((p.ext("kind"), p.ext("id")), (Some("backend"), Some("odd")));
         assert_eq!(p.ext_all("issue").count(), 1);
 

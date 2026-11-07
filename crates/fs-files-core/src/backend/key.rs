@@ -19,7 +19,11 @@ pub const RESERVED_NAME: &str = ".fs-files";
 /// A key is `/`-separated segments of `A-Z a-z 0-9 . _ -`. A segment is never empty and never starts
 /// with `.`, so `..`, absolute paths, NUL, backslashes, drive letters and hidden names are refused.
 pub fn check_key(key: &str) -> Result<Vec<&str>> {
-    let bad = |why: &str| Err(Error::InvalidKey(Note::from(format!("{why}: {key:?}")).because(why)));
+    let bad = |why: &str| {
+        Err(Error::InvalidKey(
+            Note::from(format!("{why}: {key:?}")).because(why),
+        ))
+    };
     if key.is_empty() || key.len() > MAX_KEY {
         return bad("empty or too long");
     }

@@ -14,9 +14,9 @@ use super::blob::new_key;
 use super::consts::CONTEXT;
 use super::handle::FileRepo;
 use super::names::{check_name, numbered_name};
-use crate::note::{Kind, Note};
 use crate::error::{Error, Result};
 use crate::model::OnConflict;
+use crate::note::{Kind, Note};
 use crate::transfer::Upload;
 
 /// What a session remembers.
@@ -102,9 +102,7 @@ impl FileRepo {
     }
 
     pub(super) async fn do_resume_upload(&self, id: &str) -> Result<Arc<dyn Upload>> {
-        let id: ObjectId = id
-            .parse()
-            .map_err(|_| Error::missing(Kind::Upload, id))?;
+        let id: ObjectId = id.parse().map_err(|_| Error::missing(Kind::Upload, id))?;
         let o = self.session_obj(id).await?;
         let rec = serde_json::from_value(o.content)?;
         Ok(Arc::new(UploadSession {

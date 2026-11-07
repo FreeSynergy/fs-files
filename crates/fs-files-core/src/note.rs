@@ -56,6 +56,7 @@ pub struct Note {
 impl Note {
     /// This note about `kind` `id`; a subject set before stays.
     #[must_use]
+    #[allow(clippy::needless_pass_by_value)] // ids are passed as they are
     pub fn about(mut self, kind: Kind, id: impl ToString) -> Self {
         self.subject.get_or_insert(Subject {
             kind,
