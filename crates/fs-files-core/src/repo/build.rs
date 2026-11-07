@@ -1,9 +1,9 @@
 //! File, folder and session <-> stored object: envelope derivation and index fields.
 //!
-//! Pattern: Adapter — maps our records onto the AS2 envelope + index fields that `fs-store`
+//! Pattern: Adapter — maps our records onto the AS2 envelope + index fields that `fs-objects`
 //! understands (ADR 0020); the envelope `name` is derived, never typed twice (ADR 0032).
 
-use fs_store::{Envelope, ObjectId, StoredObject};
+use fs_objects::{Envelope, ObjectId, StoredObject};
 
 use super::consts::{
     CONTEXT, FILE_CONTENT, FOLDER_CONTENT, FOLDER_TYPE, ROOT, UPLOAD_CONTENT, UPLOAD_TYPE,

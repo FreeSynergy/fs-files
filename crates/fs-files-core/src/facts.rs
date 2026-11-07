@@ -51,10 +51,10 @@ impl Error {
             }
             Self::Offset { expected, got } => facts.offsets = Some((*expected, *got)),
             Self::Store(
-                fs_store::Error::NotFound(id) | fs_store::Error::EncryptionRequired(id),
+                fs_objects::Error::NotFound(id) | fs_objects::Error::EncryptionRequired(id),
             ) => facts.id = Some(id.to_string()),
-            Self::Store(fs_store::Error::Invalid(why)) => facts.issues.push(why.clone()),
-            Self::Json(e) | Self::Store(fs_store::Error::Serde(e)) => {
+            Self::Store(fs_objects::Error::Invalid(why)) => facts.issues.push(why.clone()),
+            Self::Json(e) | Self::Store(fs_objects::Error::Serde(e)) => {
                 facts.issues.push(e.to_string());
             }
             Self::Io(e) if e.raw_os_error() == Some(36) => facts.issues.push("too-long".into()),

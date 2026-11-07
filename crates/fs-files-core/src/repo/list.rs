@@ -3,7 +3,7 @@
 //! Pattern: Repository (read side) — builds backend-neutral `Query` values;
 //! filtering, ordering and paging are done by the store, one extra row tells whether a next page exists.
 
-use fs_store::{Op, Order, Query, StoredObject, TimeField};
+use fs_objects::{Op, Order, Query, StoredObject, TimeField};
 
 use super::build::folder_key;
 use super::consts::{CONTEXT, FOLDER_TYPE};
@@ -44,7 +44,7 @@ fn ordered(q: Query, sort: Sort) -> Result<Query> {
 impl FileRepo {
     pub(super) async fn do_list(
         &self,
-        folder: Option<fs_store::ObjectId>,
+        folder: Option<fs_objects::ObjectId>,
         cursor: Option<Cursor>,
         sort: Sort,
     ) -> Result<Page> {

@@ -3,7 +3,7 @@
 //! Pattern: Value objects + Adapter — [`File`] is the contract's `File`; `FileRecord` is the
 //! JSON content of the stored `Document` (it also knows backend and key, which callers never see).
 
-use fs_store::{ObjectId, StoredObject};
+use fs_objects::{ObjectId, StoredObject};
 use serde::{Deserialize, Serialize};
 
 use crate::error::{Error, Result};
@@ -12,7 +12,7 @@ use crate::error::{Error, Result};
 #[derive(Clone, Debug, PartialEq)]
 pub struct File {
     /// The AS2 envelope as stored (type, times, audience, sensitive categories): what goes on the wire as `File.envelope`.
-    pub envelope: fs_store::Envelope,
+    pub envelope: fs_objects::Envelope,
     /// Object id; other programs refer to the file by it.
     pub id: ObjectId,
     /// `https://<instance>/files/<id>`.

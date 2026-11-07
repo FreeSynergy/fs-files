@@ -3,7 +3,7 @@
 //! Pattern: Value object — a [`Page`] carries a [`Cursor`] to ask for the next one (the caller loops;
 //! no iterator is offered); the cursor is opaque to callers.
 
-use fs_store::ObjectId;
+use fs_objects::ObjectId;
 
 use super::{File, Folder};
 

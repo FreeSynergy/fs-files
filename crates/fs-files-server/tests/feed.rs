@@ -13,7 +13,7 @@ use fs_files_core::FileChange;
 use fs_interfaces::UNSUPPORTED_PROBLEM_TYPE;
 use fs_interfaces::common_capnp::{change, change_listener};
 use fs_interfaces::rpc::{FEED_ENDED_PROBLEM_TYPE, Problem, read_envelope};
-use fs_store::ObjectId;
+use fs_objects::ObjectId;
 
 #[derive(Clone, Default)]
 struct Seen {

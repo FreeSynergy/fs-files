@@ -4,7 +4,7 @@
 //! the folder names and the file name when needed. So renaming or moving a folder is one directory
 //! rename on the disk and one record in the database, and the files below follow by themselves.
 
-use fs_store::{ObjectId, Query, StoredObject};
+use fs_objects::{ObjectId, Query, StoredObject};
 
 use super::consts::CONTEXT;
 

@@ -9,7 +9,7 @@ use fs_files_core::{
     RescanReport, Result, Subscription, Transfer, TrashReport, UploadInfo,
 };
 use fs_interfaces::Capabilities;
-use fs_store::{Envelope, ObjectId};
+use fs_objects::{Envelope, ObjectId};
 
 #[derive(Default)]
 pub struct Stub {

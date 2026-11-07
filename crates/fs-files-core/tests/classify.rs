@@ -41,7 +41,7 @@ async fn an_unencrypted_store_refuses_and_the_file_stays_as_it_was() {
         .await
         .unwrap_err();
     assert!(
-        matches!(err, Error::Store(fs_store::Error::EncryptionRequired(_))),
+        matches!(err, Error::Store(fs_objects::Error::EncryptionRequired(_))),
         "{err}"
     );
     assert!(repo.get(f.id).await.unwrap().unwrap().sensitive.is_empty());

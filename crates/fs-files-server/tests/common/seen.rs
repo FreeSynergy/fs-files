@@ -4,7 +4,7 @@
 
 use fs_interfaces::files_capnp::{entry, file};
 use fs_interfaces::rpc::{read_envelope, read_uuid};
-use fs_store::Envelope;
+use fs_objects::Envelope;
 use uuid::Uuid;
 
 /// A file as a consumer reads it.
