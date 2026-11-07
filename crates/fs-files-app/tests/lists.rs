@@ -1,6 +1,4 @@
-//! Sort, filter, search, paging, and one bad record, through the real core.
-//!
-//! Pattern: integration tests over the real core and a real folder.
+//! Sort, filter, search, paging, and one bad record, through the real server and client.
 
 mod common;
 

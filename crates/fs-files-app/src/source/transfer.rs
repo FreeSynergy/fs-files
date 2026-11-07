@@ -1,6 +1,7 @@
 //! Bytes in and out, through a path the person typed.
 //!
-//! Pattern: Adapter + Template method — all of it blocks the interface thread until it is done, measured
+//! Pattern: Facade — a few calls (upload, resume, drop, download) in front of the client and the file
+//! system of the person's computer; one fixed flow each, small enough to be one type's methods. All of it blocks the interface thread until it is done, measured
 //! in `DESIGN.md`; there is no way yet to post from a worker. An upload goes in chunks; what arrived before
 //! a failure stays as an unfinished upload. A download appears whole or not at all, never replaces a
 //! file, and a marked file needs the person's release and is written readable by its owner only.
@@ -9,15 +10,12 @@ use std::io::{Read, Seek, SeekFrom};
 
 use fs_components_app::{write_new_file, write_new_private_file};
 use fs_components_workbenches::file_manager::{FileError, FileProblem, NameRule, PendingUpload};
-use fs_files_core::{CHUNK, Upload};
+use fs_files_core::{CHUNK, Upload, check_name};
 
-use super::adapter::{FileAdapter, folder_of, id_of};
+use super::adapter::{FileAdapter, folder_of, id_of, problem_of};
 use super::change::rule_of;
 use super::paths::{open_source, target_for};
 use crate::words::say;
-
-/// The biggest file written out for now: `write_new_file` takes its whole content at once.
-const MOST_IN_MEMORY: u64 = 2 * 1024 * 1024 * 1024;
 
 fn io_error(e: &std::io::Error) -> FileError {
     FileError::failed(e.to_string())
@@ -114,9 +112,11 @@ impl FileAdapter {
         if marked && !release_marked {
             return Err(FileError::new(FileProblem::MarkedNeedsRelease, say::MARKED));
         }
-        if file.size > MOST_IN_MEMORY {
+        if file.size > self.most_in_memory {
             return Err(FileError::failed(say::TOO_BIG));
         }
+        // The name comes from the server: it must be a name, not a path, before it is joined to one.
+        check_name(&file.name).map_err(|e| problem_of(&e))?;
         let target = target_for(path, &file.name)?;
         let blob = self.wait(self.transfer.open(id))?;
         let bytes = self.read_all(blob.as_ref(), file.size)?;

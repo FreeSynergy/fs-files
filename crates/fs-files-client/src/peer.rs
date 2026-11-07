@@ -4,7 +4,7 @@
 //! `files.capnp`. Why: the frontend keeps depending on the traits it already uses, and only the provider
 //! behind them changes. The thread of the connection is the shared `Worker` of `fs-interfaces`
 //! (`remote.rs` says what it fetches at connect); the calls are in `folder_calls.rs`, `transfer_calls.rs`
-//! and `search_calls.rs`; the traits in `files_impl.rs` and `transfer_impl.rs`. Interface first
+//! and `file_calls.rs`; the traits in `files_impl.rs` and `transfer_impl.rs`. Interface first
 //! (ADR 0043): `connect` was written down, and the tests written against the traits, before this.
 
 use std::future::Future;

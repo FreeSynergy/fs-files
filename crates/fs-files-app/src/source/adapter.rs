@@ -23,6 +23,7 @@ pub struct FileAdapter {
     pub(super) files: Arc<dyn Files>,
     pub(super) transfer: Arc<dyn Transfer>,
     pub(super) runtime: Handle,
+    pub(super) most_in_memory: u64,
 }
 
 impl FileAdapter {
@@ -32,7 +33,18 @@ impl FileAdapter {
             files,
             transfer,
             runtime,
+            most_in_memory: Self::MOST_IN_MEMORY,
         }
+    }
+
+    /// The biggest file a download writes: `write_new_file` takes its whole content at once.
+    pub const MOST_IN_MEMORY: u64 = 2 * 1024 * 1024 * 1024;
+
+    /// The same with another limit for a download, for tests and small machines.
+    #[must_use]
+    pub fn with_most_in_memory(mut self, bytes: u64) -> Self {
+        self.most_in_memory = bytes;
+        self
     }
 
     pub(super) fn wait<T>(

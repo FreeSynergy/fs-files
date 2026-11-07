@@ -1,4 +1,4 @@
-//! The world of the tests: the real `fs-files-server` on a real Unix socket over the real core, a real
+//! The world of the tests: the real `fs-files-server` on a real Unix socket over the real `FileRepo`, a real
 //! local folder in a temporary directory, and a store in memory (or, for marked files, an encrypted one in
 //! that directory: the store refuses them otherwise). The app's adapter reaches it through the real
 //! `RpcFiles`; `repo` is the provider behind the server, for set-up and for comparing only.
@@ -6,7 +6,14 @@
 //! Pattern: Facade over the real thing. Nothing here pretends to be the core or the server.
 #![allow(dead_code)] // each test file uses a different subset
 
+mod decorators;
 mod server;
+
+#[allow(unused_imports)] // each test file uses a different subset
+pub use decorators::Renamed;
+#[allow(unused_imports)]
+pub use decorators::{Tripped, Tripwire};
+pub use server::Providers;
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -36,16 +43,14 @@ pub struct World {
     pub adapter: Arc<FileAdapter>,
     /// The socket of the server, for a program that is started as a process.
     pub socket: PathBuf,
-    stop: Option<tokio::sync::oneshot::Sender<()>>,
+    stop: server::Stop,
     thread: Option<std::thread::JoinHandle<()>>,
 }
 
 impl Drop for World {
     fn drop(&mut self) {
         // The client first: the server stops when its last connection has gone.
-        if let Some(stop) = self.stop.take() {
-            let _ = stop.send(());
-        }
+        server::stop(&self.stop);
         if let Some(thread) = self.thread.take() {
             let _ = thread.join();
         }
@@ -68,6 +73,16 @@ impl World {
     }
 
     fn with(kind: Kind) -> Self {
+        Self::build(kind, |repo, _| Providers::of(repo))
+    }
+
+    /// The server in front of providers the test makes from the repository (a decorator that
+    /// misbehaves on purpose); the second argument stops the server.
+    pub fn behind(make: impl FnOnce(&FileRepo, &server::Stop) -> Providers) -> Self {
+        Self::build(Kind::Memory, make)
+    }
+
+    fn build(kind: Kind, make: impl FnOnce(&FileRepo, &server::Stop) -> Providers) -> Self {
         let runtime = tokio::runtime::Runtime::new().unwrap();
         let dir = tempfile::tempdir().unwrap();
         let store: Arc<dyn Store> = runtime.block_on(async {
@@ -95,7 +110,9 @@ impl World {
             .block_on(LocalFolder::open(dir.path().join("root")))
             .unwrap();
         let repo = FileRepo::new(store.clone(), ME, "local", Arc::new(folder)).with_page_size(PAGE);
-        let (socket, stop, thread) = server::start(dir.path(), &repo);
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        let stop: server::Stop = Arc::new(std::sync::Mutex::new(Some(tx)));
+        let (socket, thread) = server::start(dir.path(), make(&repo, &stop), rx);
         let client = Arc::new(RpcFiles::connect(&socket).unwrap());
         let adapter = Arc::new(FileAdapter::new(
             client.clone(),
@@ -109,7 +126,7 @@ impl World {
             repo,
             adapter,
             socket,
-            stop: Some(stop),
+            stop,
             thread: Some(thread),
         }
     }

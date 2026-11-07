@@ -9,7 +9,7 @@ use fs_components_workbenches::file_manager::{
 use fs_files_core::{Entry, File, FileFilter, OnConflict};
 
 use super::adapter::{FileAdapter, folder_of, id_of, info_of};
-use crate::words::labels;
+use crate::words::{cli, fill, labels};
 
 pub(super) fn rule_of(rule: NameRule) -> OnConflict {
     if rule == NameRule::KeepBoth {
@@ -24,7 +24,10 @@ fn named(file: &File) -> String {
     if file.sensitive.is_empty() {
         file.name.clone()
     } else {
-        format!("[{}] {}", labels().marked, file.name)
+        fill(
+            cli::MARKED_NAME,
+            &[("mark", &labels().marked), ("name", &file.name)],
+        )
     }
 }
 

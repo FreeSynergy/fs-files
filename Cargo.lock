@@ -1547,6 +1547,7 @@ dependencies = [
 name = "fs-files-app"
 version = "0.4.0"
 dependencies = [
+ "async-trait",
  "chrono",
  "fs-components-app",
  "fs-components-render",

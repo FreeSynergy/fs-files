@@ -1,6 +1,4 @@
 //! Changes from outside: only by rescan, and a file that changed is refused, not hidden.
-//!
-//! Pattern: integration tests over the real core and a real folder.
 
 mod common;
 

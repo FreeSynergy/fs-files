@@ -18,4 +18,4 @@ mod words;
 
 pub use source::{FileAdapter, problem_of};
 pub use surface::{FilesScreen, app_widget, screen_widget};
-pub use words::{cli, fill, labels};
+pub use words::{cli, fill, labels, tenths};

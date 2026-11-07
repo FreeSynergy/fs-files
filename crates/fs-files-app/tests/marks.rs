@@ -1,8 +1,7 @@
 //! A marked file (ADR 0029), by the core's real field: marked wherever it appears, not read by itself,
 //! written out only by an explicit act. A name proves nothing.
 //!
-//! Pattern: integration tests over the real core on an encrypted store (the store refuses marks without
-//! a key, which is tested too).
+//! Run on an encrypted store (the store refuses marks without a key, which is tested too).
 
 mod common;
 

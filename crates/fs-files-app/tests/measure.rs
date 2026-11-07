@@ -2,7 +2,7 @@
 //! `cargo test --release -p fs-files-app --test measure -- --ignored --nocapture`; the numbers are in
 //! `DESIGN.md`.
 //!
-//! Pattern: measurement over the real core and a real folder, debug or release as asked.
+//! Debug or release as asked.
 
 mod common;
 

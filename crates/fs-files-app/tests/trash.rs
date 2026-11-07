@@ -1,6 +1,4 @@
 //! The trash: restore, restore to a place, purge, empty; and what is gone is really gone.
-//!
-//! Pattern: integration tests over the real core and a real folder.
 
 mod common;
 

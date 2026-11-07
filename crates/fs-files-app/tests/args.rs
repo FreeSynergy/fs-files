@@ -1,6 +1,4 @@
 //! The command line.
-//!
-//! Pattern: table of inputs and answers.
 
 use fs_components_workbenches::file_manager::FileView;
 use fs_files_app::args::parse;

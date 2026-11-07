@@ -1,6 +1,4 @@
 //! The menus: only real commands, and an entry really changes the workbench's state.
-//!
-//! Pattern: Command tests over the real core, through the shell's own way of choosing an entry.
 
 mod common;
 

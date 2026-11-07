@@ -1,6 +1,4 @@
 //! Upload and download by path, unfinished uploads, and what a path may not be.
-//!
-//! Pattern: integration tests over the real core and real folders.
 
 mod common;
 

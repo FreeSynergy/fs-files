@@ -1,6 +1,6 @@
-//! Names, through the workbench's state and the real core, onto a real folder.
+//! Names, through the workbench's state and the real server, onto a real folder.
 //!
-//! Pattern: integration tests. A name reaches the backend only through the core's own check.
+//! A name reaches the backend only through the core's own check.
 
 mod common;
 

@@ -1,7 +1,8 @@
 //! The words of the program.
 //!
-//! Pattern: Value object — English only for now (ADR 0053). The workbench's own words are its defaults;
-//! what the program itself says is here.
+//! Pattern: none — constants (whole sentences with named places, `{name}`) and pure functions that fill
+//! them or write a number; nothing is read, written or called. English only for now (ADR 0053). The
+//! workbench's own words are its defaults; what the program itself says is here.
 
 use fs_components_workbenches::file_manager::FileLabels;
 
@@ -61,6 +62,11 @@ pub mod cli {
     pub const INTO_NEEDS_UPLOAD: &str = "--into needs --upload";
     pub const CANNOT_REACH: &str = "cannot reach the files server at {socket}: {why}";
     pub const LOOKED: &str = "Looked at the folder in {seconds} s: {added} taken over, {updated} changed, {missing} missing, {skipped} not taken over. Changes made outside appear after Rescan.";
+    pub const UPLOAD_FAILED: &str = "{path}: {why}";
+    pub const UPLOADED: &str = "uploaded {path} as {name}";
+    pub const WROTE_PICTURE: &str = "wrote {file}";
+    pub const WROTE: &str = "wrote {name}";
+    pub const MARKED_NAME: &str = "[{mark}] {name}";
     pub const LOOK_FAILED: &str = "Could not look at the folder: {why}";
 
     /// The help text.
@@ -91,6 +97,11 @@ pub fn fill(sentence: &str, values: &[(&str, &str)]) -> String {
         out = out.replace(&format!("{{{name}}}"), value);
     }
     out
+}
+
+/// Seconds as a reader sees them: one decimal.
+pub fn tenths(took: std::time::Duration) -> String {
+    format!("{:.1}", took.as_secs_f32())
 }
 
 /// The words of the workbench.

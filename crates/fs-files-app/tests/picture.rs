@@ -1,8 +1,7 @@
 //! The whole program as a picture, through the shell's real path. No window is opened.
 //!
-//! Pattern: Pixel tests — skipped with a message where there is no graphics adapter. Pictures are kept
-//! where `FS_COMP_SHOTS` says. `draw_to_png` holds the process-wide lock, so everything here takes turns.
-//! A hang here is a deadlock.
+//! Skipped with a message where there is no graphics adapter. Pictures are kept where `FS_COMP_SHOTS`
+//! says. `draw_to_png` holds the process-wide lock, so everything here takes turns. A hang here is a deadlock.
 
 mod common;
 

@@ -1,7 +1,6 @@
 //! The binary: wiring only.
 //!
-//! Pattern: Facade consumer — parse arguments, connect to the server, ask it to look at its folder, then
-//! transfer or show. The runtime lives as long as the window: the workbench's calls run on it.
+//! Pattern: none — a thin binary: it parses, connects and hands over to the library; it holds no logic of its own. The runtime lives as long as the window: the workbench's calls run on it.
 
 use std::path::Path;
 use std::sync::Arc;
@@ -10,7 +9,7 @@ use std::time::Instant;
 use fs_components_app::{Status, WindowOptions, launch};
 use fs_components_workbenches::file_manager::{FileManagerWidget, FileSource};
 use fs_files_app::args::{Args, HELP, parse};
-use fs_files_app::{FileAdapter, cli, commands, fill, labels, screen_widget};
+use fs_files_app::{FileAdapter, cli, commands, fill, labels, screen_widget, tenths};
 use fs_files_client::RpcFiles;
 
 fn main() {
@@ -77,7 +76,7 @@ fn look_at_folder(source: &dyn FileSource) -> Status {
     let began = Instant::now();
     match source.rescan(None) {
         Ok(report) => {
-            let seconds = format!("{:.1}", began.elapsed().as_secs_f32());
+            let seconds = tenths(began.elapsed());
             let count = |n: usize| n.to_string();
             let line = fill(
                 cli::LOOKED,
@@ -107,7 +106,10 @@ fn show(args: &Args, source: Arc<dyn FileSource>, status: Option<Status>) -> Res
     if let Some(file) = &args.snapshot {
         app.picture(width, height, file)
             .map_err(|e| e.to_string())?;
-        eprintln!("wrote {}", file.display());
+        eprintln!(
+            "{}",
+            fill(cli::WROTE_PICTURE, &[("file", &file.display().to_string())])
+        );
         return Ok(());
     }
     let mut options = WindowOptions::default();

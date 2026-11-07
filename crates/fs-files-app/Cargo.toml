@@ -21,6 +21,7 @@ tokio = { version = "1", features = ["rt-multi-thread"] }
 [dev-dependencies]
 fs-files-server = { path = "../fs-files-server" }
 tempfile = "3"
+async-trait = "0.1"
 # provisional: becomes a tag once reviewed
 fs-components-widgets = { git = "https://github.com/FreeSynergy/fs-components", rev = "8c38a3b17f6b723ef625046a271c5564f5d7aa26" }
 fs-components-render = { git = "https://github.com/FreeSynergy/fs-components", rev = "8c38a3b17f6b723ef625046a271c5564f5d7aa26" }

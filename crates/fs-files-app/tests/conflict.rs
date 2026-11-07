@@ -1,7 +1,6 @@
 //! A taken name asks; keep both gets a free name; nothing is ever replaced.
 //!
-//! Pattern: integration tests over the real core and a real folder. Whatever is on the disk under the
-//! taken name keeps its bytes.
+//! Whatever is on the disk under the taken name keeps its bytes.
 
 mod common;
 
