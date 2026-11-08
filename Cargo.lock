@@ -1554,7 +1554,7 @@ dependencies = [
 
 [[package]]
 name = "fs-files"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "async-trait",
  "blake3",
@@ -1573,7 +1573,7 @@ dependencies = [
 
 [[package]]
 name = "fs-files-app"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "capnp",
  "fs-components-app",
@@ -1589,7 +1589,7 @@ dependencies = [
 
 [[package]]
 name = "fs-files-core"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "async-trait",
  "blake3",
@@ -1609,7 +1609,7 @@ dependencies = [
 
 [[package]]
 name = "fs-files-server"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "async-trait",
  "blake3",
@@ -1619,6 +1619,7 @@ dependencies = [
  "fs-files-core",
  "fs-interfaces",
  "fs-objects",
+ "rustix 1.1.6",
  "serde_json",
  "tempfile",
  "tokio",

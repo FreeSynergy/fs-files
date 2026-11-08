@@ -21,6 +21,7 @@ mod file_ops;
 mod files_service;
 mod folder_ops;
 mod folders_service;
+pub mod lease;
 mod places;
 mod program;
 mod search_service;
