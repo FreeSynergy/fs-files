@@ -1,0 +1,33 @@
+[package]
+name = "fs-files"
+description = "FreeSynergy.Files: files and folders, kept under their real names. Without arguments the window opens; `serve` runs the server."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "fs-files"
+path = "src/main.rs"
+
+[features]
+default = ["gui"]
+# The window (Blinc). Without it the binary has the server only: `cargo build --no-default-features`.
+gui = ["dep:fs-files-app"]
+
+[dependencies]
+fs-files-server = { path = "../fs-files-server" }
+fs-files-app = { path = "../fs-files-app", optional = true }
+
+[dev-dependencies]
+fs-files-core = { path = "../fs-files-core" }
+fs-interfaces = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.0.1", features = ["rpc"] }
+fs-objects = { git = "https://github.com/FreeSynergy/fs-objects", tag = "v0.0.1" }
+capnp = "0.27"
+tempfile = "3"
+uuid = "1"
+tokio = { version = "1", features = ["full"] }
+blake3 = { version = "1", default-features = false, features = ["std", "pure"] }
+serde_json = "1"
+chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
+async-trait = "0.1"

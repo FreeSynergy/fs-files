@@ -11,8 +11,13 @@ use fs_interfaces::files_capnp::files;
 use fs_interfaces::rpc::connect;
 
 pub fn start(socket: &Path, data: &Path, root: Option<&Path>) -> Child {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_fs-files-server"));
-    command.arg("--socket").arg(socket).arg("--data").arg(data);
+    let mut command = Command::new(env!("CARGO_BIN_EXE_fs-files"));
+    command
+        .arg("serve")
+        .arg("--socket")
+        .arg(socket)
+        .arg("--data")
+        .arg(data);
     match root {
         Some(root) => command.env("FS_FILES_ROOT", root),
         None => command.env_remove("FS_FILES_ROOT"),

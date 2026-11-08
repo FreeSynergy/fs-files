@@ -1,16 +1,18 @@
-//! `fs-files-server [--socket PATH] [--data DIR] [--actor IRI] [--instance DOMAIN]`; the folder the
-//! files live in is `FS_FILES_ROOT` (default `files` below the data directory). Files are kept under
-//! their real names there.
+//! `serve`: the server as a command of the one program (ADR 0063): `fs-files serve [--socket PATH]
+//! [--data DIR] [--actor IRI] [--instance DOMAIN]`; the folder the files live in is `FS_FILES_ROOT`
+//! (default `files` below the data directory). Files are kept under their real names there.
 //!
-//! Pattern: none (thin binary) — reads its locations, opens store and local folder, serves until a signal.
+//! Pattern: Facade — reads its locations, opens store and local folder, serves until a signal.
 
+use std::ffi::OsString;
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use fs_files_core::{FileRepo, LocalFolder, RESERVED_NAME};
-use fs_files_server::{FilesServer, check_places};
 use fs_interfaces::rpc::{ServerOptions, prepare_data_dir, run_until_signal};
 use fs_objects::{Store, TursoStore};
+
+use crate::{FilesServer, check_places};
 
 const ROOT: &str = "FS_FILES_ROOT";
 /// The id files record for the backend this program starts with.
@@ -32,19 +34,36 @@ fn root_of_env() -> Result<Option<PathBuf>, String> {
     }
 }
 
-fn main() {
-    let options = ServerOptions::from_env_or_exit("files");
-    let root = root_of_env().unwrap_or_else(|problem| {
-        eprintln!("fs-files-server: {problem}");
-        std::process::exit(2);
-    });
+/// The help text of `fs-files serve`.
+pub const HELP: &str = "fs-files serve [--socket PATH] [--data DIR] [--actor IRI] [--instance DOMAIN]\nThe files live in $FS_FILES_ROOT (default: files below the data folder).\nDefaults: $XDG_RUNTIME_DIR/freesynergy/files.sock, $XDG_DATA_HOME/freesynergy/files, the local owner";
+
+/// Why `serve` ended without serving.
+#[derive(Debug, PartialEq, Eq)]
+pub enum ServeError {
+    /// The words or the settings were wrong; the caller should exit with 2.
+    Usage(String),
+    /// The server could not start or stopped with an error; exit with 1.
+    Failed(String),
+}
+
+/// Serve `files.capnp` until a signal arrives. `args` are the words after `serve`.
+///
+/// # Errors
+/// [`ServeError::Usage`] for unknown or incomplete words or a bad `FS_FILES_ROOT`,
+/// [`ServeError::Failed`] for everything else.
+pub fn serve(args: impl IntoIterator<Item = OsString>) -> Result<(), ServeError> {
+    let Some(options) = ServerOptions::parse("files", args).map_err(ServeError::Usage)? else {
+        println!("{HELP}");
+        return Ok(());
+    };
+    let root = root_of_env().map_err(ServeError::Usage)?;
     let ServerOptions {
         socket,
         data,
         actor,
         instance,
     } = options;
-    let served = run_until_signal(&socket, || async move {
+    run_until_signal(&socket, || async move {
         let data = prepare_data_dir(&data)?;
         let root = root.unwrap_or_else(|| data.join("files"));
         check_places(&root, &data).map_err(std::io::Error::other)?;
@@ -68,9 +87,6 @@ fn main() {
                 .into_client()
                 .client,
         )
-    });
-    if let Err(e) = served {
-        eprintln!("fs-files-server: {e}");
-        std::process::exit(1);
-    }
+    })
+    .map_err(|e| ServeError::Failed(e.to_string()))
 }

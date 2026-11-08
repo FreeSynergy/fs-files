@@ -66,8 +66,9 @@ async fn the_root_and_the_instance_are_taken_from_the_environment_and_the_argume
         .run_until(async {
             let dir = tempfile::tempdir().unwrap();
             let (socket, root) = (dir.path().join("files.sock"), dir.path().join("my-files"));
-            let mut command = Command::new(env!("CARGO_BIN_EXE_fs-files-server"));
+            let mut command = Command::new(env!("CARGO_BIN_EXE_fs-files"));
             command
+                .arg("serve")
                 .arg("--socket")
                 .arg(&socket)
                 .arg("--data")
@@ -103,7 +104,8 @@ fn it_refuses_an_instance_that_is_no_domain() {
         "example.org:80",
         "-a.example",
     ] {
-        let code = Command::new(env!("CARGO_BIN_EXE_fs-files-server"))
+        let code = Command::new(env!("CARGO_BIN_EXE_fs-files"))
+            .arg("serve")
             .arg("--socket")
             .arg(dir.path().join("x.sock"))
             .arg("--data")
@@ -121,7 +123,8 @@ fn it_refuses_an_instance_that_is_no_domain() {
 #[test]
 fn it_refuses_bad_arguments_and_a_data_directory_others_can_read() {
     let run = |args: &[&str]| {
-        Command::new(env!("CARGO_BIN_EXE_fs-files-server"))
+        Command::new(env!("CARGO_BIN_EXE_fs-files"))
+            .arg("serve")
             .args(args)
             .stderr(Stdio::null())
             .stdout(Stdio::null())

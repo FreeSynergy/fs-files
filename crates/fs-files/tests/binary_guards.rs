@@ -15,7 +15,8 @@ fn code_of(
     data: &std::path::Path,
     root: &std::path::Path,
 ) -> Option<i32> {
-    Command::new(env!("CARGO_BIN_EXE_fs-files-server"))
+    Command::new(env!("CARGO_BIN_EXE_fs-files"))
+        .arg("serve")
         .arg("--socket")
         .arg(socket)
         .arg("--data")
@@ -30,7 +31,8 @@ fn code_of(
 #[test]
 fn it_refuses_a_relative_root_before_it_opens_anything() {
     let dir = tempfile::tempdir().unwrap();
-    let code = Command::new(env!("CARGO_BIN_EXE_fs-files-server"))
+    let code = Command::new(env!("CARGO_BIN_EXE_fs-files"))
+        .arg("serve")
         .arg("--socket")
         .arg(dir.path().join("x.sock"))
         .arg("--data")

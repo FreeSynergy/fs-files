@@ -256,3 +256,9 @@ file and a folder IS its real name (not derived). In the core `Error::problem()`
 * `issue` values such as "empty or too long segment" (`backend/key.rs`, `backend/local/path.rs`) are sentences instead of identifiers (§2a): replace them by identifiers.
 * The cursors of `list` and `find` are offsets; a cursor as a place in the sort key needs one query per sort order.
 * `wrong-offset` and the upload errors from `write` carry no upload `id`; `name_taken` in `backend/local/io.rs` has no `name`.
+
+## One binary `fs-files` and its window (ADR 0063, 2026-11-08)
+
+`crates/fs-files` is the only binary: `fs-files` without arguments opens the window, `fs-files serve` runs the server (`fs_files_server::serve`; the folder the files live in is `FS_FILES_ROOT`), feature `gui` (default) builds the window. `fs-files-server` and `fs-files-app` are libraries. The window (`crates/fs-files-app`) is the file manager workbench of `fs-components` over `files.capnp`: `FilesRemote` (a worker thread owns the Cap'n Proto connection) implements the workbench's `FileSource` (Adapter): folders, list and search (sort, size filter), create, rename, move, copy, trash, restore, restore to, purge, empty trash and rescan, with the server's problems as the workbench's kinds (name taken, invalid name, changed outside, not found). If no server answers on the user's own socket the window starts `fs-files serve` detached. Tests: `crates/fs-files-app/tests/remote.rs` (real server, repository and folder), `crates/fs-files/tests/binary*.rs` (the real binary).
+
+Not in the window yet (capabilities say so, nothing pretends): previews, upload, download, date filters, descending type sort; a file's sensitive marking (ADR 0029) is not read, so no entry shows one and the trash count says none is marked; classification, backends and sharing have no screen. No timeout waiting for the server. The Gallery facet is not built.

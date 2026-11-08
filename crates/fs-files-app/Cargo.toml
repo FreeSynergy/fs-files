@@ -1,0 +1,22 @@
+[package]
+name = "fs-files-app"
+description = "The files program of FreeSynergy, window: browse folders, search, create, rename, move, copy, trash and restore over the Cap'n Proto socket; on fs-components"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+fs-interfaces = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.0.1", features = ["rpc"] }
+fs-components-app = { git = "https://github.com/FreeSynergy/fs-components", rev = "fc00887d2c78a41684dbd68507b740fdef32def0" }
+fs-components-workbenches = { git = "https://github.com/FreeSynergy/fs-components", rev = "fc00887d2c78a41684dbd68507b740fdef32def0" }
+capnp = "0.27"
+uuid = "1"
+tokio = { version = "1", features = ["rt", "sync", "time", "macros"] }
+
+[dev-dependencies]
+fs-files-core = { path = "../fs-files-core" }
+fs-files-server = { path = "../fs-files-server" }
+fs-objects = { git = "https://github.com/FreeSynergy/fs-objects", tag = "v0.0.1" }
+tempfile = "3"
+tokio = { version = "1", features = ["full"] }
