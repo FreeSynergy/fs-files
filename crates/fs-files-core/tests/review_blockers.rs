@@ -1,5 +1,7 @@
 //! Data-loss cases found in review: an upload handle must never destroy a live file, and nobody
 //! else's file may be moved, merged into or deleted because a record says so.
+#![allow(clippy::needless_pass_by_value)] // tests: helper signatures kept simple, callers pass owned values
+#![allow(clippy::assert_is_empty, clippy::many_single_char_names)] // tests: plain `is_empty()` asserts read clearer than typed empty comparisons; tests: short bindings (a, b, x, y) are the clear names here
 
 mod common;
 

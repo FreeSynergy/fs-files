@@ -1,4 +1,5 @@
 //! Helpers for tests that look at the real directory behind the local backend.
+#![allow(clippy::needless_pass_by_value)] // tests: helper signatures kept simple, callers pass owned values
 
 use std::path::{Path, PathBuf};
 

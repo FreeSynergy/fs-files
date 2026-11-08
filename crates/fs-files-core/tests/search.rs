@@ -1,4 +1,5 @@
 //! Search and paging.
+#![allow(clippy::used_underscore_binding)] // tests: `_name` fixtures are kept alive on purpose and read by the harness
 
 mod common;
 

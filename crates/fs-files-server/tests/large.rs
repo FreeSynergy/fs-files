@@ -1,4 +1,5 @@
 //! A file larger than a message: it goes in and out in pieces, and no answer is bigger than a message allows.
+#![allow(clippy::cast_possible_truncation)] // tests: small known test sizes, truncation cannot happen
 
 mod common;
 

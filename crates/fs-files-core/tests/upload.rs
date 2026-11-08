@@ -1,4 +1,6 @@
 //! Resumable upload: offsets, restart, finish, abort, large files.
+#![allow(clippy::used_underscore_binding)] // tests: `_name` fixtures are kept alive on purpose and read by the harness
+#![allow(clippy::assert_is_empty)] // tests: plain `is_empty()` asserts read clearer than typed empty comparisons
 
 mod common;
 

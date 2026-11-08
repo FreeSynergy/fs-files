@@ -1,4 +1,7 @@
 //! A file larger than a chunk is never held whole and is read back in ranges.
+#![allow(clippy::cast_possible_truncation, clippy::used_underscore_binding)]
+// tests: small known test sizes, truncation cannot happen; tests: `_name` fixtures are kept alive on purpose and read by the harness
+#![allow(clippy::assert_is_empty)] // tests: plain `is_empty()` asserts read clearer than typed empty comparisons
 
 mod common;
 

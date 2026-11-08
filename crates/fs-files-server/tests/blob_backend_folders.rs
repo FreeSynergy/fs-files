@@ -134,7 +134,7 @@ async fn a_scan_of_a_long_folder_comes_in_pages_sorted_and_whole() {
             scan.get().init_cursor().set_opaque(&cursor);
             let answer = scan.send().promise.await.unwrap();
             let r = answer.get().unwrap();
-            for item in r.get_items().unwrap().iter() {
+            for item in r.get_items().unwrap() {
                 names.push(item.get_name().unwrap().to_str().unwrap().to_string());
             }
             pages += 1;

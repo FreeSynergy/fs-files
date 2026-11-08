@@ -1,5 +1,5 @@
 //! Shared helpers of the integration tests.
-
+#![allow(clippy::assert_is_empty)] // tests: plain `is_empty()` asserts read clearer than typed empty comparisons
 #![allow(dead_code)] // each test file uses a different subset
 
 pub mod disk;

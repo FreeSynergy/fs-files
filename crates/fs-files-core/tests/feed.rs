@@ -1,4 +1,5 @@
 //! `FileFeed` (`file.subscribe`): every change of a file or folder is told, nothing else is.
+#![allow(clippy::assert_is_empty, clippy::items_after_statements)] // tests: plain `is_empty()` asserts read clearer than typed empty comparisons; tests: a local `use` next to its use reads clearer
 
 mod common;
 

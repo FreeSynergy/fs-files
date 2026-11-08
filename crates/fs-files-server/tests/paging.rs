@@ -1,4 +1,5 @@
 //! Pages over the wire: a long folder in whole pages, a bad cursor refused, a search text refused at the door.
+#![allow(clippy::assert_is_empty)] // tests: plain `is_empty()` asserts read clearer than typed empty comparisons
 
 mod common;
 

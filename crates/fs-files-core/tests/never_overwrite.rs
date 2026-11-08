@@ -1,4 +1,5 @@
 //! Nothing the program does ever replaces a file or folder that is already there.
+#![allow(clippy::assert_is_empty, clippy::many_single_char_names)] // tests: plain `is_empty()` asserts read clearer than typed empty comparisons; tests: short bindings (a, b, x, y) are the clear names here
 
 mod common;
 
@@ -89,7 +90,7 @@ async fn the_programs_folder_is_not_a_user_name_and_is_not_listed() {
         report.added.is_empty() && report.skipped.is_empty(),
         "{report:?}"
     );
-    assert!(
+    assert_eq!(
         r.find(
             &fs_files_core::FileFilter {
                 trashed: true,
@@ -100,7 +101,7 @@ async fn the_programs_folder_is_not_a_user_name_and_is_not_listed() {
         .await
         .unwrap()
         .items
-        .len()
-            == 1
+        .len(),
+        1
     );
 }

@@ -1,4 +1,5 @@
 //! Files: metadata, move, copy, rename, trash, search, paging.
+#![allow(clippy::used_underscore_binding)] // tests: `_name` fixtures are kept alive on purpose and read by the harness
 
 mod common;
 
@@ -58,7 +59,7 @@ async fn move_rename_and_copy() {
     let f = upload(&e, None, "a.txt", "text/plain", b"content").await;
     let moved = e.move_file(f.id, Some(dir.id)).await.unwrap();
     assert_eq!(moved.folder, Some(dir.id));
-    assert!(names(&e, None).await == ["dir"]);
+    assert_eq!(names(&e, None).await, ["dir"]);
     let renamed = e.rename_file(f.id, "b.txt").await.unwrap();
     assert_eq!(renamed.name, "b.txt");
 

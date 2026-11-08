@@ -120,7 +120,7 @@ fn folders_rename_move_trash_restore_and_search_over_the_socket() {
         names(&source, Scope::Folder(Some(archive.key.clone())), ""),
         ["memo.txt"]
     );
-    assert!(source.trash_count().unwrap().files == 0);
+    assert_eq!(source.trash_count().unwrap().files, 0);
 
     // What this window does not do says so.
     assert_eq!(

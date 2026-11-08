@@ -1,4 +1,5 @@
 //! Finishing the same upload twice at once makes one file, not two records on one object.
+#![allow(clippy::many_single_char_names)] // tests: short bindings (a, b, x, y) are the clear names here
 
 mod common;
 

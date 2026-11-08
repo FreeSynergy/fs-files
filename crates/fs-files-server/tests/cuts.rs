@@ -70,7 +70,11 @@ async fn a_trash_report_arrives_whole_with_the_count_of_the_purged() {
         failed: (0..1000).map(|_| ObjectId::new()).collect(),
         ..Stub::default()
     };
-    let expected: Vec<_> = stub.failed.iter().map(|i| i.as_uuid()).collect();
+    let expected: Vec<_> = stub
+        .failed
+        .iter()
+        .map(fs_objects::ObjectId::as_uuid)
+        .collect();
     with_stub(stub, |root| async move {
         let c = caps(&root).await;
         let answer = c
@@ -144,7 +148,7 @@ async fn pending_uploads_come_oldest_first_in_pages_and_none_is_lost() {
             let r = answer.get().unwrap();
             let items = r.get_items().unwrap();
             assert!(items.len() <= 100 && !items.is_empty());
-            for item in items.iter() {
+            for item in items {
                 let id = item.get_id().unwrap().to_str().unwrap();
                 assert_eq!(id, format!("{seen:08}"), "oldest first, none skipped");
                 seen += 1;

@@ -1,5 +1,6 @@
 //! The S3 backend: the shared suite on a strict fake and on the `object_store` in-memory store, then
 //! what is specific to S3 (part sizes, restart, leftovers). A live server is in `s3_live.rs`.
+#![allow(clippy::assert_is_empty)] // tests: plain `is_empty()` asserts read clearer than typed empty comparisons
 #![cfg(feature = "s3")]
 
 mod common;

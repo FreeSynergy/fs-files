@@ -1,4 +1,5 @@
 //! The support report names the store of the provider (`SupportReport.instance`), and only there.
+#![allow(clippy::assert_is_empty)] // tests: plain `is_empty()` asserts read clearer than typed empty comparisons
 
 mod common;
 

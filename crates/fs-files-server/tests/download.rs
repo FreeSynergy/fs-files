@@ -1,4 +1,5 @@
 //! Reading a file through its `Blob`: ranges, the end, the media type, a file changed outside.
+#![allow(clippy::assert_is_empty)] // tests: plain `is_empty()` asserts read clearer than typed empty comparisons
 
 mod common;
 

@@ -1,5 +1,7 @@
 //! One behaviour suite for every `BlobBackend` (ADR 0045: two providers, one behaviour).
 //! Each backend's test file calls these functions; they cannot drift apart.
+#![allow(clippy::cast_possible_truncation)] // tests: small known test sizes, truncation cannot happen
+#![allow(clippy::assert_is_empty)] // tests: plain `is_empty()` asserts read clearer than typed empty comparisons
 
 use fs_files_core::{BlobBackend, Error, format_checksum};
 

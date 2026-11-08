@@ -1,4 +1,5 @@
 //! Emptying the trash and choosing where a file is restored.
+#![allow(clippy::assert_is_empty)] // tests: plain `is_empty()` asserts read clearer than typed empty comparisons
 
 mod common;
 

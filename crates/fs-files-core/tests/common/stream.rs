@@ -1,4 +1,5 @@
 //! Streaming checks shared by every backend: a blob larger than a chunk, and a restart in the middle.
+#![allow(clippy::cast_possible_truncation)] // tests: small known test sizes, truncation cannot happen
 
 use std::future::Future;
 use std::sync::Arc;

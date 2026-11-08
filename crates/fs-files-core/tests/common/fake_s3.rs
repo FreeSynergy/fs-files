@@ -1,5 +1,6 @@
 //! A strict in-memory S3: it enforces what a real S3 enforces (parts of at least 5 MiB except the
 //! last, at most 10 000 parts, ranges inside the object), so the backend's logic is tested without a server.
+#![allow(clippy::cast_possible_truncation)] // tests: small known test sizes, truncation cannot happen
 
 use std::collections::{BTreeMap, HashMap};
 use std::sync::Mutex;

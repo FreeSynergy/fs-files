@@ -1,4 +1,5 @@
 //! The rule for a taken name: refuse (default) or keep both. Nothing is ever replaced.
+#![allow(clippy::many_single_char_names)] // tests: short bindings (a, b, x, y) are the clear names here
 
 mod common;
 

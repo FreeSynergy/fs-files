@@ -1,4 +1,4 @@
-//! The same suites against a live S3 server (RustFS, MinIO, AWS...). Ignored by default; set
+//! The same suites against a live S3 server (RustFS, `MinIO`, AWS...). Ignored by default; set
 //! `FS_FILES_S3_ENDPOINT`, `FS_FILES_S3_BUCKET`, `FS_FILES_S3_ACCESS_KEY`, `FS_FILES_S3_SECRET_KEY`
 //! (the bucket must exist) and run `cargo test --test s3_live -- --ignored`.
 #![cfg(feature = "s3")]

@@ -1,4 +1,5 @@
 //! S3 configuration: credentials stay secret, bad input is refused, an unreachable server is found at `backend.add`.
+#![allow(clippy::needless_pass_by_value)] // tests: helper signatures kept simple, callers pass owned values
 #![cfg(feature = "s3")]
 
 mod common;

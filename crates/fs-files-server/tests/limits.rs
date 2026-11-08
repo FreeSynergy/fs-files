@@ -1,4 +1,5 @@
 //! What does not fit one message, as a consumer sees it: refused or cut, and the connection stays.
+#![allow(clippy::cast_possible_truncation)] // tests: small known test sizes, truncation cannot happen
 
 mod common;
 

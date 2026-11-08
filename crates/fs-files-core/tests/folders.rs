@@ -1,4 +1,5 @@
 //! Folders: names, nesting, moving, deleting.
+#![allow(clippy::assert_is_empty)] // tests: plain `is_empty()` asserts read clearer than typed empty comparisons
 
 mod common;
 

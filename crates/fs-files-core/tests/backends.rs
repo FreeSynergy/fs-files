@@ -1,4 +1,5 @@
 //! Backends are swappable at runtime; files remember where their bytes are.
+#![allow(clippy::assert_is_empty)] // tests: plain `is_empty()` asserts read clearer than typed empty comparisons
 
 mod common;
 
@@ -119,15 +120,15 @@ async fn a_bad_configuration_changes_nothing() {
         );
     }
     assert_eq!(r.list_backends().await.unwrap(), before);
-    assert!(
+    assert_eq!(
         r.list_backends()
             .await
             .unwrap()
             .iter()
             .find(|b| b.active)
             .unwrap()
-            .id
-            == "main"
+            .id,
+        "main"
     );
 }
 
@@ -139,7 +140,7 @@ async fn errors_never_repeat_the_configuration() {
     assert!(!err.contains("hunter2"), "{err}");
     let err = env
         .repo
-        .add_backend(r#"hunter2-secret {"#)
+        .add_backend(r"hunter2-secret {")
         .await
         .unwrap_err()
         .to_string();

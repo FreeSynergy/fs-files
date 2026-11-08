@@ -1,5 +1,6 @@
 //! `subscribe` over a real socket: every change of a file or folder is told with its envelope, until
 //! the consumer drops the subscription; a provider without a feed says so; a feed that cannot go on says so.
+#![allow(clippy::unused_async_trait_impl)] // the trait dictates `async fn`
 
 mod common;
 

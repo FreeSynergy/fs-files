@@ -18,6 +18,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     local.run_until(run()).await
 }
 
+#[allow(clippy::similar_names)] // `make` (the request) and `made` (its reply) are the clear pair
 async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let dir = tempfile::tempdir()?;
     let store: Arc<dyn Store> = Arc::new(TursoStore::open_in_memory().await?);
@@ -46,6 +47,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut make = folders.create_folder_request();
     make.get().init_parent();
     make.get().set_name("Docs");
+    // `make` (the request) and `made` (its reply) are the clear pair
     let made = make.send().promise.await?;
     let docs = read_envelope(made.get()?.get_folder()?.get_envelope()?)?
         .id

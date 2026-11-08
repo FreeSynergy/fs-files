@@ -1,4 +1,5 @@
 //! Folders over the wire: make, rename, move, delete, resolve, list; the disk follows.
+#![allow(clippy::assert_is_empty)] // tests: plain `is_empty()` asserts read clearer than typed empty comparisons
 
 mod common;
 

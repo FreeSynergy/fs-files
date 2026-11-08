@@ -1,4 +1,5 @@
 //! The trash over the wire: trash, restore, restore elsewhere, purge, empty; nothing is deleted before purge.
+#![allow(clippy::assert_is_empty)] // tests: plain `is_empty()` asserts read clearer than typed empty comparisons
 
 mod common;
 

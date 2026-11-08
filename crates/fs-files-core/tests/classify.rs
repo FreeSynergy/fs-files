@@ -1,4 +1,5 @@
 //! Sensitive categories (ADR 0029): they go to the envelope; the store decides if it may hold them.
+#![allow(clippy::assert_is_empty)] // tests: plain `is_empty()` asserts read clearer than typed empty comparisons
 
 mod common;
 

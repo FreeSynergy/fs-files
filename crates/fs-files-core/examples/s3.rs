@@ -1,7 +1,7 @@
 //! Add an S3 backend (RustFS or any S3 store) at runtime and upload a file to it.
 //!
-//! FS_FILES_S3_ENDPOINT=http://127.0.0.1:9000 FS_FILES_S3_BUCKET=files \
-//! FS_FILES_S3_ACCESS_KEY=... FS_FILES_S3_SECRET_KEY=... cargo run -p fs-files-core --example s3
+//! `FS_FILES_S3_ENDPOINT=http://127.0.0.1:9000` `FS_FILES_S3_BUCKET=files` \
+//! `FS_FILES_S3_ACCESS_KEY`=... `FS_FILES_S3_SECRET_KEY`=... cargo run -p fs-files-core --example s3
 
 use std::sync::Arc;
 
