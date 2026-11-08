@@ -89,6 +89,7 @@ fn folders_rename_move_trash_restore_and_search_over_the_socket() {
     let moved_name = source
         .move_to(&note.reference(), Some(&docs.key), NameRule::Refuse)
         .unwrap();
+    assert_eq!(moved_name, "note.txt", "the name it has now");
     assert_eq!(
         names(&source, Scope::Folder(Some(docs.key.clone())), ""),
         ["note.txt"]
