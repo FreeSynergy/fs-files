@@ -3,6 +3,8 @@ resolver = "2"
 members = ["crates/fs-files-core", "crates/fs-files-server", "crates/fs-files-app", "crates/fs-files"]
 
 [workspace.package]
+authors = ["FreeSynergy <support@freesynergy.net>"]
+repository = "https://github.com/FreeSynergy/fs-files"
 version = "0.0.2"
 edition = "2024"
 license = "MIT OR Apache-2.0"
