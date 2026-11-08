@@ -2,7 +2,7 @@
 //!
 //! Pattern: Proxy — a Cap'n Proto client lives on one thread, so a worker thread owns the connection
 //! and every call is a job handed to it; the caller waits on a plain channel (the window thread is not
-//! inside a runtime). The `FileSource` of the workbench is implemented on it in `source.rs`.
+//! inside a runtime). The `FileSource` of the workbench is implemented on it in `source/`.
 
 use std::future::Future;
 use std::path::Path;
