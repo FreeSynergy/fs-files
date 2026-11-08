@@ -87,8 +87,14 @@ impl FilesRemote {
                         .get_next()
                         .and_then(common_capnp::cursor::Reader::get_opaque)
                         .map_err(|e| problem(&e))?;
-                    page_of(page.get_items().map_err(|e| problem(&e))?, next)
-                        .map_err(|e| problem(&e))
+                    let mut found = page_of(page.get_items().map_err(|e| problem(&e))?, next)
+                        .map_err(|e| problem(&e))?;
+                    // The contract cannot say "the top level only": an unset folder means anywhere. A
+                    // filter without a search word at the top level keeps what lies at the top.
+                    if term.is_empty() && matches!(scope, Scope::Folder(None)) {
+                        found.entries.retain(|e| e.folder.is_none());
+                    }
+                    Ok(found)
                 })
             }
         }

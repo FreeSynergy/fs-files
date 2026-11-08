@@ -40,20 +40,32 @@ impl FilesRemote {
     ) -> Result<String, FileError> {
         let (key, kind, name) = (id(&entry.key)?, entry.kind, name.to_string());
         self.run(move |c| async move {
+            // The name it has now: under keep-both the server may have chosen another than asked.
             if kind == EntryKind::Folder {
                 let mut call = c.folders.rename_folder_request();
                 write_uuid(call.get().init_id(), Some(key));
                 call.get().set_name(name.as_str());
                 call.get().set_on_conflict(on_conflict(rule));
-                call.send().promise.await.map_err(|e| problem(&e))?;
+                let answer = call.send().promise.await.map_err(|e| problem(&e))?;
+                answer
+                    .get()
+                    .and_then(folders::rename_folder_results::Reader::get_folder)
+                    .and_then(folder_of)
+                    .map(|f| f.name)
+                    .map_err(|e| problem(&e))
             } else {
                 let mut call = c.folders.rename_file_request();
                 write_uuid(call.get().init_id(), Some(key));
                 call.get().set_name(name.as_str());
                 call.get().set_on_conflict(on_conflict(rule));
-                call.send().promise.await.map_err(|e| problem(&e))?;
+                let answer = call.send().promise.await.map_err(|e| problem(&e))?;
+                answer
+                    .get()
+                    .and_then(folders::rename_file_results::Reader::get_file)
+                    .and_then(file_of)
+                    .map(|f| f.name)
+                    .map_err(|e| problem(&e))
             }
-            Ok(key.to_string())
         })
     }
 
@@ -70,15 +82,26 @@ impl FilesRemote {
                 write_uuid(call.get().init_id(), Some(key));
                 write_uuid(call.get().init_parent(), to);
                 call.get().set_on_conflict(on_conflict(rule));
-                call.send().promise.await.map_err(|e| problem(&e))?;
+                let answer = call.send().promise.await.map_err(|e| problem(&e))?;
+                answer
+                    .get()
+                    .and_then(folders::move_folder_results::Reader::get_folder)
+                    .and_then(folder_of)
+                    .map(|f| f.name)
+                    .map_err(|e| problem(&e))
             } else {
                 let mut call = c.folders.move_file_request();
                 write_uuid(call.get().init_id(), Some(key));
                 write_uuid(call.get().init_folder(), to);
                 call.get().set_on_conflict(on_conflict(rule));
-                call.send().promise.await.map_err(|e| problem(&e))?;
+                let answer = call.send().promise.await.map_err(|e| problem(&e))?;
+                answer
+                    .get()
+                    .and_then(folders::move_file_results::Reader::get_file)
+                    .and_then(file_of)
+                    .map(|f| f.name)
+                    .map_err(|e| problem(&e))
             }
-            Ok(key.to_string())
         })
     }
 
@@ -99,7 +122,7 @@ impl FilesRemote {
                 .get()
                 .and_then(folders::copy_file_results::Reader::get_file)
                 .and_then(file_of)
-                .map(|f| f.key)
+                .map(|f| f.name)
                 .map_err(|e| problem(&e))
         })
     }
@@ -136,8 +159,13 @@ impl FilesRemote {
             let mut call = c.folders.restore_request();
             write_uuid(call.get().init_id(), Some(key));
             call.get().set_on_conflict(on_conflict(rule));
-            call.send().promise.await.map_err(|e| problem(&e))?;
-            Ok(key.to_string())
+            let answer = call.send().promise.await.map_err(|e| problem(&e))?;
+            answer
+                .get()
+                .and_then(folders::restore_results::Reader::get_file)
+                .and_then(file_of)
+                .map(|f| f.name)
+                .map_err(|e| problem(&e))
         })
     }
 
@@ -153,8 +181,13 @@ impl FilesRemote {
             write_uuid(call.get().init_id(), Some(key));
             write_uuid(call.get().init_folder(), to);
             call.get().set_on_conflict(on_conflict(rule));
-            call.send().promise.await.map_err(|e| problem(&e))?;
-            Ok(key.to_string())
+            let answer = call.send().promise.await.map_err(|e| problem(&e))?;
+            answer
+                .get()
+                .and_then(folders::restore_to_results::Reader::get_file)
+                .and_then(file_of)
+                .map(|f| f.name)
+                .map_err(|e| problem(&e))
         })
     }
 

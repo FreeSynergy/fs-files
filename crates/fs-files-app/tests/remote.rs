@@ -86,23 +86,24 @@ fn folders_rename_move_trash_restore_and_search_over_the_socket() {
         .remove(0);
     assert_eq!((note.kind, note.size), (EntryKind::File, 5));
 
-    let moved = source
+    let moved_name = source
         .move_to(&note.reference(), Some(&docs.key), NameRule::Refuse)
         .unwrap();
     assert_eq!(
         names(&source, Scope::Folder(Some(docs.key.clone())), ""),
         ["note.txt"]
     );
-    source
+    let renamed = source
         .rename(
             &EntryRef {
-                key: moved.clone(),
+                key: note.key.clone(),
                 kind: EntryKind::File,
             },
             "memo.txt",
             NameRule::Refuse,
         )
         .unwrap();
+    assert_eq!(renamed, "memo.txt", "the name it has now, not the id");
     assert_eq!(names(&source, Scope::Everywhere, "memo"), ["memo.txt"]);
 
     // A taken name is the workbench's own kind of problem, with the server's words.
@@ -110,11 +111,11 @@ fn folders_rename_move_trash_restore_and_search_over_the_socket() {
     let clash = source.create_folder(Some(&docs.key), "Sub").unwrap_err();
     assert_eq!(clash.problem, FileProblem::NameConflict, "{clash}");
 
-    source.trash(&moved).unwrap();
+    source.trash(&note.key).unwrap();
     assert_eq!(names(&source, Scope::Trash, ""), ["memo.txt"]);
     assert_eq!(source.trash_count().unwrap().files, 1);
     source
-        .restore_to(&moved, Some(&archive.key), NameRule::Refuse)
+        .restore_to(&note.key, Some(&archive.key), NameRule::Refuse)
         .unwrap();
     assert_eq!(
         names(&source, Scope::Folder(Some(archive.key.clone())), ""),
@@ -124,7 +125,7 @@ fn folders_rename_move_trash_restore_and_search_over_the_socket() {
 
     // What this window does not do says so.
     assert_eq!(
-        source.preview(&moved, 10).unwrap_err().problem,
+        source.preview(&note.key, 10).unwrap_err().problem,
         FileProblem::Unsupported
     );
     assert!(!source.capabilities().upload);
@@ -137,4 +138,27 @@ fn nothing_on_the_socket_is_said_plainly() {
         .err()
         .unwrap();
     assert!(message.contains("fs-files serve"), "{message}");
+}
+
+#[test]
+fn a_size_filter_at_the_top_level_keeps_what_lies_at_the_top() {
+    let dir = tempfile::tempdir().unwrap();
+    let (socket, root) = (dir.path().join("files.sock"), dir.path().join("files"));
+    start_server(&socket, &root);
+    let source = FilesRemote::connect(&socket).unwrap();
+    let sub = source.create_folder(None, "Sub").unwrap();
+    std::fs::write(root.join("top.txt"), "0123456789").unwrap();
+    std::fs::create_dir_all(root.join("Sub")).unwrap();
+    std::fs::write(root.join("Sub").join("deep.txt"), "0123456789").unwrap();
+    source.rescan(None).unwrap();
+    let mut filter = ListFilter::default();
+    filter.min_size = Some(5);
+    let page = source
+        .list(
+            &ListRequest::new(Scope::Folder(None), "", filter, SortOrder::default()),
+            None,
+        )
+        .unwrap();
+    let names: Vec<_> = page.entries.iter().map(|e| e.name.as_str()).collect();
+    assert_eq!(names, ["top.txt"], "{names:?} (sub folder {})", sub.key);
 }
