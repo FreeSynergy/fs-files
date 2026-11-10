@@ -51,13 +51,17 @@ pub fn spawn(command: &mut Command, socket: &Path) -> Child {
     let _ = socket;
     let child = command.stderr(Stdio::null()).spawn().unwrap();
     #[cfg(windows)]
-    LEASES.lock().unwrap().push((child.id(), held));
+    LEASES
+        .lock()
+        .unwrap()
+        .push((child.id(), socket.to_owned(), held));
     child
 }
 
 /// The leases the tests of this process hold on the servers they started (Windows only needs them).
 #[cfg(windows)]
-static LEASES: std::sync::Mutex<Vec<(u32, std::fs::File)>> = std::sync::Mutex::new(Vec::new());
+static LEASES: std::sync::Mutex<Vec<(u32, std::path::PathBuf, std::fs::File)>> =
+    std::sync::Mutex::new(Vec::new());
 
 /// True while a server answers on `socket`.
 pub async fn is_up(socket: &Path) -> bool {
@@ -88,9 +92,15 @@ pub fn terminate(mut child: Child) {
 #[cfg(windows)]
 pub fn terminate(mut child: Child) {
     // Letting go of the lease is what ends the server in order: it looks every 100 ms and ends after three empty looks.
+    // Every lease on the socket of this server is let go of: a second server that was refused (and ended at once) also took one,
+    // and a lease that nobody ever lets go of would keep the first server alive.
     let mut leases = LEASES.lock().unwrap();
-    let held = leases.iter().any(|(pid, _)| *pid == child.id());
-    leases.retain(|(pid, _)| *pid != child.id());
+    let socket = leases
+        .iter()
+        .find(|(pid, _, _)| *pid == child.id())
+        .map(|(_, socket, _)| socket.clone());
+    let held = socket.is_some();
+    leases.retain(|(_, s, _)| Some(s) != socket.as_ref());
     drop(leases);
     if !held {
         // A server that was not started through `spawn` has no lease to let go of: never wait for ever.

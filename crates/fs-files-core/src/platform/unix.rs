@@ -14,6 +14,10 @@ impl NameRules for UnixNames {
     fn refuse(&self, _name: &str) -> Option<&'static str> {
         None
     }
+
+    fn same_name(&self, a: &str, b: &str) -> bool {
+        a == b
+    }
 }
 
 impl Durability for UnixDurability {

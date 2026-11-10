@@ -3,7 +3,7 @@
 
 mod common;
 
-use common::disk::{exists, on_disk, root};
+use common::disk::{on_disk, root};
 use common::{env, names, read_all, upload};
 use fs_files_core::{
     BlobBackend, Error, FileFilter, Files, LocalFolder, OnConflict, Spot, Transfer,
@@ -195,7 +195,7 @@ async fn the_reserved_name_is_refused_in_any_case_and_odd_errors_have_problem_ty
     }
     // (Windows has one `.fs-files` for every case, so nothing can be said by looking for the other spelling)
     #[cfg(unix)]
-    assert!(!exists(&e, ".FS-FILES"));
+    assert!(!common::disk::exists(&e, ".FS-FILES"));
     // a symlink at a place the program is about to use is "changed outside", not "invalid name"
     let d = r.create_folder(None, "d").await.unwrap();
     std::fs::remove_dir(root(&e).join("d")).unwrap();

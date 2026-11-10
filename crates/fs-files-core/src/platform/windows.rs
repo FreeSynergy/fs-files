@@ -35,6 +35,16 @@ impl NameRules for WindowsNames {
         }
         None
     }
+
+    fn same_name(&self, a: &str, b: &str) -> bool {
+        Self::lower(a) == Self::lower(b)
+    }
+}
+
+impl WindowsNames {
+    fn lower(name: &str) -> String {
+        name.to_lowercase()
+    }
 }
 
 impl Durability for WindowsDurability {

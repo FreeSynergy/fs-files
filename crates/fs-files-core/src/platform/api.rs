@@ -8,6 +8,9 @@ use std::path::Path;
 pub(crate) trait NameRules: Send + Sync {
     /// Why `name`, one segment of a path, is not a name on this disk; `None` when it is fine.
     fn refuse(&self, name: &str) -> Option<&'static str>;
+
+    /// True when the disk keeps `a` and `b` as one name (Windows ignores case: `Other` and `OTHER`; Unix keeps both).
+    fn same_name(&self, a: &str, b: &str) -> bool;
 }
 
 /// Making a change to a folder durable, so that a rename or a new file that was reported is still there after a power loss.

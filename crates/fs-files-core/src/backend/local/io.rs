@@ -76,6 +76,11 @@ pub(super) fn rename_new(from: &Path, to: &Path, native: bool) -> std::io::Resul
     {
         return Ok(());
     }
+    // A change of case only (`Other` to `OTHER`) on a disk that keeps one name for both is the same entry under a new spelling:
+    // it is renamed in place, and nothing is replaced because nothing else has that name.
+    if same_entry_new_spelling(from, to) {
+        return std::fs::rename(from, to);
+    }
     // Fallback. A file is moved by hard link + unlink, which refuses an existing target atomically
     // (POSIX `link`). A folder cannot be linked: "look, then rename" is the best there is, and a folder
     // created in between could be replaced if it is empty (never one with content).
@@ -88,6 +93,17 @@ pub(super) fn rename_new(from: &Path, to: &Path, native: bool) -> std::io::Resul
     }
     std::fs::hard_link(from, to)?;
     std::fs::remove_file(from)
+}
+
+/// `from` and `to` sit in one folder and their names differ only in what the disk ignores (the case, on Windows).
+fn same_entry_new_spelling(from: &Path, to: &Path) -> bool {
+    let (Some(a), Some(b)) = (
+        from.file_name().and_then(|n| n.to_str()),
+        to.file_name().and_then(|n| n.to_str()),
+    ) else {
+        return false;
+    };
+    a != b && from.parent() == to.parent() && crate::platform::current().names.same_name(a, b)
 }
 
 /// Turn an IO error of a name-based operation into the error the caller should see.

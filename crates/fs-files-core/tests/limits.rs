@@ -111,7 +111,16 @@ async fn moving_a_folder_whose_subtree_would_not_fit_is_refused_up_front() {
     let short = if cfg!(unix) {
         std::path::PathBuf::from("/tmp")
     } else {
-        std::env::temp_dir()
+        // The top of the system drive (a runner or an administrator may write there), else the temp folder.
+        let top = std::path::PathBuf::from(format!(
+            "{}\\",
+            std::env::var("SystemDrive").unwrap_or_else(|_| "C:".into())
+        ));
+        if tempfile::tempdir_in(&top).is_ok() {
+            top
+        } else {
+            std::env::temp_dir()
+        }
     };
     let dir = tempfile::tempdir_in(short).unwrap();
     let blobs = dir.path().join("blobs");
