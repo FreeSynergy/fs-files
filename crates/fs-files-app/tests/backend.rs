@@ -84,7 +84,7 @@ fn files_are_uploaded_listed_changed_trashed_restored_and_downloaded() {
         names(&files, &v(&[("name", "renamed (copy)")])),
         ["renamed (copy).txt"]
     );
-    assert!(copy.values["copy"][0] != id);
+    assert_ne!(copy.values["copy"][0], id);
     files
         .run(
             "classify",
@@ -106,7 +106,10 @@ fn files_are_uploaded_listed_changed_trashed_restored_and_downloaded() {
     );
 
     files.run("delete", &v(&[("file", &id)])).unwrap();
-    assert!(names(&files, &v(&[("name", "renamed.txt")])).is_empty());
+    assert_eq!(
+        names(&files, &v(&[("name", "renamed.txt")])),
+        Vec::<String>::new()
+    );
     assert_eq!(names(&files, &v(&[("state", "trashed")])), ["renamed.txt"]);
     files.run("restore", &v(&[("file", &id)])).unwrap();
     assert_eq!(
@@ -115,7 +118,10 @@ fn files_are_uploaded_listed_changed_trashed_restored_and_downloaded() {
     );
     files.run("delete", &v(&[("file", &id)])).unwrap();
     files.run("purge", &v(&[("file", &id)])).unwrap();
-    assert!(names(&files, &v(&[("state", "trashed")])).is_empty());
+    assert_eq!(
+        names(&files, &v(&[("state", "trashed")])),
+        Vec::<String>::new()
+    );
     let empty = files.run("emptyTrash", &Values::new()).unwrap();
     assert_eq!(empty.values["purged"], ["0"]);
     assert!(matches!(

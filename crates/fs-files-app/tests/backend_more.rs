@@ -52,7 +52,7 @@ fn pictures_are_the_image_files_and_albums_do_not_exist_yet() {
         .unwrap();
     assert_eq!(std::fs::read(&target).unwrap().len(), 4);
 
-    assert!(AlbumBackend.list(&Values::new()).unwrap().is_empty());
+    assert_eq!(AlbumBackend.list(&Values::new()).unwrap(), []);
 }
 
 #[test]
