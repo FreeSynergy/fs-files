@@ -22,6 +22,7 @@ mod backend_storage;
 mod catalog;
 mod detach;
 pub mod gui;
+mod link;
 mod listing;
 mod remote;
 mod transfer;

@@ -46,7 +46,11 @@ pub fn v(pairs: &[(&str, &str)]) -> Values {
 }
 
 pub fn url(p: &Path) -> String {
-    format!("file://{}", p.display())
+    // Windows writes the path after three slashes, with the drive letter first: `file:///C:/Users/me/a.txt`.
+    #[cfg(windows)]
+    return format!("file:///{}", p.display().to_string().replace('\\', "/"));
+    #[cfg(unix)]
+    return format!("file://{}", p.display());
 }
 
 pub struct World {

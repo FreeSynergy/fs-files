@@ -30,10 +30,14 @@ jobs:
       # One step per crate with a time limit, so a test that waits for ever on Windows shows which crate it is in.
       - run: cargo test -p fs-files-types -p fs-files-app --all-features --no-fail-fast
         timeout-minutes: 15
+        if: ${{ !cancelled() }}
       - run: cargo test -p fs-files-core --all-features --no-fail-fast
         timeout-minutes: 20
+        if: ${{ !cancelled() }}
       - run: cargo test -p fs-files-server --all-features --no-fail-fast
         timeout-minutes: 20
+        if: ${{ !cancelled() }}
       - run: cargo test -p fs-files --all-features --no-fail-fast
         timeout-minutes: 15
+        if: ${{ !cancelled() }}
       - uses: FreeSynergy/fs-release/actions/rust-rules@main

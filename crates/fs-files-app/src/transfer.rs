@@ -60,8 +60,9 @@ pub(crate) fn path_of(input: &Values, field: &str) -> Result<PathBuf, BackendErr
         }
     }
     String::from_utf8(out)
-        .map(PathBuf::from)
-        .map_err(|_| rejected(field, TypeProblem::BadUri))
+        .ok()
+        .and_then(|text| crate::link::current().path_of(&text))
+        .ok_or_else(|| rejected(field, TypeProblem::BadUri))
 }
 
 fn io(e: &std::io::Error) -> BackendError {
