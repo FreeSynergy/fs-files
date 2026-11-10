@@ -281,7 +281,7 @@ Every command of the core and **every capability id of both `requirements.md`** 
 
 ```text
 Album: find create edit delete add remove nest query suggest sort           (no album object in the core; the list is empty)
-File: subscribe (a stream, not a one-shot command: the core has FileFeed) preview nameCheck renameBulk trashConfigure
+File: uploadResume subscribe (a stream, not a one-shot command: the core has FileFeed) preview nameCheck renameBulk trashConfigure
       shareCreate shareRevoke shareRole versions revert pin encrypt syncConfigure tag duplicates searchContent link
       searchSave lock fileRequest undo
 Folder: archive
@@ -296,6 +296,7 @@ Answered for `Picture`: `find` (= `media.list`, `media.search`: the image files)
 
 ### Provisional decisions and findings (for the strategy)
 
+* Record ids and reference values are `urn:uuid:<uuid>` (a reference must be an absolute IRI for the basic type); the backend reads both forms. A move without the `folder`/`parent` field leaves the place unchanged, an empty list means the top level; `classify` without `sensitive` leaves the marking (rule for changing). A list command (kind `find`) with an input the core does not know (`searchContent` …) answers `unsupported:<key>`, never everything.
 * No quantity type in `fs-types` yet: a size is decimal text (`size`, `minSize`, `maxSize`).
 * A name that is taken has no `TypeProblem` code; it is reported as `choice.not-in-list` on the field `name` (the frontend shows the form finding). Other refusals of the core are `Unavailable(text)`.
 * `upload` and `download` take a `file:` link (`BasicType::Link`) for the local path: the form has no file chooser (a component, the frontend's). A download never replaces an existing file.

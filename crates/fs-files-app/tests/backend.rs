@@ -1,83 +1,13 @@
-//! The `Backend` of each data type over the socket: `FilesRemote` against a real server, repository and folder.
+//! The `Backend` of `File` and `Folder` over the socket: `FilesRemote` against a real server, repository and folder.
 //!
 //! Pattern: Integration test — the server runs on its own thread and socket; the backends are the ones the window uses.
 
-use std::path::Path;
-use std::sync::Arc;
+mod support;
 
 use fs_admin_frontend::{Backend, BackendError, Values};
-use fs_files_app::{
-    AlbumBackend, FileBackend, FilesRemote, FolderBackend, PictureBackend, StorageBackendBackend,
-};
-use fs_files_core::{FileRepo, LocalFolder};
-use fs_files_server::FilesServer;
-use fs_interfaces::rpc::{bind_socket, serve};
-use fs_objects::{Store, TursoStore};
-
-const ME: &str = "https://local.invalid/users/owner";
-
-fn start_server(socket: &Path, root: &Path) {
-    let (socket, root) = (socket.to_path_buf(), root.to_path_buf());
-    let (up, started) = std::sync::mpsc::channel();
-    std::thread::spawn(move || {
-        let runtime = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .unwrap();
-        tokio::task::LocalSet::new().block_on(&runtime, async move {
-            let store: Arc<dyn Store> = Arc::new(TursoStore::open_in_memory().await.unwrap());
-            let backend = Arc::new(LocalFolder::open(&root).await.unwrap());
-            let repo = Arc::new(FileRepo::new(store, ME, "main", backend));
-            let server = FilesServer::new(repo.clone(), repo.clone(), repo.clone(), repo);
-            let bound = bind_socket(&socket).await.unwrap();
-            up.send(()).unwrap();
-            serve(bound, server.into_client().client, std::future::pending())
-                .await
-                .ok();
-        });
-    });
-    started.recv().unwrap();
-}
-
-fn v(pairs: &[(&str, &str)]) -> Values {
-    pairs
-        .iter()
-        .map(|(k, x)| ((*k).to_owned(), vec![(*x).to_owned()]))
-        .collect()
-}
-
-fn url(p: &Path) -> String {
-    format!("file://{}", p.display())
-}
-
-struct World {
-    _dir: tempfile::TempDir,
-    dir: std::path::PathBuf,
-    remote: Arc<FilesRemote>,
-}
-
-fn world() -> World {
-    let dir = tempfile::tempdir().unwrap();
-    let (socket, root) = (dir.path().join("files.sock"), dir.path().join("files"));
-    start_server(&socket, &root);
-    let remote = Arc::new(FilesRemote::connect(&socket).unwrap());
-    World {
-        dir: dir.path().to_path_buf(),
-        _dir: dir,
-        remote,
-    }
-}
-
-fn names(b: &dyn Backend, query: &Values) -> Vec<String> {
-    let mut n: Vec<String> = b
-        .list(query)
-        .unwrap()
-        .iter()
-        .map(|r| r.values["name"][0].clone())
-        .collect();
-    n.sort();
-    n
-}
+use fs_files_app::{FileBackend, FolderBackend};
+use fs_types::BasicRules;
+use support::{names, url, v, world};
 
 #[test]
 fn the_server_describes_all_five_types() {
@@ -137,7 +67,9 @@ fn files_are_uploaded_listed_changed_trashed_restored_and_downloaded() {
         .run("rename", &v(&[("file", &id), ("name", "renamed.txt")]))
         .unwrap();
     assert_eq!(names(&files, &v(&[("name", "renamed")])), ["renamed.txt"]);
-    files.run("move", &v(&[("file", &id)])).unwrap();
+    let mut top = v(&[("file", &id)]);
+    top.insert("folder".into(), Vec::new());
+    files.run("move", &top).unwrap();
     assert!(
         files
             .list(&Values::new())
@@ -219,126 +151,138 @@ fn folders_are_created_renamed_moved_deleted_and_rescanned() {
     folders
         .run("rename", &v(&[("folder", &b), ("name", "C")]))
         .unwrap();
-    folders.run("move", &v(&[("folder", &b)])).unwrap();
+    let mut top = v(&[("folder", &b)]);
+    top.insert("parent".into(), Vec::new());
+    folders.run("move", &top).unwrap();
     let rows = folders.list(&Values::new()).unwrap();
     let moved = rows.iter().find(|r| r.id == b).unwrap();
     assert!(!moved.values.contains_key("parent"));
     folders.run("resolve", &v(&[("folder", &b)])).unwrap();
 
-    std::fs::write(w.dir.join("files").join("found.txt"), "x").unwrap();
+    std::fs::write(w.dir.join("files").join("A").join("found.txt"), "x").unwrap();
     let scan = folders.run("rescan", &v(&[("folder", &a)])).unwrap();
-    assert!(scan.values.contains_key("skipped"));
+    assert_eq!(scan.values["added"], ["found.txt"]);
     folders.run("delete", &v(&[("folder", &b)])).unwrap();
     assert_eq!(names(&folders, &Values::new()), ["A"]);
 }
 
 #[test]
-fn pictures_are_the_image_files_and_albums_do_not_exist_yet() {
+fn ids_and_references_are_absolute_iris_that_the_basic_type_accepts() {
     let w = world();
-    let (files, pictures) = (
+    let (files, folders) = (
         FileBackend(w.remote.clone()),
-        PictureBackend(w.remote.clone()),
+        FolderBackend(w.remote.clone()),
     );
-    let (photo, text) = (w.dir.join("p.png"), w.dir.join("t.txt"));
-    std::fs::write(&photo, [0x89, b'P', b'N', b'G']).unwrap();
-    std::fs::write(&text, "x").unwrap();
-    let id = files
-        .run(
-            "upload",
-            &v(&[("source", &url(&photo)), ("mediaType", "image/png")]),
-        )
+    let dir = folders
+        .run("create", &v(&[("name", "D")]))
         .unwrap()
         .id
         .unwrap();
-    files.run("upload", &v(&[("source", &url(&text))])).unwrap();
-    let rows = pictures.list(&Values::new()).unwrap();
-    assert_eq!(rows.len(), 1);
-    assert_eq!(rows[0].values["file"], std::slice::from_ref(&id));
-
-    pictures
-        .run(
-            "sensitiveMark",
-            &v(&[("picture", &id), ("sensitive", "dpv:Health")]),
-        )
+    assert!(dir.starts_with("urn:uuid:"), "{dir}");
+    let local = w.dir.join("a b.txt");
+    std::fs::write(&local, "x").unwrap();
+    // a path with a space typed as a link: the percent code is decoded
+    let encoded = format!("file://{}", local.display()).replace(' ', "%20");
+    let id = files
+        .run("upload", &v(&[("source", &encoded), ("folder", &dir)]))
+        .unwrap()
+        .id
         .unwrap();
-    assert_eq!(
-        pictures.list(&Values::new()).unwrap()[0].values["sensitive"],
-        ["dpv:Health"]
-    );
-    let target = w.dir.join("copy.png");
-    pictures
-        .run(
-            "download",
-            &v(&[("picture", &id), ("target", &url(&target))]),
-        )
-        .unwrap();
-    assert_eq!(std::fs::read(&target).unwrap().len(), 4);
-
-    assert!(AlbumBackend.list(&Values::new()).unwrap().is_empty());
-}
-
-#[test]
-fn what_the_core_lacks_is_refused_with_the_name_and_never_faked() {
-    let w = world();
-    let unsupported = |e: Result<_, BackendError>, name: &str| match e {
-        Err(BackendError::Unavailable(t)) => assert_eq!(t, format!("unsupported:{name}")),
-        other => panic!("{name}: {other:?}"),
-    };
-    unsupported(
-        FileBackend(w.remote.clone()).run("preview", &Values::new()),
-        "preview",
-    );
-    unsupported(
-        FileBackend(w.remote.clone()).run("shareCreate", &Values::new()),
-        "shareCreate",
-    );
-    unsupported(
-        FolderBackend(w.remote.clone()).run("archive", &Values::new()),
-        "archive",
-    );
-    unsupported(
-        PictureBackend(w.remote.clone()).run("tagAdd", &Values::new()),
-        "tagAdd",
-    );
-    unsupported(
-        StorageBackendBackend(w.remote.clone()).run("quota", &Values::new()),
-        "quota",
-    );
-    unsupported(AlbumBackend.run("create", &Values::new()), "create");
-}
-
-#[test]
-fn storage_backends_are_listed_and_a_bad_configuration_is_refused() {
-    let w = world();
-    let storage = StorageBackendBackend(w.remote.clone());
-    let rows = storage.list(&Values::new()).unwrap();
-    assert_eq!(rows.len(), 1);
-    assert_eq!(rows[0].id, "main");
-    assert_eq!(rows[0].values["state"], ["active"]);
+    let described = w.remote.describe().unwrap();
+    let file = described.iter().find(|d| d.name == "File").unwrap();
+    let rules = BasicRules::standard();
+    let row = &files.list(&Values::new()).unwrap()[0];
+    assert_eq!(row.id, id);
+    assert_eq!(row.values["name"], ["a b.txt"]);
+    for (field, values) in &row.values {
+        for value in values {
+            file.check_value(&rules, field, value)
+                .unwrap_or_else(|e| panic!("{field}={value}: {e:?}"));
+        }
+    }
+    // restoreTo: trash it, restore into the top level
+    files.run("delete", &v(&[("file", &id)])).unwrap();
+    files.run("restoreTo", &v(&[("file", &id)])).unwrap();
     assert!(
-        storage
-            .run("create", &v(&[("config", "{\"kind\":\"nope\"}")]))
-            .is_err()
+        files.list(&Values::new()).unwrap()[0]
+            .values
+            .get("folder")
+            .is_none()
     );
-    let second = serde_json_config("second");
-    storage.run("create", &v(&[("config", &second)])).unwrap();
-    assert_eq!(storage.list(&Values::new()).unwrap().len(), 2);
-    storage.run("delete", &v(&[("storage", "second")])).ok();
-}
-
-fn serde_json_config(id: &str) -> String {
-    format!("{{\"id\":\"{id}\",\"kind\":\"local\",\"path\":\"{id}\",\"active\":false}}")
 }
 
 #[test]
-fn unfinished_uploads_are_listed_and_can_be_aborted() {
+fn a_missing_field_leaves_a_change_unchanged_and_an_empty_one_clears() {
+    let w = world();
+    let (files, folders) = (
+        FileBackend(w.remote.clone()),
+        FolderBackend(w.remote.clone()),
+    );
+    let dir = folders
+        .run("create", &v(&[("name", "D")]))
+        .unwrap()
+        .id
+        .unwrap();
+    let local = w.dir.join("n.txt");
+    std::fs::write(&local, "x").unwrap();
+    let id = files
+        .run("upload", &v(&[("source", &url(&local)), ("folder", &dir)]))
+        .unwrap()
+        .id
+        .unwrap();
+    files
+        .run(
+            "classify",
+            &v(&[("file", &id), ("sensitive", "dpv:Health")]),
+        )
+        .unwrap();
+    // move without the field: unchanged; classify without the field: the marking stays
+    files.run("move", &v(&[("file", &id)])).unwrap();
+    files.run("classify", &v(&[("file", &id)])).unwrap();
+    let row = &files.list(&Values::new()).unwrap()[0];
+    assert_eq!(row.values["folder"], [dir.clone()]);
+    assert_eq!(row.values["sensitive"], ["dpv:Health"]);
+    // an empty list clears
+    let mut cleared = v(&[("file", &id)]);
+    cleared.insert("sensitive".into(), Vec::new());
+    files.run("classify", &cleared).unwrap();
+    assert!(
+        !files.list(&Values::new()).unwrap()[0]
+            .values
+            .contains_key("sensitive")
+    );
+    let mut top = v(&[("file", &id)]);
+    top.insert("folder".into(), Vec::new());
+    files.run("move", &top).unwrap();
+    assert!(
+        !files.list(&Values::new()).unwrap()[0]
+            .values
+            .contains_key("folder")
+    );
+    // folders: the same rule for `parent`
+    let child = folders
+        .run("create", &v(&[("name", "C"), ("parent", &dir)]))
+        .unwrap()
+        .id
+        .unwrap();
+    folders.run("move", &v(&[("folder", &child)])).unwrap();
+    let rows = folders.list(&Values::new()).unwrap();
+    assert_eq!(
+        rows.iter().find(|r| r.id == child).unwrap().values["parent"],
+        [dir]
+    );
+}
+
+#[test]
+fn a_find_with_an_input_of_a_command_the_core_lacks_is_refused() {
     let w = world();
     let files = FileBackend(w.remote.clone());
-    let none = files.run("uploadList", &Values::new()).unwrap();
-    assert!(none.values.is_empty());
-    assert!(
-        files
-            .run("uploadAbort", &v(&[("uploadId", "nothing")]))
-            .is_err()
-    );
+    assert!(matches!(
+        files.list(&v(&[("text", "x")])),
+        Err(BackendError::Unavailable(t)) if t == "unsupported:text"
+    ));
+    assert!(matches!(
+        files.list(&v(&[("picture", "x")])),
+        Err(BackendError::Unavailable(_))
+    ));
 }

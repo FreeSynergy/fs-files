@@ -15,6 +15,32 @@ use crate::values::{Found, entry_record, id_of, millis, number, sort_of, text};
 /// The most records one list reads. Beyond it the person narrows the search (the frontend has no paging yet).
 pub(crate) const MAX_RECORDS: usize = 5000;
 
+/// The inputs of the command `find` of the file types. The frontend runs every command of kind `find` as a list, so a
+/// query with another key is a command the core does not have (`searchContent` …): it is refused, not answered with
+/// everything.
+pub(crate) fn only_find_inputs(query: &Values, allowed: &[&str]) -> Result<(), BackendError> {
+    match query.keys().find(|k| !allowed.contains(&k.as_str())) {
+        Some(key) => Err(crate::remote::unsupported(key)),
+        None => Ok(()),
+    }
+}
+
+/// The keys of the `find` of `File` and `Picture`.
+pub(crate) const FIND_KEYS: &[&str] = &[
+    "name",
+    "mediaType",
+    "folder",
+    "minSize",
+    "maxSize",
+    "modifiedAfter",
+    "modifiedBefore",
+    "createdAfter",
+    "createdBefore",
+    "sortBy",
+    "order",
+    "state",
+];
+
 /// Put the typed `find` input into the filter of the contract. `media` fixes the media type prefix when given.
 pub(crate) fn fill(
     mut f: file_filter::Builder<'_>,

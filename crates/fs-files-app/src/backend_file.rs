@@ -11,23 +11,24 @@ use fs_files_types::is_supported;
 use fs_interfaces::files_capnp::{folders, transfer};
 use fs_interfaces::rpc::write_uuid;
 
-use crate::listing::find_all;
+use crate::listing::{FIND_KEYS, MAX_RECORDS, find_all, only_find_inputs};
 use crate::remote::{FilesRemote, problem, unsupported};
 use crate::transfer::{download, upload};
-use crate::values::{Found, file_record, id_of, need_id, on_conflict, text};
+use crate::values::{Found, as_iri, file_record, id_of, need_id, on_conflict, text};
 
 /// The files.
 pub struct FileBackend(pub Arc<FilesRemote>);
 
 fn done(id: impl ToString) -> Outcome {
     Outcome {
-        id: Some(id.to_string()),
+        id: Some(as_iri(&id.to_string())),
         values: Values::new(),
     }
 }
 
 impl Backend for FileBackend {
     fn list(&self, query: &Values) -> Result<Vec<Record>, BackendError> {
+        only_find_inputs(query, FIND_KEYS)?;
         let query = query.clone();
         self.0.run(move |c| async move {
             Ok(find_all(&c, &query, None)
@@ -89,6 +90,10 @@ async fn relocate(
     copy: bool,
 ) -> Result<Outcome, BackendError> {
     let (id, folder) = (need_id(input, "file")?, id_of(input, "folder")?);
+    // The rule for changing: a field that is missing is unchanged. Only an empty list means the top level.
+    if !copy && !input.contains_key("folder") {
+        return Ok(done(id));
+    }
     let file = if copy {
         let mut call = f.copy_file_request();
         write_uuid(call.get().init_id(), Some(id));
@@ -156,6 +161,10 @@ async fn restore(f: &folders::Client, input: &Values, to: bool) -> Result<Outcom
 /// The categories of the sensitive marking; an empty list clears it (the rule for changing).
 async fn classify(f: &folders::Client, input: &Values) -> Result<Outcome, BackendError> {
     let id = need_id(input, "file")?;
+    // The rule for changing: missing = unchanged (an empty list clears the marking).
+    if !input.contains_key("sensitive") {
+        return Ok(done(id));
+    }
     let categories: Vec<String> = input
         .get("sensitive")
         .map(|v| v.iter().filter(|s| !s.trim().is_empty()).cloned().collect())
@@ -218,38 +227,61 @@ async fn empty_trash(f: &folders::Client) -> Result<Outcome, BackendError> {
     let mut out = Outcome::default();
     out.values
         .insert("purged".into(), vec![report.get_purged().to_string()]);
+    let failed: Vec<String> = report
+        .get_failed()
+        .map_err(|e| problem(&e))?
+        .iter()
+        .filter_map(|u| fs_interfaces::rpc::read_uuid(u))
+        .map(crate::values::urn)
+        .collect();
+    if !failed.is_empty() || report.get_failed_missing() > 0 {
+        out.values.insert("failed".into(), failed);
+        out.values.insert(
+            "failedMissing".into(),
+            vec![report.get_failed_missing().to_string()],
+        );
+    }
     Ok(out)
 }
 
+/// The unfinished uploads, page after page (oldest first), at most [`MAX_RECORDS`].
 async fn pending(t: &transfer::Client) -> Result<Outcome, BackendError> {
-    let mut call = t.pending_uploads_request();
-    call.get().init_cursor().set_opaque(&[]);
-    let answer = call.send().promise.await.map_err(|e| problem(&e))?;
-    let items = answer
-        .get()
-        .and_then(|r| r.get_items())
-        .map_err(|e| problem(&e))?;
     let mut out = Outcome::default();
-    for u in items {
-        let received = u.get_received();
-        let id = u
-            .get_id()
-            .map_err(|e| problem(&e))?
-            .to_string()
-            .map_err(|e| problem(&e.into()))?;
-        let name = u
-            .get_name()
-            .map_err(|e| problem(&e))?
-            .to_string()
-            .map_err(|e| problem(&e.into()))?;
-        out.values.entry("uploadId".into()).or_default().push(id);
-        out.values.entry("name".into()).or_default().push(name);
-        out.values
-            .entry("received".into())
-            .or_default()
-            .push(received.to_string());
+    let mut cursor: Vec<u8> = Vec::new();
+    let mut seen = 0usize;
+    loop {
+        let mut call = t.pending_uploads_request();
+        call.get().init_cursor().set_opaque(&cursor);
+        let answer = call.send().promise.await.map_err(|e| problem(&e))?;
+        let r = answer.get().map_err(|e| problem(&e))?;
+        for u in r.get_items().map_err(|e| problem(&e))? {
+            let text = |t: capnp::Result<capnp::text::Reader<'_>>| {
+                t.map_err(|e| problem(&e))
+                    .and_then(|t| t.to_string().map_err(|e| problem(&e.into())))
+            };
+            out.values
+                .entry("uploadId".into())
+                .or_default()
+                .push(text(u.get_id())?);
+            out.values
+                .entry("name".into())
+                .or_default()
+                .push(text(u.get_name())?);
+            out.values
+                .entry("received".into())
+                .or_default()
+                .push(u.get_received().to_string());
+            seen += 1;
+        }
+        let next = r
+            .get_next()
+            .and_then(fs_interfaces::common_capnp::cursor::Reader::get_opaque)
+            .map_err(|e| problem(&e))?;
+        if next.is_empty() || seen >= MAX_RECORDS {
+            return Ok(out);
+        }
+        cursor = next.to_vec();
     }
-    Ok(out)
 }
 
 async fn abort(t: &transfer::Client, input: &Values) -> Result<Outcome, BackendError> {

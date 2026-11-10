@@ -33,7 +33,7 @@ pub(crate) fn later() -> Vec<CommandDescription> {
         on_file("encrypt", CommandKind::Other),
         command("file", "syncConfigure", CommandKind::Other).input(text("peer")),
         on_file("tag", CommandKind::Change).input(field("tags", BasicType::Keywords)),
-        command("file", "duplicates", CommandKind::Find),
+        command("file", "duplicates", CommandKind::Other),
         command("file", "searchContent", CommandKind::Find).input(text("text").required()),
         on_file("link", CommandKind::Other).input(optional_record("folder", "Folder")),
         command("file", "searchSave", CommandKind::Create)

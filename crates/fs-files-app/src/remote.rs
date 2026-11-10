@@ -170,7 +170,9 @@ pub(crate) fn problem(error: &capnp::Error) -> BackendError {
         return BackendError::Unavailable(error.to_string());
     };
     if p.is_unsupported() {
-        return BackendError::Unavailable(format!("unsupported:{}", p.detail));
+        // the detail of "not possible" is `capability: reason`; the name is the capability
+        let name = p.detail.split(':').next().unwrap_or_default().trim();
+        return BackendError::Unavailable(format!("unsupported:{name}"));
     }
     match p.problem_type.rsplit('/').next().unwrap_or_default() {
         "not-found" => BackendError::NotFound,

@@ -14,6 +14,7 @@ pub struct StorageBackend;
 impl DescribesType for StorageBackend {
     fn describe() -> TypeDescription {
         TypeDescription::new("StorageBackend", PROGRAM, "AS2 Service", "storage")
+            .field(text("name").required())
             .field(text("kind").required())
             .field(
                 FieldDescription::new("state", BasicType::Choice)

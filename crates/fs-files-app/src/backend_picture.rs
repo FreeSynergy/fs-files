@@ -11,7 +11,7 @@ use fs_admin_frontend::{Backend, BackendError, Outcome, Record, Values};
 use fs_files_types::is_supported;
 
 use crate::backend_file::FileBackend;
-use crate::listing::find_all;
+use crate::listing::{FIND_KEYS, find_all, only_find_inputs};
 use crate::remote::{FilesRemote, unsupported};
 use crate::transfer::download;
 use crate::values::{Found, need_id, text};
@@ -24,6 +24,7 @@ pub struct AlbumBackend;
 
 impl Backend for PictureBackend {
     fn list(&self, query: &Values) -> Result<Vec<Record>, BackendError> {
+        only_find_inputs(query, FIND_KEYS)?;
         let query = query.clone();
         self.0.run(move |c| async move {
             let mut out = Vec::new();

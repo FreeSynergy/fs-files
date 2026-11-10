@@ -8,6 +8,7 @@ use std::io::{Read, Write};
 use std::path::PathBuf;
 
 use fs_admin_frontend::{BackendError, Outcome, Values};
+use fs_interfaces::common_capnp::blob::Client as Blob;
 use fs_interfaces::files_capnp::transfer;
 use fs_interfaces::rpc::write_uuid;
 use fs_types::{RecordIssue, RecordProblem, TypeProblem};
@@ -91,7 +92,13 @@ pub(crate) async fn upload(t: &transfer::Client, input: &Values) -> Result<Outco
     let mut offset = 0u64;
     let mut buffer = vec![0u8; CHUNK];
     loop {
-        let n = local.read(&mut buffer).map_err(|e| io(&e))?;
+        let n = match local.read(&mut buffer) {
+            Ok(n) => n,
+            Err(e) => {
+                let _ = upload.abort_request().send().promise.await;
+                return Err(io(&e));
+            }
+        };
         if n == 0 {
             break;
         }
@@ -140,19 +147,27 @@ pub(crate) async fn download(
         .create_new(true)
         .open(&path)
         .map_err(|e| io(&e))?;
+    // A partial file would block every retry (`create_new`): it is removed on any failure.
+    if let Err(e) = copy_blob(&blob, &mut local).await {
+        drop(local);
+        let _ = std::fs::remove_file(&path);
+        return Err(e);
+    }
+    Ok(Outcome {
+        id: Some(crate::values::urn(id)),
+        values: Values::new(),
+    })
+}
+
+/// The bytes of `blob` into `local`, chunk by chunk, then to disk.
+async fn copy_blob(blob: &Blob, local: &mut std::fs::File) -> Result<(), BackendError> {
     let mut offset = 0u64;
     loop {
         let mut read = blob.read_request();
         read.get().set_offset(offset);
         read.get()
             .set_length(u32::try_from(CHUNK).unwrap_or(u32::MAX));
-        let answer = match read.send().promise.await {
-            Ok(a) => a,
-            Err(e) => {
-                let _ = std::fs::remove_file(&path);
-                return Err(problem(&e));
-            }
-        };
+        let answer = read.send().promise.await.map_err(|e| problem(&e))?;
         let data = answer
             .get()
             .and_then(|r| r.get_data())
@@ -163,9 +178,5 @@ pub(crate) async fn download(
         local.write_all(data).map_err(|e| io(&e))?;
         offset += data.len() as u64;
     }
-    local.sync_all().map_err(|e| io(&e))?;
-    Ok(Outcome {
-        id: Some(id.to_string()),
-        values: Values::new(),
-    })
+    local.sync_all().map_err(|e| io(&e))
 }

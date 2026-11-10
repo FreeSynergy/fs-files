@@ -15,7 +15,8 @@ use crate::values::{storage_record, text};
 pub struct StorageBackendBackend(pub Arc<FilesRemote>);
 
 impl Backend for StorageBackendBackend {
-    fn list(&self, _: &Values) -> Result<Vec<Record>, BackendError> {
+    fn list(&self, query: &Values) -> Result<Vec<Record>, BackendError> {
+        crate::listing::only_find_inputs(query, &[])?;
         self.0.run(|c| async move {
             let answer = c
                 .backends

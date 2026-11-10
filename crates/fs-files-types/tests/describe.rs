@@ -53,6 +53,7 @@ fn every_described_command_is_a_requirement_or_a_core_command() {
     let core = [
         ("File", "restoreTo"),
         ("File", "emptyTrash"),
+        ("File", "uploadResume"),
         ("Picture", "sensitiveMark"),
         ("Album", "find"),
         ("Folder", "move"),

@@ -73,7 +73,10 @@ fn actions() -> Vec<CommandDescription> {
             .input(optional_record("folder", "Folder"))
             .input(on_conflict()),
         on_record("file", "purge", CommandKind::Delete, "file", "File"),
-        command("file", "emptyTrash", CommandKind::Other).result(field("purged", BasicType::Text)),
+        command("file", "emptyTrash", CommandKind::Other)
+            .result(field("purged", BasicType::Text))
+            .result(record("failed", "File").multiple())
+            .result(field("failedMissing", BasicType::Text)),
         on_record("file", "resolve", CommandKind::Other, "file", "File"),
         command("file", "upload", CommandKind::Create)
             .input(optional_record("folder", "Folder"))
@@ -89,6 +92,9 @@ fn actions() -> Vec<CommandDescription> {
             .result(text("name").multiple())
             .result(field("received", BasicType::Text).multiple()),
         command("file", "uploadAbort", CommandKind::Other).input(text("uploadId").required()),
+        command("file", "uploadResume", CommandKind::Other)
+            .input(text("uploadId").required())
+            .input(field("source", BasicType::Link).required()),
         command("file", "subscribe", CommandKind::Other),
     ]
 }

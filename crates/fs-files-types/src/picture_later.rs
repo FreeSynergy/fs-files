@@ -42,7 +42,7 @@ fn library() -> Vec<CommandDescription> {
             .input(text("crop")),
         on_picture("delete", CommandKind::Delete),
         on_picture("restore", CommandKind::Other),
-        command("picture", "duplicates", CommandKind::Find),
+        command("picture", "duplicates", CommandKind::Other),
         on_picture("merge", CommandKind::Other),
         on_picture("stackCreate", CommandKind::Create),
     ]
@@ -57,7 +57,7 @@ fn extras() -> Vec<CommandDescription> {
             .input(text("stripLocation")),
         on_picture("shareGrant", CommandKind::Other).input(text("grantee").required()),
         on_picture("shareRevoke", CommandKind::Delete),
-        command("picture", "placeList", CommandKind::Find),
+        command("picture", "placeList", CommandKind::Other),
         on_picture("placeAssign", CommandKind::Change).input(field("place", BasicType::Place)),
         on_picture("placeResolve", CommandKind::Other),
         command("picture", "sync", CommandKind::Other),

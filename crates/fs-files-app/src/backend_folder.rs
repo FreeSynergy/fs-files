@@ -14,7 +14,9 @@ use uuid::Uuid;
 
 use crate::listing::MAX_RECORDS;
 use crate::remote::{FilesRemote, problem, unsupported};
-use crate::values::{Found, entry_record, folder_record, id_of, need_id, on_conflict, text};
+use crate::values::{
+    Found, as_iri, entry_record, folder_record, id_of, need_id, on_conflict, text,
+};
 
 /// The folders.
 pub struct FolderBackend(pub Arc<FilesRemote>);
@@ -48,35 +50,36 @@ async fn children(f: &folders::Client, parent: Option<Uuid>) -> Result<Vec<Recor
     }
 }
 
+/// Every folder, breadth first; the name filter is applied while walking, so the bound counts matches.
 async fn walk(f: &folders::Client, name: Option<String>) -> Result<Vec<Record>, BackendError> {
+    let word = name.map(|w| w.to_lowercase());
     let mut all = Vec::new();
     let mut queue = std::collections::VecDeque::from([None]);
-    while let Some(parent) = queue.pop_front() {
+    'walk: while let Some(parent) = queue.pop_front() {
         for r in children(f, parent).await? {
-            if let Ok(id) = r.id.parse::<Uuid>() {
+            if let Ok(id) = Uuid::parse_str(&r.id) {
                 queue.push_back(Some(id));
             }
-            all.push(r);
+            let matches = word.as_ref().is_none_or(|w| {
+                r.values
+                    .get("name")
+                    .and_then(|v| v.first())
+                    .is_some_and(|n| n.to_lowercase().contains(w))
+            });
+            if matches {
+                all.push(r);
+            }
             if all.len() >= MAX_RECORDS {
-                queue.clear();
-                break;
+                break 'walk;
             }
         }
-    }
-    if let Some(word) = name {
-        let word = word.to_lowercase();
-        all.retain(|r| {
-            r.values
-                .get("name")
-                .and_then(|v| v.first())
-                .is_some_and(|n| n.to_lowercase().contains(&word))
-        });
     }
     Ok(all)
 }
 
 impl Backend for FolderBackend {
     fn list(&self, query: &Values) -> Result<Vec<Record>, BackendError> {
+        crate::listing::only_find_inputs(query, &["name"])?;
         let name = text(query, "name").map(str::to_owned);
         self.0
             .run(move |c| async move { walk(&c.folders, name).await })
@@ -104,7 +107,7 @@ impl Backend for FolderBackend {
 
 fn done(id: impl ToString) -> Outcome {
     Outcome {
-        id: Some(id.to_string()),
+        id: Some(as_iri(&id.to_string())),
         values: Values::new(),
     }
 }
@@ -138,6 +141,10 @@ async fn rename(f: &folders::Client, input: &Values) -> Result<Outcome, BackendE
 }
 
 async fn relocate(f: &folders::Client, input: &Values) -> Result<Outcome, BackendError> {
+    // The rule for changing: a field that is missing is unchanged. Only an empty list means the top level.
+    if !input.contains_key("parent") {
+        return Ok(done(need_id(input, "folder")?));
+    }
     let mut call = f.move_folder_request();
     write_uuid(call.get().init_id(), Some(need_id(input, "folder")?));
     write_uuid(call.get().init_parent(), id_of(input, "parent")?);

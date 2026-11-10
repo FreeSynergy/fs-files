@@ -55,7 +55,7 @@ impl DescribesType for Album {
                 ),
             )
             .command(on_album("query", CommandKind::Change).input(text("query")))
-            .command(command("album", "suggest", CommandKind::Find))
+            .command(command("album", "suggest", CommandKind::Other))
             .command(
                 on_album("sort", CommandKind::Change)
                     .input(optional_record("cover", "Picture"))

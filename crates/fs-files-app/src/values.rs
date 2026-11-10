@@ -6,7 +6,18 @@
 use fs_admin_frontend::{BackendError, Record, Values};
 use fs_interfaces::files_capnp::{OnConflict, SortBy, backend_info, entry, file, folder};
 use fs_interfaces::rpc::{read_envelope, read_uuid};
+use fs_types::{RecordIssue, RecordProblem, TypeProblem};
 use uuid::Uuid;
+
+/// The id of a record as the frontend wants it: an absolute IRI (`urn:uuid:<id>`); a bare uuid is no reference.
+pub(crate) fn urn(id: Uuid) -> String {
+    id.urn().to_string()
+}
+
+/// A bare uuid as `urn:uuid:…`; anything else as it is.
+pub(crate) fn as_iri(id: &str) -> String {
+    Uuid::parse_str(id).map_or_else(|_| id.to_owned(), urn)
+}
 
 /// One value for a field.
 fn one(values: &mut Values, name: &str, value: impl Into<String>) {
@@ -22,7 +33,7 @@ pub(crate) fn file_record(f: file::Reader<'_>) -> capnp::Result<Record> {
     one(&mut v, "size", f.get_size().to_string());
     one(&mut v, "checksum", f.get_checksum()?.to_string()?);
     if let Some(folder) = read_uuid(f.get_folder()?) {
-        one(&mut v, "folder", folder.to_string());
+        one(&mut v, "folder", urn(folder));
     }
     one(
         &mut v,
@@ -35,7 +46,7 @@ pub(crate) fn file_record(f: file::Reader<'_>) -> capnp::Result<Record> {
         v.insert("sensitive".to_owned(), envelope.sensitive);
     }
     Ok(Record {
-        id: envelope.id.to_string(),
+        id: urn(envelope.id.as_uuid()),
         values: v,
     })
 }
@@ -46,12 +57,12 @@ pub(crate) fn folder_record(f: folder::Reader<'_>) -> capnp::Result<Record> {
     let mut v = Values::new();
     one(&mut v, "name", envelope.name);
     if let Some(parent) = read_uuid(f.get_parent()?) {
-        one(&mut v, "parent", parent.to_string());
+        one(&mut v, "parent", urn(parent));
     }
     one(&mut v, "published", envelope.published.to_rfc3339());
     one(&mut v, "updated", envelope.updated.to_rfc3339());
     Ok(Record {
-        id: envelope.id.to_string(),
+        id: urn(envelope.id.as_uuid()),
         values: v,
     })
 }
@@ -83,8 +94,13 @@ pub(crate) fn entry_record(e: entry::Reader<'_>) -> capnp::Result<Found> {
     })
 }
 
-pub(crate) fn bad(what: &str) -> BackendError {
-    BackendError::Unavailable(format!("bad input: {what}"))
+/// A finding on `field`: what was typed is not usable (a number, a time or an id that does not parse).
+pub(crate) fn bad(field: &str) -> BackendError {
+    BackendError::Rejected(vec![RecordIssue {
+        field: field.to_owned(),
+        index: 0,
+        problem: RecordProblem::Value(TypeProblem::Character),
+    }])
 }
 
 /// The first value of a field, trimmed; `None` if absent or empty.
@@ -99,13 +115,13 @@ pub(crate) fn text<'a>(input: &'a Values, name: &str) -> Option<&'a str> {
 /// An id from the first value of a field.
 pub(crate) fn id_of(input: &Values, name: &str) -> Result<Option<Uuid>, BackendError> {
     text(input, name)
-        .map(|s| s.parse::<Uuid>().map_err(|_| BackendError::NotFound))
+        .map(|s| Uuid::parse_str(s).map_err(|_| bad(name)))
         .transpose()
 }
 
 /// A required id.
 pub(crate) fn need_id(input: &Values, name: &str) -> Result<Uuid, BackendError> {
-    id_of(input, name)?.ok_or(BackendError::NotFound)
+    id_of(input, name)?.ok_or_else(|| bad(name))
 }
 
 pub(crate) fn on_conflict(input: &Values) -> OnConflict {
