@@ -27,5 +27,13 @@ jobs:
           cache-key: windows
       - run: cargo fmt --check
       - run: cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic
-      - run: cargo test --workspace --all-features --no-fail-fast
+      # One step per crate with a time limit, so a test that waits for ever on Windows shows which crate it is in.
+      - run: cargo test -p fs-files-types -p fs-files-app --all-features --no-fail-fast
+        timeout-minutes: 15
+      - run: cargo test -p fs-files-core --all-features --no-fail-fast
+        timeout-minutes: 20
+      - run: cargo test -p fs-files-server --all-features --no-fail-fast
+        timeout-minutes: 20
+      - run: cargo test -p fs-files --all-features --no-fail-fast
+        timeout-minutes: 15
       - uses: FreeSynergy/fs-release/actions/rust-rules@main
