@@ -64,6 +64,7 @@ pub fn serve(args: impl IntoIterator<Item = OsString>) -> Result<(), ServeError>
         data,
         actor,
         instance,
+        facet: _, // files has one face only
     } = options;
     if let Some(lease) = lease {
         // The window that started this server holds the lease; when none does, end as a signal would.
