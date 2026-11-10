@@ -317,3 +317,22 @@ Answered for `Picture`: `find` (= `media.list`, `media.search`: the image files)
 `crates/fs-files` is the only binary: `fs-files` without arguments opens the window, `fs-files serve` runs the server (`fs_files_server::serve`; the folder the files live in is `FS_FILES_ROOT`), feature `gui` (default) builds the window. `fs-files-server` and `fs-files-app` are libraries. The window (`crates/fs-files-app`) is the file manager workbench of `fs-components` over `files.capnp`: `FilesRemote` (a worker thread owns the Cap'n Proto connection) implements the workbench's `FileSource` (Adapter): folders, list and search (sort, size filter), create, rename, move, copy, trash, restore, restore to, purge, empty trash and rescan, with the server's problems as the workbench's kinds (name taken, invalid name, changed outside, not found). If no server answers on the user's own socket the window starts `fs-files serve` detached. Tests: `crates/fs-files-app/tests/remote.rs` (real server, repository and folder), `crates/fs-files/tests/binary*.rs` (the real binary).
 
 Not in the window yet (capabilities say so, nothing pretends): previews, upload, download, date filters, descending type sort; a file's sensitive marking (ADR 0029) is not read, so no entry shows one and the trash count says none is marked; classification, backends and sharing have no screen. No timeout waiting for the server. The Gallery facet is not built.
+
+
+## Windows port (2026-11-10, sprint decision C: a real port, no cross-build, no exception)
+**Pattern:** every part that differs between Linux and Windows is a trait with a Linux and a Windows implementation (ADR 0043):
+| Part | Trait | Linux | Windows |
+|------|-------|-------|---------|
+| Names the local disk keeps | `NameRules` (`fs-files-core/src/platform`) | any name the shared rules accept | refuses `< > : " \| ? *`, a trailing dot or space and the device names (`CON`, `NUL`, `COM1`, also with an extension), because the disk would not refuse all of them (`a:b` is a stream of `a`); `same_name` ignores case, so a change of case only is renamed in place |
+| Durability of a folder change | `Durability` | fsync of the folder | none (NTFS journals its metadata; a folder cannot be flushed) |
+| Move without replacing | `Moves` | `renameat2(RENAME_NOREPLACE)` | the hard-link way (look, then rename for a folder) |
+| Starting the server so that it outlives the window | `Detach` (`fs-files-app/src/detach`) | own process group | no console window, own process group |
+| Reading a `file:` link | `FileLinks` (`fs-files-app/src/link`) | the text is the path | `file:///C:/Users/me/a.jpg` is `C:\Users\me\a.jpg` |
+| Socket, lease and log files, ending in order | `fs-interfaces` `Endpoint` (named pipe), `companion_path`, `stop_self` | Unix socket, signal | named pipe, files in `%LOCALAPPDATA%\FreeSynergy\run`, no signal to send: the lease watcher calls `stop_self` |
+A link planted in the root (symlink, or a junction on Windows) is refused the same way: `FileType::is_symlink` is true for both.
+The lease lock needs a handle that can read or write data on Windows (it was `append`, which cannot lock there).
+**Windows gate:** `.github/workflows/windows.yml` on `windows-2022` (fmt, clippy pedantic, tests per crate with a time limit, the coding rules).
+Tests that depend on Unix modes (`0o700`, unreadable files) run on Unix only and say why; names that differ only in case are one name on
+Windows and the tests say that. Until `fs-interfaces` is tagged with the transport, the crates point at its branch `win-port`.
+**Open on Windows:** no path longer than the 4095 bytes counted by the repository is meant to be used (Windows takes more with the
+`\\?\` form, which Explorer cannot open); UNC links (`file://server/share`) are refused; the store's UAC/setup flow for fs-files itself is the one of `fs-store`.
