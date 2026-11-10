@@ -16,10 +16,10 @@ use fs_interfaces::rpc::{unsupported, write_uuid};
 use crate::backends_service::BackendsImpl;
 use crate::errors::rpc_error;
 use crate::feed::{offered, subscribe};
-use crate::types_service::CatalogImpl;
 use crate::folders_service::FoldersImpl;
 use crate::search_service::SearchImpl;
 use crate::transfer_service::TransferImpl;
+use crate::types_service::CatalogImpl;
 use crate::wire::CONTRACT_VERSION;
 
 /// The root capability of the files program.

@@ -1,17 +1,22 @@
 [package]
 name = "fs-files-app"
-description = "The files program of FreeSynergy, window: browse folders, search, create, rename, move, copy, trash and restore over the Cap'n Proto socket; on fs-components"
+description = "The files program of FreeSynergy, window: the generated Admin frontend over the Cap'n Proto socket, in the standard window shell"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+fs-files-types = { path = "../fs-files-types" }
+fs-types = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.0.2" }
 fs-interfaces = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.0.5", features = ["rpc"] }
-fs-components-app = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.0.2" }
-fs-components-workbenches = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.0.2" }
+fs-admin-frontend = { git = "https://github.com/FreeSynergy/fs-components", rev = "4688cee" }
+fs-components-app = { git = "https://github.com/FreeSynergy/fs-components", rev = "4688cee" }
+fs-components-fields = { git = "https://github.com/FreeSynergy/fs-components", rev = "4688cee" }
+fs-components-styles = { git = "https://github.com/FreeSynergy/fs-components", rev = "4688cee" }
 capnp = "0.27"
 uuid = "1"
+chrono = { version = "0.4", default-features = false, features = ["std"] }
 tokio = { version = "1", features = ["rt", "sync", "time", "macros"] }
 
 [dev-dependencies]

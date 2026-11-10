@@ -1,21 +1,15 @@
-//! The window of `fs-files` (ADR 0063): wiring only.
+//! The start of `fs-files` (ADR 0063): wiring only.
 //!
 //! Pattern: Facade consumer — connect to the server (starting it if none answers on the user's own
-//! socket), build the file manager, open the window or draw one picture.
+//! socket), build the file manager, open the window (`window.rs`) or draw one picture.
 
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 
-use fs_components_app::{
-    AppError, AppWidget, Element, Screen, Surface, WindowOptions, launch, parse_size,
-};
-use fs_components_workbenches::file_manager::{FileLabels, FileManagerWidget, FileSource};
+use fs_components_app::{WindowOptions, launch, parse_size};
 use fs_interfaces::rpc::default_socket;
 
 use crate::FilesRemote;
-
-/// The title of the window.
-pub const TITLE: &str = "FreeSynergy Files";
+use crate::window::app_widget;
 
 /// The help text.
 pub const HELP: &str = "fs-files: the files window (without arguments it opens)
@@ -24,28 +18,6 @@ pub const HELP: &str = "fs-files: the files window (without arguments it opens)
                      without it, a server is started if none answers; start it yourself with `fs-files serve`
   --snapshot <png>   draw a picture instead of opening a window
   --size <WxH>       window or picture size (default 1200x800)";
-
-struct FilesScreen(FileManagerWidget);
-
-impl Surface for FilesScreen {
-    fn build(&self, width: f32, height: f32) -> Box<dyn Element> {
-        Box::new(self.0.build(width, height))
-    }
-
-    fn styles(&self) -> String {
-        self.0.styles()
-    }
-}
-
-/// The shell around the file manager over `source`.
-///
-/// # Errors
-/// [`AppError`] if the shell cannot be made.
-pub fn app_widget(source: Arc<dyn FileSource>) -> Result<AppWidget, AppError> {
-    let widget = FileManagerWidget::new(source, FileLabels::default());
-    let screen = Screen::new("files", TITLE, Arc::new(FilesScreen(widget)));
-    AppWidget::new(TITLE, vec![screen])
-}
 
 struct Args {
     socket: Option<PathBuf>,
@@ -95,7 +67,8 @@ pub fn run(words: &[String]) -> Result<(), String> {
         .or_else(|| default_socket("files"))
         .ok_or("no socket: give --socket or set XDG_RUNTIME_DIR")?;
     let remote = connect_or_start(&socket, args.socket.is_none())?;
-    let app = app_widget(Arc::new(remote)).map_err(|e| e.to_string())?;
+    let descriptions = remote.describe()?;
+    let app = app_widget(&std::sync::Arc::new(remote), descriptions).map_err(|e| e.to_string())?;
     let (width, height) = args.size;
     if let Some(file) = &args.snapshot {
         app.picture(width, height, file)

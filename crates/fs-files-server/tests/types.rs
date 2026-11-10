@@ -22,7 +22,10 @@ async fn the_catalog_is_served_over_the_socket() {
         let read = read_catalog(answer.get().unwrap().get_types().unwrap()).unwrap();
         let local: Vec<_> = registry().iter().cloned().collect();
         assert_eq!(read, local);
-        assert!(read.iter().any(|t| t.name == "File" && t.find_command("find").is_some()));
+        assert!(
+            read.iter()
+                .any(|t| t.name == "File" && t.find_command("find").is_some())
+        );
     })
     .await;
 }

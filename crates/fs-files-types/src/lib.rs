@@ -26,5 +26,5 @@ pub use picture::Picture;
 pub use registry::registry;
 pub use requirements::{REQUIREMENTS, Requirement};
 pub use storage::StorageBackend;
-pub use wire::{read_catalog, write_catalog};
 pub use support::{SUPPORTED, is_supported, unsupported};
+pub use wire::{read_catalog, write_catalog};
