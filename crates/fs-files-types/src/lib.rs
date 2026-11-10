@@ -17,6 +17,7 @@ mod registry;
 mod requirements;
 mod storage;
 mod support;
+mod wire;
 
 pub use album::Album;
 pub use file::File;
@@ -25,4 +26,5 @@ pub use picture::Picture;
 pub use registry::registry;
 pub use requirements::{REQUIREMENTS, Requirement};
 pub use storage::StorageBackend;
+pub use wire::{read_catalog, write_catalog};
 pub use support::{SUPPORTED, is_supported, unsupported};

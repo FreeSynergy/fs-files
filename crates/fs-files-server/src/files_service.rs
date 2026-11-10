@@ -16,6 +16,7 @@ use fs_interfaces::rpc::{unsupported, write_uuid};
 use crate::backends_service::BackendsImpl;
 use crate::errors::rpc_error;
 use crate::feed::{offered, subscribe};
+use crate::types_service::CatalogImpl;
 use crate::folders_service::FoldersImpl;
 use crate::search_service::SearchImpl;
 use crate::transfer_service::TransferImpl;
@@ -104,6 +105,11 @@ impl files::Server for FilesServer {
     ) -> Done {
         let backends = self.backends.clone();
         r.get().set_backends(new_client(BackendsImpl { backends }));
+        Ok(())
+    }
+
+    async fn types(self: Rc<Self>, _: files::TypesParams, mut r: files::TypesResults) -> Done {
+        r.get().set_catalog(new_client(CatalogImpl));
         Ok(())
     }
 

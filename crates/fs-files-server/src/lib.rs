@@ -26,6 +26,7 @@ mod places;
 mod program;
 mod search_service;
 mod transfer_service;
+mod types_service;
 mod trash_ops;
 mod upload_service;
 mod wire;

@@ -55,6 +55,8 @@ fn every_described_command_is_a_requirement_or_a_core_command() {
         ("File", "emptyTrash"),
         ("Picture", "sensitiveMark"),
         ("Album", "find"),
+        ("Folder", "move"),
+        ("Folder", "resolve"),
     ];
     let named: BTreeSet<(&str, &str)> = REQUIREMENTS
         .iter()
@@ -146,4 +148,23 @@ fn each_type_has_a_find_that_lists_it() {
             t.name
         );
     }
+}
+
+#[test]
+fn the_catalog_survives_the_wire() {
+    use fs_interfaces::types_capnp::type_catalog::describe_results;
+    let r = registry();
+    let mut message = capnp::message::Builder::new_default();
+    let root = message.init_root::<describe_results::Builder>();
+    fs_files_types::write_catalog(&r, root.init_types(u32::try_from(r.len()).unwrap()));
+    let read = fs_files_types::read_catalog(
+        message
+            .get_root_as_reader::<describe_results::Reader>()
+            .unwrap()
+            .get_types()
+            .unwrap(),
+    )
+    .unwrap();
+    let before: Vec<_> = r.iter().cloned().collect();
+    assert_eq!(read, before);
 }
