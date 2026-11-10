@@ -133,7 +133,7 @@ mod tests {
             "COM\u{b9}",
             "lpt\u{b3}.x",
             "FS-FIL~1",
-            "fs-fil~12.txt",
+            "fs-fi~12.txt",
         ] {
             assert!(rules.refuse(bad).is_some(), "{bad}");
         }
