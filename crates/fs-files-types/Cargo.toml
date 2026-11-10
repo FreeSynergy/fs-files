@@ -8,5 +8,5 @@ rust-version.workspace = true
 
 [dependencies]
 fs-types = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.0.2" }
-fs-interfaces = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.0.14" }
+fs-interfaces = { git = "https://github.com/FreeSynergy/fs-interfaces", branch = "win-port" }
 capnp = "0.27"

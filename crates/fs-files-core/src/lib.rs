@@ -25,6 +25,7 @@ mod feed;
 mod files;
 mod model;
 mod note;
+mod platform;
 mod repo;
 mod transfer;
 

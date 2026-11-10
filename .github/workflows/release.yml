@@ -16,7 +16,8 @@ jobs:
       kind: app
       app-id: net.freesynergy.Files
       macos: false
-      windows-targets: ""   # Unix sockets and Unix paths for now
+      windows-targets: "x86_64"   # the disk parts (names, durability, moves) and the process parts have a Windows implementation; the gate runs on windows-2022
+      windows-formats: "zip,exe"
     secrets:
       GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
       GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}

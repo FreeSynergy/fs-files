@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use fs_files_core::{FileRepo, LocalFolder, RESERVED_NAME};
-use fs_interfaces::rpc::{ServerOptions, prepare_data_dir, run_until_signal};
+use fs_interfaces::rpc::{ServerOptions, prepare_data_dir, run_until_signal, stop_self};
 use fs_objects::{Store, TursoStore};
 
 use crate::{FilesServer, check_places};
@@ -67,12 +67,7 @@ pub fn serve(args: impl IntoIterator<Item = OsString>) -> Result<(), ServeError>
     } = options;
     if let Some(lease) = lease {
         // The window that started this server holds the lease; when none does, end as a signal would.
-        crate::lease::watch(lease, || {
-            let _ = rustix::process::kill_process(
-                rustix::process::getpid(),
-                rustix::process::Signal::TERM,
-            );
-        });
+        crate::lease::watch(lease, stop_self);
     }
     run_until_signal(&socket, || async move {
         let data = prepare_data_dir(&data)?;

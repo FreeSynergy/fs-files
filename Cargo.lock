@@ -1580,7 +1580,7 @@ dependencies = [
  "fs-files-app",
  "fs-files-core",
  "fs-files-server",
- "fs-interfaces 0.0.1 (git+https://github.com/FreeSynergy/fs-interfaces?tag=v0.0.14)",
+ "fs-interfaces 0.0.1 (git+https://github.com/FreeSynergy/fs-interfaces?branch=win-port)",
  "fs-objects",
  "serde_json",
  "tempfile",
@@ -1601,7 +1601,7 @@ dependencies = [
  "fs-files-core",
  "fs-files-server",
  "fs-files-types",
- "fs-interfaces 0.0.1 (git+https://github.com/FreeSynergy/fs-interfaces?tag=v0.0.14)",
+ "fs-interfaces 0.0.1 (git+https://github.com/FreeSynergy/fs-interfaces?branch=win-port)",
  "fs-objects",
  "fs-types",
  "tempfile",
@@ -1617,7 +1617,7 @@ dependencies = [
  "blake3",
  "bytes",
  "chrono",
- "fs-interfaces 0.0.1 (git+https://github.com/FreeSynergy/fs-interfaces?tag=v0.0.14)",
+ "fs-interfaces 0.0.1 (git+https://github.com/FreeSynergy/fs-interfaces?branch=win-port)",
  "fs-objects",
  "infer",
  "object_store",
@@ -1640,9 +1640,8 @@ dependencies = [
  "chrono",
  "fs-files-core",
  "fs-files-types",
- "fs-interfaces 0.0.1 (git+https://github.com/FreeSynergy/fs-interfaces?tag=v0.0.14)",
+ "fs-interfaces 0.0.1 (git+https://github.com/FreeSynergy/fs-interfaces?branch=win-port)",
  "fs-objects",
- "rustix 1.1.6",
  "serde_json",
  "tempfile",
  "tokio",
@@ -1654,7 +1653,7 @@ name = "fs-files-types"
 version = "0.0.5"
 dependencies = [
  "capnp",
- "fs-interfaces 0.0.1 (git+https://github.com/FreeSynergy/fs-interfaces?tag=v0.0.14)",
+ "fs-interfaces 0.0.1 (git+https://github.com/FreeSynergy/fs-interfaces?branch=win-port)",
  "fs-types",
 ]
 
@@ -1670,7 +1669,16 @@ dependencies = [
 [[package]]
 name = "fs-interfaces"
 version = "0.0.1"
-source = "git+https://github.com/FreeSynergy/fs-interfaces?tag=v0.0.14#3f93a1a8531676fb243e09cb36a5537981c8ebf3"
+source = "git+https://github.com/FreeSynergy/fs-interfaces?tag=v0.0.2#a8c28ea86f863db92f0d333fcf27b0d012fd8832"
+dependencies = [
+ "capnp",
+ "idna",
+]
+
+[[package]]
+name = "fs-interfaces"
+version = "0.0.1"
+source = "git+https://github.com/FreeSynergy/fs-interfaces?branch=win-port#b7a78b3f1f79de03ed55ad5f9fea6fdecfc49f39"
 dependencies = [
  "capnp",
  "capnp-rpc",
@@ -1681,15 +1689,6 @@ dependencies = [
  "tokio",
  "tokio-util",
  "uuid",
-]
-
-[[package]]
-name = "fs-interfaces"
-version = "0.0.1"
-source = "git+https://github.com/FreeSynergy/fs-interfaces?tag=v0.0.2#a8c28ea86f863db92f0d333fcf27b0d012fd8832"
-dependencies = [
- "capnp",
- "idna",
 ]
 
 [[package]]

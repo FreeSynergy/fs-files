@@ -10,14 +10,12 @@ use tokio::io::{AsyncReadExt, AsyncSeekExt};
 use crate::error::{Error, Result};
 use crate::note::Note;
 
-/// Flush a directory entry to disk (Unix; elsewhere a no-op).
+/// Flush a directory entry to disk (where the system has such a thing).
 pub(super) async fn sync_dir(dir: &Path) -> Result<()> {
-    #[cfg(unix)]
-    {
-        tokio::fs::File::open(dir).await?.sync_all().await?;
-    }
-    #[cfg(not(unix))]
-    let _ = dir;
+    let dir = dir.to_owned();
+    tokio::task::spawn_blocking(move || crate::platform::current().durability.sync_dir(&dir))
+        .await
+        .map_err(|e| Error::Backend(e.to_string().into()))??;
     Ok(())
 }
 
@@ -68,22 +66,16 @@ pub(super) async fn remove_quiet(path: &Path) -> Result<()> {
 
 /// Move `from` to `to` (file or folder) and **never replace** what is at `to`.
 ///
-/// On Linux this is one atomic `renameat2(RENAME_NOREPLACE)`. Without the flag (old kernel, a file system
+/// On Linux this is one atomic `renameat2(RENAME_NOREPLACE)` (the platform part `Moves`). Without the flag (old kernel, a file system
 /// that lacks it, other systems) a file is moved by hard link + unlink, which is atomic and never replaces;
 /// a folder by "look, then rename", which is **not** atomic (see the comment in the body).
 pub(super) fn rename_new(from: &Path, to: &Path, native: bool) -> std::io::Result<()> {
-    #[cfg(target_os = "linux")]
-    if native {
-        use rustix::fs::{CWD, RenameFlags, renameat_with};
-        use rustix::io::Errno;
-        match renameat_with(CWD, from, CWD, to, RenameFlags::NOREPLACE) {
-            Ok(()) => return Ok(()),
-            Err(e) if e == Errno::INVAL || e == Errno::NOSYS => {}
-            Err(e) => return Err(e.into()),
-        }
+    if crate::platform::current()
+        .moves
+        .rename_new_native(from, to, native)?
+    {
+        return Ok(());
     }
-    #[cfg(not(target_os = "linux"))]
-    let _ = native;
     // Fallback. A file is moved by hard link + unlink, which refuses an existing target atomically
     // (POSIX `link`). A folder cannot be linked: "look, then rename" is the best there is, and a folder
     // created in between could be replaced if it is empty (never one with content).

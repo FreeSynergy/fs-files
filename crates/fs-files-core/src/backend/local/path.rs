@@ -41,6 +41,9 @@ pub(super) fn check_path(key: &str) -> Result<Vec<&str>> {
         if s.chars().any(|c| c.is_control() || c == '\\') {
             return bad("separator or control character in a name");
         }
+        if let Some(why) = crate::platform::current().names.refuse(s) {
+            return bad(why);
+        }
     }
     if segments[0].eq_ignore_ascii_case(RESERVED_NAME) {
         return bad("the name is reserved for the program");

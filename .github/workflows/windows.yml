@@ -1,0 +1,31 @@
+# The gate of check.yml on the Windows runner of fs-release (windows-2022): fmt, clippy (pedantic), tests, coding rules.
+# The Windows parts of fs-files-platform are built and tested here, never cross-built (ADR 0043, port decision of the sprint).
+# Own steps instead of the reusable workflow, only because the tests run with `--no-fail-fast`: one failing test file must
+# not hide the results of the others.
+name: windows
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  windows:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: FreeSynergy/fs-release/actions/setup-rust@main
+        with:
+          components: rustfmt,clippy
+          cache-key: windows
+      - run: cargo fmt --check
+      - run: cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic
+      - run: cargo test --workspace --all-features --no-fail-fast
+      - uses: FreeSynergy/fs-release/actions/rust-rules@main

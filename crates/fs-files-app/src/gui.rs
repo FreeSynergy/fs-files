@@ -6,7 +6,7 @@
 use std::path::{Path, PathBuf};
 
 use fs_components_app::{WindowOptions, launch, parse_size};
-use fs_interfaces::rpc::default_socket;
+use fs_interfaces::rpc::{companion_path, default_socket};
 
 use crate::FilesRemote;
 use crate::window::app_widget;
@@ -65,7 +65,7 @@ pub fn run(words: &[String]) -> Result<(), String> {
         .socket
         .clone()
         .or_else(|| default_socket("files"))
-        .ok_or("no socket: give --socket or set XDG_RUNTIME_DIR")?;
+        .ok_or("no socket: give --socket (no default socket on this system)")?;
     let remote = connect_or_start(&socket, args.socket.is_none())?;
     let descriptions = remote.describe()?;
     let app = app_widget(&std::sync::Arc::new(remote), descriptions).map_err(|e| e.to_string())?;
@@ -89,7 +89,7 @@ fn connect_or_start(socket: &Path, may_start: bool) -> Result<FilesRemote, Strin
     // This window is a user of the server for as long as it lives: the shared lock on the lease is
     // let go by the system when the process ends. A server this window starts ends itself when no
     // window holds the lease any more (a server started by hand has none).
-    let lease = socket.with_extension("lease");
+    let lease = companion_path(socket, "lease");
     if may_start {
         hold_lease(&lease);
     }
@@ -100,7 +100,7 @@ fn connect_or_start(socket: &Path, may_start: bool) -> Result<FilesRemote, Strin
     let me = std::env::current_exe().map_err(|e| e.to_string())?;
     // What the server says when it cannot start (a bad folder, a data folder others can read) goes to a
     // file next to the socket, so the window can tell the person instead of only waiting.
-    let log = socket.with_extension("log");
+    let log = companion_path(socket, "log");
     let log_file = std::fs::File::create(&log).ok();
     let mut server = std::process::Command::new(me);
     server
@@ -110,8 +110,7 @@ fn connect_or_start(socket: &Path, may_start: bool) -> Result<FilesRemote, Strin
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
         .stderr(log_file.map_or_else(std::process::Stdio::null, std::process::Stdio::from));
-    #[cfg(unix)]
-    std::os::unix::process::CommandExt::process_group(&mut server, 0);
+    crate::detach::current().apply(&mut server);
     let mut child = server
         .spawn()
         .map_err(|e| format!("could not start the files server: {e}"))?;
