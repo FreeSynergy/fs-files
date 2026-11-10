@@ -3,7 +3,7 @@
 `fs-files` is the files program of FreeSynergy. This repo holds the **program core** (`crates/fs-files-core`, no GUI) and the **server** (`crates/fs-files-server`, the contract over a Unix socket).
 **Metadata** (name, media type, size, checksum, folder, trash flag) is an object in `fs-objects`; the **bytes** are in a
 backend behind `BlobBackend`. Other programs refer to a file by its object id and read through the `Blob` trait; they never
-see a path or a backend. Contract: `files.capnp` in `fs-interfaces` v0.44.0 (draft, consumers: 0 of 2).
+see a path or a backend. Contract: `files.capnp` in `fs-interfaces` (tag v0.0.5, with `Files.types`) (draft, consumers: 0 of 2).
 
 ## State
 
@@ -87,6 +87,16 @@ Version 0.6.0, tagged v0.6.0 (header corrected 2026-11-08; 0.5.0 was: stage 1: l
 | `fs-files-server/places.rs` | Specification | the folder of the files must not hold the data directory (`check_places`) |
 | `fs-files-server/errors.rs` | Adapter | core errors as RFC 9457 problems; `finish` = `run_to_end` |
 | `fs-files-server/wire/*` | Adapter, Specification | ids, texts with limits, cursor, entries and pages, filter, reports |
+| `fs-files-types/{file,folder,storage,album,picture}.rs` | Registry entry (`DescribesType`, trait first) + Builder | each data type reports itself to the generated frontend: fields, all commands (ADR 0066) |
+| `fs-files-types/{file_later,picture_later}.rs` | Builder | the commands of `requirements.md` the core does not have, described anyway |
+| `fs-files-types/support.rs`, `requirements.rs` | Specification | which command the core answers (the one table, until `types.capnp` has `supported`); which capability of the requirements lives in which command |
+| `fs-files-types/wire.rs` | Adapter | plain descriptions of `fs-types` v0.0.2 to and from the generated `types_capnp` of the contract tag |
+| `fs-files-server/types_service.rs` | Adapter | `Files.types`: the registry as the `TypeCatalog` capability |
+| `fs-files-app/remote.rs` | Proxy | a worker thread owns the Cap'n Proto connection |
+| `fs-files-app/backend_{file,folder,storage,picture}.rs` | Adapter + command dispatch by name | `files.capnp` behind the `Backend` trait of `fs-admin-frontend`, one per data type |
+| `fs-files-app/listing.rs` | Iterator over pages | the list is `find` with an empty search word, read page by page (strategy rule) |
+| `fs-files-app/transfer.rs` | Template method | upload and download in chunks between a `file:` link and a file of the program |
+| `fs-files-app/{values,catalog,words}.rs`, `window.rs`, `gui.rs` | Adapter / Strategy (`Say`) / Facade | records and typed values; the catalog read from the server; the English words; the window shell; the start |
 
 ## Decisions (the owner may want to change these)
 
@@ -250,6 +260,50 @@ wants remote backends needs the client side (`RemoteBackend`), not built; (7) a 
 file and a folder IS its real name (not derived). In the core `Error::problem()` makes the mapping; a name clash is still `Error::Conflict`.
 `OnConflict` is a last parameter of rename, move, copy and `startUpload` (0 = refuse, so old callers keep working; the wire `copyFile` now refuses by default, the Rust `copy_file` without `_as` still keeps both). `Sort` is a last parameter of `list` and `find`. Capabilities: `file.sort`, `file.conflictRule`, `folder.rescan` (Files), `blob.rename` and `blob.scan` (backend). Also appended since v0.8.0: `OnConflict` (v0.9.0), `Sort` (v0.10.0), size and date filters (v0.11.0), `emptyTrash`, `restoreTo`, `TrashReport` (v0.12.0), `getFolder` (v0.13.0), `pendingUploads`, `UploadInfo` (v0.14.0). `moveFolder`, `pending`, `FileFilter.trashed` exist since v0.5.0. `Files.subscribe @6` takes a `ChangeListener`
 (common.capnp); the Rust form is `FileFeed` (the placeholder `Files::subscribe` is gone).
+
+## Type descriptions and the window (ADR 0066, Thread R, 2026-11-10)
+
+Types (crate `fs-files-types`, `DescribesType` of `fs-types` **v0.0.2**, the version `fs-admin-frontend` @4688cee uses; reported by `Files.types @7` of `files.capnp`, interfaces tag v0.0.5):
+
+| Type | Standard | Why |
+|---|---|---|
+| `File` | AS2 `Document` (narrowed to `Image`/`Video`/`Audio` by media type, as the core stores it) | a file is a document with bytes, a name and a media type |
+| `Folder` | AS2 `Collection` | a collection of files and folders; the order is the view parameter `sortBy` of `find`, so not `OrderedCollection` |
+| `StorageBackend` | AS2 `Service` (provisional, no standard for "a place that holds bytes") | `backend.list/add/remove` of the requirements are about it |
+| `Picture` (gallery facet) | AS2 `Image` | refers to its `File`; the core has no metadata object yet |
+| `Album` (gallery facet) | AS2 `Collection` | order is a view parameter (`album.sort`); items by reference |
+
+Every command of the core and **every capability id of both `requirements.md`** is in a description (`requirements.rs` maps id to command; a test checks that none is missing). The list of a type is its `find` (empty = all, `Backend::list`; pages are read until the end, at most 5000 records). The app is the standard window shell with `fs-admin-frontend` (git, `rev = "4688cee"`) over one `Backend` per type (`crates/fs-files-app/src/backend_*.rs`); the old workbench window (`source/`) is gone, its code is in git history. The file list and gallery grid components are in `fs-components` (branch `r2-files-components`, crates `fs-components-file-list`, `fs-components-gallery-grid`; **tag pending**), not used by the admin window yet: the generated frontend has no hook for a component of its own.
+
+### Unsupported (named, not faked)
+
+`types.capnp` v0.0.5 has no `supported` field in `CommandDescription` (Thread T adds it). Until then **`fs-files-types/src/support.rs` (`SUPPORTED`) is the one table**; a command not in it is unsupported, and `Backend::run` answers `BackendError::Unavailable("unsupported:<name>")` for it. The frontend is never changed to switch a control on; one row is added when the core gets the command. Not answered today (`cargo run -p fs-files-types --example unsupported`):
+
+```text
+Album: find create edit delete add remove nest query suggest sort           (no album object in the core; the list is empty)
+File: subscribe (a stream, not a one-shot command: the core has FileFeed) preview nameCheck renameBulk trashConfigure
+      shareCreate shareRevoke shareRole versions revert pin encrypt syncConfigure tag duplicates searchContent link
+      searchSave lock fileRequest undo
+Folder: archive
+Picture: register import libraryScan autoUpload metadataRead metadataEdit metadataExport tagAdd tagRemove previewGenerate
+      open videoPlay edit delete restore duplicates merge stackCreate shareCreate shareGrant shareRevoke placeList
+      placeAssign placeResolve sync personDetect personName personMerge personLink labelSuggest searchSemantic similar
+      ocr favourite archive visibility commentAdd ratingSet batch story watermark transcode
+StorageBackend: quota
+```
+
+Answered for `Picture`: `find` (= `media.list`, `media.search`: the image files), `download` (= `media.download`), `sensitiveMark` (= `classify`). `media.delete` / `media.restore` stay unsupported on purpose: they mean the metadata object, which the core does not have; trashing the file is `File.delete`.
+
+### Provisional decisions and findings (for the strategy)
+
+* No quantity type in `fs-types` yet: a size is decimal text (`size`, `minSize`, `maxSize`).
+* A name that is taken has no `TypeProblem` code; it is reported as `choice.not-in-list` on the field `name` (the frontend shows the form finding). Other refusals of the core are `Unavailable(text)`.
+* `upload` and `download` take a `file:` link (`BasicType::Link`) for the local path: the form has no file chooser (a component, the frontend's). A download never replaces an existing file.
+* `Folder.create` / `move` and `Album` `parent` have a `reference` **without** a target, because a reference to the own type makes the frontend take the selected record for it (the rule for commands on a record) and the top level could not be chosen.
+* `change` is partial in the backend (missing = unchanged, empty = cleared) for `classify`; `rename`/`move` send the fields they change.
+* The generated frontend @4688cee shows a locked "coming soon" control for an unsupported command **not yet** (it knows no `supported`): the controls of `Album` and the unsupported commands are shown as normal buttons and answer `unsupported:<name>`. Finding for Thread A.
+* The generated frontend has no paging and no tile or grid view for lists: a list is a table.
+* Two `fs-types` versions in one build are separate types: moving to `fs-types` v0.0.11 (field `supported`, `Edit`) needs `fs-admin-frontend` on v0.0.11 too. Blocker for Thread A / the coordinator; this repo stays on v0.0.2.
 
 ## After the sprint (strategy list, 2026-11-07)
 
