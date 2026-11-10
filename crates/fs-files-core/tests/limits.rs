@@ -4,12 +4,14 @@ mod common;
 
 use common::disk::root;
 use common::env;
-use fs_files_core::{BlobBackend, Entry, Error, Files, LocalFolder, Spot, Transfer};
+use fs_files_core::{BlobBackend, Error, Files, LocalFolder, Spot, Transfer};
 
 #[cfg(unix)] // an unreadable file is made with mode bits
 #[tokio::test]
 async fn rescan_goes_on_after_an_entry_it_cannot_read() {
     use std::os::unix::fs::PermissionsExt;
+
+    use fs_files_core::Entry;
     let e = env().await;
     let r = &e.repo;
     std::fs::write(root(&e).join("locked"), b"secret").unwrap();
