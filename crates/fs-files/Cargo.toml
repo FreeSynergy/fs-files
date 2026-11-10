@@ -21,6 +21,10 @@ gui = ["dep:fs-files-app"]
 fs-files-server = { path = "../fs-files-server" }
 fs-files-app = { path = "../fs-files-app", optional = true }
 
+[target.'cfg(windows)'.dev-dependencies]
+# Links in the tests: a junction is the folder link of Windows (no right needed).
+junction = "1"
+
 [dev-dependencies]
 fs-files-core = { path = "../fs-files-core" }
 fs-interfaces = { git = "https://github.com/FreeSynergy/fs-interfaces", branch = "win-port", features = ["rpc"] }

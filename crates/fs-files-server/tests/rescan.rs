@@ -24,7 +24,9 @@ async fn new_changed_and_vanished_files_are_reported_and_no_record_is_deleted() 
         std::fs::create_dir(fx.root.join("Docs/Sub")).unwrap();
         std::fs::write(fx.root.join("Docs/changed.txt"), "one, and more").unwrap();
         std::fs::remove_file(fx.root.join("Docs/vanished.txt")).unwrap();
-        std::os::unix::fs::symlink("/etc/hostname", fx.root.join("Docs/link")).unwrap();
+        let target = fx.root.join("target.txt");
+        std::fs::write(&target, "elsewhere").unwrap();
+        common::links::link_file(&target, &fx.root.join("Docs/link"));
 
         let mut call = c.folders.rescan_request();
         write_uuid(call.get().init_folder(), Some(dir));

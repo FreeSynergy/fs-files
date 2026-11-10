@@ -52,7 +52,6 @@ async fn files_are_ordinary_files_in_the_root() {
     );
 }
 
-#[cfg(unix)]
 #[tokio::test]
 async fn symlinks_never_lead_out_of_the_root() {
     let dir = tmp();
@@ -61,8 +60,8 @@ async fn symlinks_never_lead_out_of_the_root() {
     let root = dir.path().join("root");
     let b = open(&root).await;
     // a directory link, a file link, and a link as the pending folder
-    std::os::unix::fs::symlink(outside.path(), root.join("dirlink")).unwrap();
-    std::os::unix::fs::symlink(outside.path().join("secret"), root.join("filelink")).unwrap();
+    common::links::link_dir(outside.path(), &root.join("dirlink"));
+    common::links::link_file(&outside.path().join("secret"), &root.join("filelink"));
     for key in ["dirlink/secret", "filelink"] {
         assert!(
             matches!(b.get(key, 0, 99).await, Err(Error::InvalidKey(_))),
@@ -96,7 +95,6 @@ async fn symlinks_never_lead_out_of_the_root() {
     );
 }
 
-#[cfg(unix)]
 #[tokio::test]
 async fn a_symlinked_pending_folder_is_refused() {
     let dir = tmp();
@@ -104,7 +102,7 @@ async fn a_symlinked_pending_folder_is_refused() {
     let root = dir.path().join("root");
     let b = open(&root).await;
     std::fs::remove_dir(root.join(".fs-files/pending")).unwrap();
-    std::os::unix::fs::symlink(outside.path(), root.join(".fs-files/pending")).unwrap();
+    common::links::link_dir(outside.path(), &root.join(".fs-files/pending"));
     assert!(matches!(
         b.put("k", 0, b"x").await,
         Err(Error::InvalidKey(_))

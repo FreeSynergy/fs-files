@@ -1,5 +1,7 @@
 //! Where the files may live relative to the program's own data: never around the database.
 
+mod common;
+
 use std::path::Path;
 
 use fs_files_server::check_places;
@@ -23,7 +25,7 @@ fn a_root_that_holds_the_data_is_refused_in_every_shape() {
     assert!(refused(&dir.path().join("data/./"), &data).contains("objects.db"));
     refused(&dir.path().join("data/../data"), &data);
     let link = dir.path().join("link");
-    std::os::unix::fs::symlink(&data, &link).unwrap();
+    common::links::link_dir(&data, &link);
     refused(&link, &data);
     refused(&link.join("not-made-yet"), &data.join("not-made-yet"));
     refused(Path::new("/"), &data);
@@ -42,7 +44,7 @@ fn a_root_beside_or_below_the_data_is_fine_made_or_not() {
     }
     let link = dir.path().join("to-elsewhere");
     std::fs::create_dir(dir.path().join("elsewhere")).unwrap();
-    std::os::unix::fs::symlink(dir.path().join("elsewhere"), &link).unwrap();
+    common::links::link_dir(&dir.path().join("elsewhere"), &link);
     check_places(&link.join("new"), &data).unwrap();
 }
 

@@ -197,6 +197,6 @@ async fn the_reserved_name_is_refused_in_any_case_and_odd_errors_have_problem_ty
     // a symlink at a place the program is about to use is "changed outside", not "invalid name"
     let d = r.create_folder(None, "d").await.unwrap();
     std::fs::remove_dir(root(&e).join("d")).unwrap();
-    std::os::unix::fs::symlink("/tmp", root(&e).join("d")).unwrap();
+    common::links::link_dir(e.dir.path(), &root(&e).join("d"));
     assert!(kind(r.create_folder(Some(d.id), "x").await).ends_with("changed-outside"));
 }

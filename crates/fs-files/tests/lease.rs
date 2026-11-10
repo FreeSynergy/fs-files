@@ -5,9 +5,19 @@
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
+async fn is_up(socket: &std::path::Path) -> bool {
+    // `connect` spawns the connection on the local set.
+    tokio::task::LocalSet::new()
+        .run_until(fs_interfaces::rpc::connect::<
+            fs_interfaces::files_capnp::files::Client,
+        >(socket))
+        .await
+        .is_ok()
+}
+
 async fn wait_for(socket: &std::path::Path) {
     for _ in 0..200 {
-        if socket.exists() {
+        if is_up(socket).await {
             return;
         }
         tokio::time::sleep(Duration::from_millis(50)).await;
@@ -74,7 +84,7 @@ async fn the_server_ends_with_its_last_window_and_not_before() {
         "no window left: a clean end"
     );
     assert!(
-        !dir.path().join("files.sock").exists(),
+        !is_up(&dir.path().join("files.sock")).await,
         "the socket is removed"
     );
 }

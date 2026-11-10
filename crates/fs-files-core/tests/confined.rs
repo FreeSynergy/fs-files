@@ -26,7 +26,7 @@ async fn a_path_below_the_base_is_made_there_and_every_other_is_refused() {
     std::fs::create_dir_all(&outside).unwrap();
     std::fs::create_dir_all(&base).unwrap();
     let r = confined(&base).await;
-    std::os::unix::fs::symlink(&outside, base.join("link")).unwrap();
+    common::links::link_dir(&outside, &base.join("link"));
 
     let info = r
         .add_backend(&local("second", "second/inner"))

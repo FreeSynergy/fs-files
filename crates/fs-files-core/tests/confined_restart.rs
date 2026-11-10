@@ -168,6 +168,7 @@ async fn an_add_that_fails_its_check_leaves_only_what_was_there_before() {
     assert_eq!(std::fs::read(base.join("Outer/mine.txt")).unwrap(), b"mine");
 }
 
+#[cfg(unix)] // a folder that cannot be written is made with mode bits
 #[tokio::test]
 async fn an_add_whose_folder_cannot_be_opened_leaves_the_folder_as_it_was() {
     use std::os::unix::fs::PermissionsExt;
@@ -195,7 +196,7 @@ fn forget_does_not_clean_through_a_link_that_took_the_place_of_the_folder() {
     std::fs::create_dir_all(elsewhere.join(".fs-files/pending")).unwrap();
     std::fs::create_dir_all(&base).unwrap();
     let link = base.join("X");
-    std::os::unix::fs::symlink(&elsewhere, &link).unwrap();
+    common::links::link_dir(&elsewhere, &link);
     let place = Place {
         path: link.clone(),
         made: vec![link.clone()],

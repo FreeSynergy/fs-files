@@ -958,7 +958,7 @@ checksum = "fe6d2e5af09e8c8ad56c969f2157a3d4238cebc7c55f0a517728c38f7b200f81"
 dependencies = [
  "serde",
  "termcolor",
- "unicode-width 0.1.14",
+ "unicode-width 0.2.3",
 ]
 
 [[package]]
@@ -1582,6 +1582,7 @@ dependencies = [
  "fs-files-server",
  "fs-interfaces 0.0.1 (git+https://github.com/FreeSynergy/fs-interfaces?branch=win-port)",
  "fs-objects",
+ "junction",
  "serde_json",
  "tempfile",
  "tokio",
@@ -1620,6 +1621,7 @@ dependencies = [
  "fs-interfaces 0.0.1 (git+https://github.com/FreeSynergy/fs-interfaces?branch=win-port)",
  "fs-objects",
  "infer",
+ "junction",
  "object_store",
  "rustix 1.1.6",
  "serde",
@@ -1642,6 +1644,7 @@ dependencies = [
  "fs-files-types",
  "fs-interfaces 0.0.1 (git+https://github.com/FreeSynergy/fs-interfaces?branch=win-port)",
  "fs-objects",
+ "junction",
  "serde_json",
  "tempfile",
  "tokio",
@@ -2668,6 +2671,16 @@ dependencies = [
  "cfg-if",
  "futures-util",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "junction"
+version = "1.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8cfc352a66ba903c23239ef51e809508b6fc2b0f90e3476ac7a9ff47e863ae95"
+dependencies = [
+ "scopeguard",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

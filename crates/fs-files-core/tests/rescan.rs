@@ -73,8 +73,7 @@ async fn rescan_takes_over_new_files_and_folders_and_updates_changed_ones() {
     );
 
     // odd entries are listed, not taken over
-    #[cfg(unix)]
-    std::os::unix::fs::symlink("/etc", root(&e).join("d/link")).unwrap();
+    common::links::link_dir(e.dir.path(), &root(&e).join("d/link"));
     std::fs::write(root(&e).join("d/ok.txt"), b"ok").unwrap();
     let odd = r.rescan(Some(d.id)).await.unwrap();
     assert!(

@@ -221,7 +221,6 @@ async fn a_path_the_disk_cannot_hold_fails_cleanly() {
     assert!(listed.is_empty());
 }
 
-#[cfg(unix)]
 #[tokio::test]
 async fn a_symlink_planted_in_the_root_leads_nowhere() {
     let e = env().await;
@@ -232,7 +231,7 @@ async fn a_symlink_planted_in_the_root_leads_nowhere() {
     let f = upload(r, Some(d.id), "a.txt", "text/plain", b"a").await;
     // somebody replaces the folder by a link to the outside
     std::fs::rename(root(&e).join("dir"), e.dir.path().join("moved-away")).unwrap();
-    std::os::unix::fs::symlink(outside.path(), root(&e).join("dir")).unwrap();
+    common::links::link_dir(outside.path(), &root(&e).join("dir"));
     assert!(r.open(f.id).await.is_err());
     assert!(
         r.start_upload(Some(d.id), "b.txt", "text/plain")

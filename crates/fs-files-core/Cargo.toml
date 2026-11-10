@@ -30,6 +30,10 @@ bytes = { version = "1", optional = true }
 [target.'cfg(target_os = "linux")'.dependencies]
 rustix = { version = "1", default-features = false, features = ["std", "fs"] }
 
+[target.'cfg(windows)'.dev-dependencies]
+# Links in the tests: a junction is the folder link of Windows (no right needed).
+junction = "1"
+
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }
 tempfile = "3"
