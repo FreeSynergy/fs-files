@@ -1,5 +1,5 @@
 # The gate of check.yml on the Windows runner of fs-release (windows-2022): fmt, clippy (pedantic), tests, coding rules.
-# The Windows parts of fs-files-platform are built and tested here, never cross-built (ADR 0043, port decision of the sprint).
+# The Windows parts of of this port are built and tested here, never cross-built (ADR 0043, port decision of the sprint).
 # Own steps instead of the reusable workflow, only because the tests run with `--no-fail-fast`: one failing test file must
 # not hide the results of the others.
 name: windows
