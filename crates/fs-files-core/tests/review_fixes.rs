@@ -193,6 +193,8 @@ async fn the_reserved_name_is_refused_in_any_case_and_odd_errors_have_problem_ty
             "{n}"
         );
     }
+    // (Windows has one `.fs-files` for every case, so nothing can be said by looking for the other spelling)
+    #[cfg(unix)]
     assert!(!exists(&e, ".FS-FILES"));
     // a symlink at a place the program is about to use is "changed outside", not "invalid name"
     let d = r.create_folder(None, "d").await.unwrap();

@@ -95,13 +95,21 @@ async fn unicode_long_spaces_and_case_differences_work() {
         assert_eq!(on_disk(&e, n), n.as_bytes());
         assert_eq!(read_all(r, f.id).await, n.as_bytes());
     }
-    // Linux: different case is a different file; an exact duplicate is refused
+    // Linux: different case is a different file; Windows keeps one name for both and says so; an exact duplicate is refused
     let a = upload(r, None, "Foto.jpg", "image/jpeg", b"upper").await;
-    let b = upload(r, None, "foto.jpg", "image/jpeg", b"lower").await;
     assert_eq!(read_all(r, a.id).await, b"upper");
-    assert_eq!(read_all(r, b.id).await, b"lower");
     assert_eq!(on_disk(&e, "Foto.jpg"), b"upper");
-    assert_eq!(on_disk(&e, "foto.jpg"), b"lower");
+    if cfg!(windows) {
+        assert!(is_conflict(
+            r.start_upload(None, "foto.jpg", "image/jpeg")
+                .await
+                .map(|_| ())
+        ));
+    } else {
+        let b = upload(r, None, "foto.jpg", "image/jpeg", b"lower").await;
+        assert_eq!(read_all(r, b.id).await, b"lower");
+        assert_eq!(on_disk(&e, "foto.jpg"), b"lower");
+    }
     assert!(is_conflict(
         r.start_upload(None, "Foto.jpg", "image/jpeg")
             .await

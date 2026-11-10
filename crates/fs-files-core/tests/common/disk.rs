@@ -23,7 +23,12 @@ pub fn tree(dir: &Path) -> Vec<String> {
     fn walk(base: &Path, at: &Path, out: &mut Vec<String>) {
         for entry in std::fs::read_dir(at).unwrap() {
             let p = entry.unwrap().path();
-            let rel = p.strip_prefix(base).unwrap().to_string_lossy().into_owned();
+            // Always written with `/`, so a test reads the same on every system.
+            let rel = p
+                .strip_prefix(base)
+                .unwrap()
+                .to_string_lossy()
+                .replace('\\', "/");
             if rel == ".fs-files" {
                 continue;
             }

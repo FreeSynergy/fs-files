@@ -58,13 +58,16 @@ async fn the_server_ends_with_its_last_window_and_not_before() {
     let lease = dir.path().join("files.lease");
     // Two windows hold the lease.
     let one = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
         .create(true)
-        .append(true)
+        .truncate(false)
         .open(&lease)
         .unwrap();
     one.lock_shared().unwrap();
     let two = std::fs::OpenOptions::new()
-        .append(true)
+        .read(true)
+        .write(true)
         .open(&lease)
         .unwrap();
     two.lock_shared().unwrap();

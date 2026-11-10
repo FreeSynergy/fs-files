@@ -28,7 +28,8 @@ fn a_root_that_holds_the_data_is_refused_in_every_shape() {
     common::links::link_dir(&data, &link);
     refused(&link, &data);
     refused(&link.join("not-made-yet"), &data.join("not-made-yet"));
-    refused(Path::new("/"), &data);
+    // the top of the drive the data is on
+    refused(data.ancestors().last().unwrap(), &data);
 }
 
 #[test]

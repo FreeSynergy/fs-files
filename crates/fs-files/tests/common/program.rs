@@ -20,12 +20,24 @@ pub fn start(socket: &Path, data: &Path, root: Option<&Path>) -> Child {
         .arg(socket)
         .arg("--data")
         .arg(data);
+    match root {
+        Some(root) => command.env("FS_FILES_ROOT", root),
+        None => command.env_remove("FS_FILES_ROOT"),
+    };
+    spawn(&mut command, socket)
+}
+
+/// Starts the server of `command` (already `serve ...`) so that [`terminate`] can end it in order: on Windows the test holds
+/// the lease of the server, as a window does.
+pub fn spawn(command: &mut Command, socket: &Path) -> Child {
     #[cfg(windows)]
     let held = {
         let lease = socket.with_extension("lease");
         let held = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
             .create(true)
-            .append(true)
+            .truncate(false)
             .open(&lease)
             .unwrap();
         held.lock_shared().unwrap();
@@ -35,10 +47,8 @@ pub fn start(socket: &Path, data: &Path, root: Option<&Path>) -> Child {
             .env("FS_LEASE_POLL_MS", "100");
         held
     };
-    match root {
-        Some(root) => command.env("FS_FILES_ROOT", root),
-        None => command.env_remove("FS_FILES_ROOT"),
-    };
+    #[cfg(unix)]
+    let _ = socket;
     let child = command.stderr(Stdio::null()).spawn().unwrap();
     #[cfg(windows)]
     LEASES.lock().unwrap().push((child.id(), held));
@@ -78,7 +88,15 @@ pub fn terminate(mut child: Child) {
 #[cfg(windows)]
 pub fn terminate(mut child: Child) {
     // Letting go of the lease is what ends the server in order: it looks every 100 ms and ends after three empty looks.
-    LEASES.lock().unwrap().retain(|(pid, _)| *pid != child.id());
+    let mut leases = LEASES.lock().unwrap();
+    let held = leases.iter().any(|(pid, _)| *pid == child.id());
+    leases.retain(|(pid, _)| *pid != child.id());
+    drop(leases);
+    if !held {
+        // A server that was not started through `spawn` has no lease to let go of: never wait for ever.
+        let _ = child.kill();
+        panic!("terminate was given a server that holds no lease");
+    }
     assert!(child.wait().unwrap().success());
 }
 

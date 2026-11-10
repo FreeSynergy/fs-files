@@ -108,7 +108,12 @@ async fn leftover_pending_blobs_are_swept_but_live_uploads_are_kept() {
 #[tokio::test]
 async fn moving_a_folder_whose_subtree_would_not_fit_is_refused_up_front() {
     // A short root of our own (the temp folder of a test run can be long, and the root counts).
-    let dir = tempfile::tempdir_in("/tmp").unwrap();
+    let short = if cfg!(unix) {
+        std::path::PathBuf::from("/tmp")
+    } else {
+        std::env::temp_dir()
+    };
+    let dir = tempfile::tempdir_in(short).unwrap();
     let blobs = dir.path().join("blobs");
     let store: std::sync::Arc<dyn fs_objects::Store> =
         std::sync::Arc::new(fs_objects::TursoStore::open_in_memory().await.unwrap());

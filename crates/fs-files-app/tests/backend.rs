@@ -188,7 +188,7 @@ fn ids_and_references_are_absolute_iris_that_the_basic_type_accepts() {
     let local = w.dir.join("a b.txt");
     std::fs::write(&local, "x").unwrap();
     // a path with a space typed as a link: the percent code is decoded
-    let encoded = format!("file://{}", local.display()).replace(' ', "%20");
+    let encoded = url(&local).replace(' ', "%20");
     let id = files
         .run("upload", &v(&[("source", &encoded), ("folder", &dir)]))
         .unwrap()

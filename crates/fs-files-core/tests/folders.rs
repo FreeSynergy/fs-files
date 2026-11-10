@@ -34,8 +34,13 @@ async fn names_are_unique_per_folder_exactly() {
         e.repo.create_folder(None, "Photos").await,
         Err(Error::Conflict(_))
     ));
-    // the operating system decides: on Linux a different case is a different name
-    e.repo.create_folder(None, "photos").await.unwrap();
+    // the operating system decides: on Linux a different case is a different name, on Windows it is the same one
+    let lower = e.repo.create_folder(None, "photos").await;
+    if cfg!(windows) {
+        assert!(matches!(lower, Err(Error::Conflict(_))));
+    } else {
+        lower.unwrap();
+    }
     // the same name in another folder is fine, and a file and a folder share one namespace
     e.repo.create_folder(Some(a.id), "Photos").await.unwrap();
     upload(&e.repo, None, "x.txt", "text/plain", b"x").await;

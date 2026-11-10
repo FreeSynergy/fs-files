@@ -5,7 +5,7 @@ mod common;
 
 use std::process::{Command, Stdio};
 
-use common::program::{connected, is_up, start, terminate, wait_for};
+use common::program::{connected, is_up, spawn, start, terminate, wait_for};
 use common::{list_all, mkdir, names, put_file, text_file};
 use fs_interfaces::files_capnp::OnConflict;
 
@@ -77,9 +77,8 @@ async fn the_root_and_the_instance_are_taken_from_the_environment_and_the_argume
                 .arg("--data")
                 .arg(dir.path().join("data"))
                 .args(["--instance", "files.example.org"])
-                .env("FS_FILES_ROOT", &root)
-                .stderr(Stdio::null());
-            let server = command.spawn().unwrap();
+                .env("FS_FILES_ROOT", &root);
+            let server = spawn(&mut command, &socket);
             wait_for(&socket).await;
             let (connection, c) = connected(&socket).await;
             let file = put_file(&c, None, "x.txt", "", b"x", OnConflict::Refuse).await;

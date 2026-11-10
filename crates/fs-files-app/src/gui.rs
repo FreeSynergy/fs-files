@@ -139,9 +139,12 @@ fn connect_or_start(socket: &Path, may_start: bool) -> Result<FilesRemote, Strin
 /// Hold the shared lock on `path` until this process ends.
 fn hold_lease(path: &Path) {
     static HELD: std::sync::OnceLock<std::fs::File> = std::sync::OnceLock::new();
+    // Read and write, not append: Windows takes a lock only on a handle that can read or write data.
     let file = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
         .create(true)
-        .append(true)
+        .truncate(false)
         .open(path);
     if let Ok(file) = file
         && file.lock_shared().is_ok()

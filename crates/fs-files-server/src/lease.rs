@@ -40,7 +40,13 @@ pub fn take_lease(args: Vec<OsString>) -> Result<(Option<PathBuf>, Vec<OsString>
 /// Whether nobody holds the lease right now (and the lease file is there to ask).
 #[must_use]
 pub fn unused(path: &Path) -> bool {
-    let Ok(file) = OpenOptions::new().create(true).append(true).open(path) else {
+    let Ok(file) = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(path)
+    else {
         return false;
     };
     match file.try_lock() {
@@ -86,7 +92,13 @@ pub fn watch(path: PathBuf, end: impl FnOnce() + Send + 'static) {
 /// # Errors
 /// The file cannot be made or locked.
 pub fn hold(path: &Path) -> std::io::Result<File> {
-    let file = OpenOptions::new().create(true).append(true).open(path)?;
+    // Read and write, not append: Windows takes a lock only on a handle that can read or write data.
+    let file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(path)?;
     file.lock_shared()?;
     Ok(file)
 }
