@@ -5,6 +5,7 @@
 //! fs-files                          the window (feature `gui`, on by default)
 //! fs-files [--socket F] [--size WxH] [--snapshot F.png]
 //! fs-files serve                    the server (Cap'n Proto, files.capnp)
+//! fs-files --version                the version
 //! ```
 
 use std::process::ExitCode;
@@ -16,6 +17,10 @@ fn main() -> ExitCode {
     let raw: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
     let text = |i: usize| raw.get(i).and_then(|w| w.to_str());
     match text(0) {
+        Some("--version" | "-V") => {
+            println!("fs-files {}", env!("CARGO_PKG_VERSION"));
+            ExitCode::SUCCESS
+        }
         Some("serve") => serve(&raw[1..]),
         // `fs-files --socket PATH serve`: the option may stand before the word.
         Some("--socket") if text(2) == Some("serve") => {

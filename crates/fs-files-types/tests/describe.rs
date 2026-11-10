@@ -19,7 +19,7 @@ fn all_five_types_are_sound_and_registered() {
         t.validate().expect("sound");
         assert_eq!(t.program, "fs-files");
     }
-    assert!(r.unresolved_targets().is_empty());
+    assert_eq!(r.unresolved_targets(), []);
 }
 
 #[test]
@@ -115,7 +115,7 @@ fn the_support_table_names_only_described_commands_and_the_core_ones() {
     }
     assert!(!is_supported("File", "preview"));
     assert!(!is_supported("Album", "create"));
-    assert!(!unsupported().is_empty());
+    assert!(unsupported().len() > 50);
 }
 
 #[test]

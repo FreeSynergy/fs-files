@@ -7,7 +7,7 @@ see a path or a backend. Contract: `files.capnp` in `fs-interfaces` (tag v0.0.5,
 
 ## State
 
-Version 0.0.4 (window rebuilt on the generated Admin frontend; earlier: 0.6.0 tagged v0.6.0, header corrected 2026-11-08; 0.5.0 was: stage 1: local folder, stage 2: S3, stage 3: real names, stage 4: the server, 0.5.0: store identity, typed problem extensions, uploads paged in the store). Built on fs-objects 0.4.0 and fs-interfaces 0.44.0 (git tags). Interface status: draft, provisional, consumers 0 of 2.
+Version 0.0.5 (0.0.4 was tagged but its release failed: `--version` was missing; window rebuilt on the generated Admin frontend; earlier: 0.6.0 tagged v0.6.0, header corrected 2026-11-08; 0.5.0 was: stage 1: local folder, stage 2: S3, stage 3: real names, stage 4: the server, 0.5.0: store identity, typed problem extensions, uploads paged in the store). Built on fs-objects 0.4.0 and fs-interfaces 0.44.0 (git tags). Interface status: draft, provisional, consumers 0 of 2.
 
 | Area | State |
 |---|---|

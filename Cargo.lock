@@ -1571,7 +1571,7 @@ dependencies = [
 
 [[package]]
 name = "fs-files"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "async-trait",
  "blake3",
@@ -1590,7 +1590,7 @@ dependencies = [
 
 [[package]]
 name = "fs-files-app"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "capnp",
  "chrono",
@@ -1611,7 +1611,7 @@ dependencies = [
 
 [[package]]
 name = "fs-files-core"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "async-trait",
  "blake3",
@@ -1631,7 +1631,7 @@ dependencies = [
 
 [[package]]
 name = "fs-files-server"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "async-trait",
  "blake3",
@@ -1651,7 +1651,7 @@ dependencies = [
 
 [[package]]
 name = "fs-files-types"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "capnp",
  "fs-interfaces 0.0.1 (git+https://github.com/FreeSynergy/fs-interfaces?tag=v0.0.5)",
