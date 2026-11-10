@@ -335,4 +335,4 @@ The lease lock needs a handle that can read or write data on Windows (it was `ap
 Tests that depend on Unix modes (`0o700`, unreadable files) run on Unix only and say why; names that differ only in case are one name on
 Windows and the tests say that. Until `fs-interfaces` is tagged with the transport, the crates point at its branch `win-port`.
 **Open on Windows:** no path longer than the 4095 bytes counted by the repository is meant to be used (Windows takes more with the
-`\\?\` form, which Explorer cannot open); UNC links (`file://server/share`) are refused; the store's UAC/setup flow for fs-files itself is the one of `fs-store`.
+`\\?\` form, which Explorer cannot open); UNC links (`file://server/share`, `file:////server/share`) and links whose decoded text holds a backslash (`%5C`) are refused, because the files of the app are local; the store's UAC/setup flow for fs-files itself is the one of `fs-store`.

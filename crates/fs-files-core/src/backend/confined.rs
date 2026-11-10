@@ -43,6 +43,15 @@ impl ConfinedLocalFactory {
                 Component::Normal(n) if n.to_string_lossy().eq_ignore_ascii_case(RESERVED_NAME) => {
                     return Err(refused("names the program's own folder"));
                 }
+                Component::Normal(n)
+                    if crate::platform::current()
+                        .names
+                        .refuse(&n.to_string_lossy())
+                        .is_some() =>
+                {
+                    // Also the short 8.3 form of the program's folder (`FS-FIL~1`), which is the folder itself on Windows.
+                    return Err(refused("holds a name this system does not keep"));
+                }
                 Component::Normal(n) => parts.push(n),
                 Component::CurDir => {}
                 _ => return Err(refused("must be relative and stay below the base")),

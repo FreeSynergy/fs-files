@@ -13,6 +13,7 @@ use fs_interfaces::rpc::{bind_socket, connect, serve};
 use fs_objects::{Store, TursoStore};
 
 pub mod backend;
+#[path = "../../../fs-files-core/tests/common/links.rs"]
 pub mod links;
 pub mod program;
 pub mod search;

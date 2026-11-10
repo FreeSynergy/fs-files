@@ -103,7 +103,17 @@ fn same_entry_new_spelling(from: &Path, to: &Path) -> bool {
     ) else {
         return false;
     };
-    a != b && from.parent() == to.parent() && crate::platform::current().names.same_name(a, b)
+    let Some(dir) = from.parent().filter(|d| Some(*d) == to.parent()) else {
+        return false;
+    };
+    // A folder can be case sensitive on Windows: there `Other` and `OTHER` are two entries and the rename would replace one.
+    // The listing shows each entry in its own spelling, so an entry with exactly the new spelling is another one; on a folder
+    // that ignores case the listing has only the old spelling.
+    a != b
+        && crate::platform::current().names.same_name(a, b)
+        && !std::fs::read_dir(dir).is_ok_and(|mut entries| {
+            entries.any(|e| e.is_ok_and(|e| e.file_name().to_str() == Some(b)))
+        })
 }
 
 /// Turn an IO error of a name-based operation into the error the caller should see.

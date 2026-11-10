@@ -9,6 +9,11 @@ pub(super) struct DrivePaths;
 
 impl FileLinks for DrivePaths {
     fn path_of(&self, text: &str) -> Option<PathBuf> {
+        // Local links only: `file:////host/share` is a UNC path and a decoded `%5C` would be a separator the
+        // link did not write as one. Both are refused (the same as a link with a host).
+        if text.starts_with("//") || text.contains('\\') {
+            return None;
+        }
         let bytes = text.as_bytes();
         let drive = bytes.len() >= 3
             && bytes[0] == b'/'
@@ -34,5 +39,13 @@ mod tests {
             links.path_of("/Users/me/a.jpg"),
             Some(PathBuf::from(r"\Users\me\a.jpg"))
         );
+    }
+
+    #[test]
+    fn unc_and_encoded_backslashes_are_refused() {
+        let links = DrivePaths;
+        assert_eq!(links.path_of("//host/share/a.jpg"), None);
+        assert_eq!(links.path_of(r"/C:/a\..\b.jpg"), None);
+        assert_eq!(links.path_of(r"/\\host\share"), None);
     }
 }
