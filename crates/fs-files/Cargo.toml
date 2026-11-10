@@ -23,7 +23,7 @@ fs-files-app = { path = "../fs-files-app", optional = true }
 
 [dev-dependencies]
 fs-files-core = { path = "../fs-files-core" }
-fs-interfaces = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.0.5", features = ["rpc"] }
+fs-interfaces = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.0.14", features = ["rpc"] }
 fs-objects = { git = "https://github.com/FreeSynergy/fs-objects", tag = "v0.0.1" }
 capnp = "0.27"
 tempfile = "3"

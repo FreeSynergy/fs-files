@@ -9,7 +9,7 @@ rust-version.workspace = true
 [dependencies]
 fs-files-types = { path = "../fs-files-types" }
 fs-types = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.0.2" }
-fs-interfaces = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.0.5", features = ["rpc"] }
+fs-interfaces = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.0.14", features = ["rpc"] }
 fs-admin-frontend = { git = "https://github.com/FreeSynergy/fs-components", rev = "4688cee" }
 fs-components-app = { git = "https://github.com/FreeSynergy/fs-components", rev = "4688cee" }
 fs-components-fields = { git = "https://github.com/FreeSynergy/fs-components", rev = "4688cee" }
