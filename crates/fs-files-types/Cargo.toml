@@ -1,0 +1,10 @@
+[package]
+name = "fs-files-types"
+description = "Type descriptions of the files program (File, Folder, StorageBackend, Album, Picture): fields, all commands, and which ones the core supports"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+fs-types = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.0.2" }

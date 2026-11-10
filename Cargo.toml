@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/fs-files-core", "crates/fs-files-server", "crates/fs-files-app", "crates/fs-files"]
+members = ["crates/fs-files-core", "crates/fs-files-types", "crates/fs-files-server", "crates/fs-files-app", "crates/fs-files"]
 
 [workspace.package]
 authors = ["FreeSynergy <support@freesynergy.net>"]
