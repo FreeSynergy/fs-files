@@ -12,7 +12,7 @@ name = "fs_files_server"
 [dependencies]
 fs-files-core = { path = "../fs-files-core" }
 fs-files-types = { path = "../fs-files-types" }
-fs-interfaces = { git = "https://github.com/FreeSynergy/fs-interfaces", branch = "win-port", features = ["rpc"] }
+fs-interfaces = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.0.16", features = ["rpc"] }
 fs-objects = { git = "https://github.com/FreeSynergy/fs-objects", tag = "v0.0.1" }
 capnp = "0.27"
 capnp-rpc = "0.27"

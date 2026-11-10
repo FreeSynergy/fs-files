@@ -27,7 +27,7 @@ junction = "1"
 
 [dev-dependencies]
 fs-files-core = { path = "../fs-files-core" }
-fs-interfaces = { git = "https://github.com/FreeSynergy/fs-interfaces", branch = "win-port", features = ["rpc"] }
+fs-interfaces = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.0.16", features = ["rpc"] }
 fs-objects = { git = "https://github.com/FreeSynergy/fs-objects", tag = "v0.0.1" }
 capnp = "0.27"
 tempfile = "3"
