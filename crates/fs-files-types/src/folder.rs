@@ -1,6 +1,6 @@
 //! `Folder`: the data type of a folder (ADR 0066).
 //!
-//! Pattern: Registry entry (trait first, ADR 0043) — `DescribesType`. Standard: ActivityStreams 2.0 `Collection`: a
+//! Pattern: Registry entry (trait first, ADR 0043) — `DescribesType`. Standard: `ActivityStreams` 2.0 `Collection`: a
 //! folder is a collection of files and folders, as the core stores it (`DESIGN.md`). `OrderedCollection` is not used:
 //! the order is a view parameter (the `sortBy` of `find`), not a property of the folder.
 

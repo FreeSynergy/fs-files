@@ -120,7 +120,7 @@ fn files_are_uploaded_listed_changed_trashed_restored_and_downloaded() {
     assert_eq!(names(&files, &Values::new()), ["note.txt"]);
     let row = &files.list(&Values::new()).unwrap()[0];
     assert_eq!(row.values["size"], ["5"]);
-    assert_eq!(row.values["folder"], [docs_id.clone()]);
+    assert_eq!(row.values["folder"], std::slice::from_ref(&docs_id));
     assert_eq!(row.values["state"], ["live"]);
 
     // the same name again is refused as a finding on the field `name`, and keep-both gives it another name
@@ -221,14 +221,8 @@ fn folders_are_created_renamed_moved_deleted_and_rescanned() {
         .unwrap();
     folders.run("move", &v(&[("folder", &b)])).unwrap();
     let rows = folders.list(&Values::new()).unwrap();
-    assert!(
-        rows.iter()
-            .find(|r| r.id == b)
-            .unwrap()
-            .values
-            .get("parent")
-            .is_none()
-    );
+    let moved = rows.iter().find(|r| r.id == b).unwrap();
+    assert!(!moved.values.contains_key("parent"));
     folders.run("resolve", &v(&[("folder", &b)])).unwrap();
 
     std::fs::write(w.dir.join("files").join("found.txt"), "x").unwrap();
@@ -259,7 +253,7 @@ fn pictures_are_the_image_files_and_albums_do_not_exist_yet() {
     files.run("upload", &v(&[("source", &url(&text))])).unwrap();
     let rows = pictures.list(&Values::new()).unwrap();
     assert_eq!(rows.len(), 1);
-    assert_eq!(rows[0].values["file"], [id.clone()]);
+    assert_eq!(rows[0].values["file"], std::slice::from_ref(&id));
 
     pictures
         .run(
@@ -342,8 +336,9 @@ fn unfinished_uploads_are_listed_and_can_be_aborted() {
     let files = FileBackend(w.remote.clone());
     let none = files.run("uploadList", &Values::new()).unwrap();
     assert!(none.values.is_empty());
-    assert!(matches!(
-        files.run("uploadAbort", &v(&[("uploadId", "nothing")])),
-        Err(_)
-    ));
+    assert!(
+        files
+            .run("uploadAbort", &v(&[("uploadId", "nothing")]))
+            .is_err()
+    );
 }

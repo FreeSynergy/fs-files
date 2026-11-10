@@ -1,7 +1,7 @@
 //! `File`: the data type of a stored file (ADR 0066).
 //!
 //! Pattern: Registry entry (trait first, ADR 0043) — `DescribesType` is how the type enters the `TypeRegistry`; the
-//! description is built with the Builder of `fs-types`. Standard: ActivityStreams 2.0 `Document` (W3C Recommendation);
+//! description is built with the Builder of `fs-types`. Standard: `ActivityStreams` 2.0 `Document` (W3C Recommendation);
 //! the media type narrows it to `Image`, `Video` or `Audio`, as the core stores it (`DESIGN.md`). A file is a
 //! document with bytes, a name and a media type; AS2 has no better term, and the
 //! `Document` subtypes carry the same properties. Commands: everything the core has and everything

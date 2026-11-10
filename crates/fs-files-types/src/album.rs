@@ -1,6 +1,6 @@
 //! `Album`: the data type of the gallery facet for a set of pictures (ADR 0066).
 //!
-//! Pattern: Registry entry (trait first, ADR 0043) — `DescribesType`. Standard: ActivityStreams 2.0 `Collection`
+//! Pattern: Registry entry (trait first, ADR 0043) — `DescribesType`. Standard: `ActivityStreams` 2.0 `Collection`
 //! (`requirements.md` of the gallery names `Collection` / `OrderedCollection`). `Collection` is chosen because the order
 //! of an album is a view parameter (`album.sort`), as for a folder, not part of the data; the items are references to
 //! pictures, never copies. The core has no album object yet: every command is unsupported (`support.rs`).

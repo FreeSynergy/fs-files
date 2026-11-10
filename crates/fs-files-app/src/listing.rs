@@ -35,24 +35,17 @@ pub(crate) fn fill(
     if let Some(max) = number(input, "maxSize")? {
         f.set_max_size(i64::try_from(max).unwrap_or(i64::MAX));
     }
-    let times: [(&str, fn(&mut file_filter::Builder<'_>, i64)); 4] = [
-        ("modifiedAfter", |f, t| {
-            f.reborrow().init_modified_after().set_unix_millis(t)
-        }),
-        ("modifiedBefore", |f, t| {
-            f.reborrow().init_modified_before().set_unix_millis(t)
-        }),
-        ("createdAfter", |f, t| {
-            f.reborrow().init_created_after().set_unix_millis(t)
-        }),
-        ("createdBefore", |f, t| {
-            f.reborrow().init_created_before().set_unix_millis(t)
-        }),
-    ];
-    for (name, set) in times {
-        if let Some(t) = millis(input, name)? {
-            set(&mut f, t);
-        }
+    if let Some(t) = millis(input, "modifiedAfter")? {
+        f.reborrow().init_modified_after().set_unix_millis(t);
+    }
+    if let Some(t) = millis(input, "modifiedBefore")? {
+        f.reborrow().init_modified_before().set_unix_millis(t);
+    }
+    if let Some(t) = millis(input, "createdAfter")? {
+        f.reborrow().init_created_after().set_unix_millis(t);
+    }
+    if let Some(t) = millis(input, "createdBefore")? {
+        f.reborrow().init_created_before().set_unix_millis(t);
     }
     Ok(())
 }

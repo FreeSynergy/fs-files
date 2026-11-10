@@ -7,7 +7,13 @@
 
 #![deny(missing_docs)]
 #![warn(clippy::pedantic)]
-#![allow(clippy::must_use_candidate, clippy::module_name_repetitions)]
+#![allow(
+    clippy::must_use_candidate,
+    clippy::module_name_repetitions,
+    // the generated readers have one method per field; a closure names the one asked for
+    clippy::redundant_closure_for_method_calls,
+    clippy::needless_pass_by_value
+)]
 
 mod backend_file;
 mod backend_folder;

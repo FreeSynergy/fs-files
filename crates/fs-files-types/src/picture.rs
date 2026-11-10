@@ -1,6 +1,6 @@
 //! `Picture`: the data type of the gallery facet for an image (ADR 0066).
 //!
-//! Pattern: Registry entry (trait first, ADR 0043) — `DescribesType`. Standard: ActivityStreams 2.0 `Image` (the
+//! Pattern: Registry entry (trait first, ADR 0043) — `DescribesType`. Standard: `ActivityStreams` 2.0 `Image` (the
 //! gallery requirements name `Image` / `Video` with a reference to the file record). A picture refers to its `File`
 //! (`file`), the bytes stay in `fs-files`; the core has no metadata object for it yet, so what is derived from the file
 //! (name, media type, size) is answered today and the rest (`takenAt`, `place`, `keywords` …) is empty. Commands: the

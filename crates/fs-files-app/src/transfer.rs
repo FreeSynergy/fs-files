@@ -50,15 +50,12 @@ pub(crate) fn path_of(input: &Values, field: &str) -> Result<PathBuf, BackendErr
         let decoded = (raw[i] == b'%')
             .then(|| Some((hex(*raw.get(i + 1)?)? << 4) | hex(*raw.get(i + 2)?)?))
             .flatten();
-        match decoded {
-            Some(byte) => {
-                out.push(byte);
-                i += 3;
-            }
-            None => {
-                out.push(raw[i]);
-                i += 1;
-            }
+        if let Some(byte) = decoded {
+            out.push(byte);
+            i += 3;
+        } else {
+            out.push(raw[i]);
+            i += 1;
         }
     }
     String::from_utf8(out)
