@@ -24,6 +24,7 @@ pub mod gui;
 mod listing;
 mod remote;
 mod transfer;
+mod uploads;
 mod values;
 pub mod window;
 mod words;

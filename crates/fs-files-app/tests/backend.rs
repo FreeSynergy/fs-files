@@ -203,12 +203,8 @@ fn ids_and_references_are_absolute_iris_that_the_basic_type_accepts() {
     // restoreTo: trash it, restore into the top level
     files.run("delete", &v(&[("file", &id)])).unwrap();
     files.run("restoreTo", &v(&[("file", &id)])).unwrap();
-    assert!(
-        files.list(&Values::new()).unwrap()[0]
-            .values
-            .get("folder")
-            .is_none()
-    );
+    let restored = files.list(&Values::new()).unwrap();
+    assert!(!restored[0].values.contains_key("folder"));
 }
 
 #[test]
@@ -240,7 +236,7 @@ fn a_missing_field_leaves_a_change_unchanged_and_an_empty_one_clears() {
     files.run("move", &v(&[("file", &id)])).unwrap();
     files.run("classify", &v(&[("file", &id)])).unwrap();
     let row = &files.list(&Values::new()).unwrap()[0];
-    assert_eq!(row.values["folder"], [dir.clone()]);
+    assert_eq!(row.values["folder"], std::slice::from_ref(&dir));
     assert_eq!(row.values["sensitive"], ["dpv:Health"]);
     // an empty list clears
     let mut cleared = v(&[("file", &id)]);
