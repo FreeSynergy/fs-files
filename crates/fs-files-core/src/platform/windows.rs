@@ -91,4 +91,11 @@ mod tests {
             assert!(rules.refuse(good).is_none(), "{good}");
         }
     }
+
+    #[test]
+    fn windows_keeps_one_name_for_every_case() {
+        let rules = WindowsNames;
+        assert!(rules.same_name("Other", "OTHER"));
+        assert!(!rules.same_name("a", "b"));
+    }
 }
