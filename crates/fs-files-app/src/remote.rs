@@ -5,86 +5,20 @@
 //! of each data type for the generated frontend is implemented on it in the `backend_*` modules.
 
 use std::future::Future;
-use std::path::{Path, PathBuf};
-use std::pin::Pin;
+use std::path::Path;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex, PoisonError, mpsc};
-use std::thread;
 use std::time::Duration;
 
 use fs_admin_frontend::BackendError;
-use fs_interfaces::files_capnp::{backends, files, folders, search, transfer};
-use fs_interfaces::rpc::client::{CALL_TIMEOUT, Fault, call_limited};
-use fs_interfaces::rpc::{Connection, Expected, Problem, ServerStarter, connect, connect_matching};
+use fs_interfaces::rpc::client::{Fault, call_limited};
+use fs_interfaces::rpc::{Expected, Problem, ServerStarter};
 use fs_types::{RecordIssue, RecordProblem, TypeProblem};
 
-/// The name of the server in the words of a timeout.
-const SERVER: &str = "files";
-
-/// What the caller waits on top of a limit for a worker that cannot run the job.
-const GRACE: Duration = Duration::from_secs(2);
-
-/// Commands that move bytes or walk a whole tree: they get [`Limits::long`], every other call [`Limits::call`].
-const LONG_COMMANDS: &[&str] = &[
-    "upload",
-    "download",
-    "copy",
-    "move",
-    "restore",
-    "restoreTo",
-    "purge",
-    "emptyTrash",
-    "rescan",
-];
-
-/// How long the window waits for the server before it says so (no call waits for ever; a window never freezes).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Limits {
-    /// The questions asked right after the handshake and the type descriptions: the window is not open yet, so short.
-    pub start: Duration,
-    /// Every other call: the default of fs-interfaces (`CALL_TIMEOUT`, 30 s).
-    pub call: Duration,
-    /// Transfer, copy, move, restore, purge, empty trash and rescan: they read or write file bytes or a whole folder
-    /// tree (a large file over S3, a move between backends is a copy), so a quarter of an hour.
-    pub long: Duration,
-}
-
-impl Default for Limits {
-    fn default() -> Self {
-        Self {
-            start: Duration::from_secs(10),
-            call: CALL_TIMEOUT,
-            long: Duration::from_secs(15 * 60),
-        }
-    }
-}
-
-/// A call that ran out of time, as the person sees it. `BackendError::Handshake` is the one variant that carries a text
-/// for the person and a "Try again" (which connects anew), and a server that does not answer needs exactly that.
-fn timed_out(fault: &Fault) -> BackendError {
-    BackendError::Handshake(fault.to_string())
-}
-
-/// The clients a job works with.
-pub(crate) struct Clients {
-    pub(crate) files: files::Client,
-    pub(crate) folders: folders::Client,
-    pub(crate) search: search::Client,
-    pub(crate) transfer: transfer::Client,
-    pub(crate) backends: backends::Client,
-}
-
-type Job = Box<dyn FnOnce(Rc<Clients>) -> Pin<Box<dyn Future<Output = ()>>> + Send>;
-
-/// How the connection is made: plain (a server that is there, as the tests have it) or with the version handshake.
-enum Dial {
-    Plain(PathBuf),
-    Matching {
-        socket: PathBuf,
-        expected: Expected,
-        starter: Arc<dyn ServerStarter + Send + Sync>,
-    },
-}
+pub(crate) use crate::dial::Clients;
+use crate::dial::{Dial, Job};
+pub use crate::limits::Limits;
+use crate::limits::{GRACE, LONG_COMMANDS, SERVER, timed_out};
 
 /// The state of the connection: a worker that answers, or why there is none (the window shows it, "Try again").
 enum Link {
@@ -233,139 +167,8 @@ impl FilesRemote {
     }
 }
 
-impl Dial {
-    /// Start a worker thread that connects and then answers the jobs; wait until it is connected.
-    fn open(
-        &self,
-        limits: Limits,
-    ) -> Result<tokio::sync::mpsc::UnboundedSender<Job>, BackendError> {
-        let (jobs, inbox) = tokio::sync::mpsc::unbounded_channel();
-        let (ready, started) = mpsc::channel();
-        let how = match self {
-            Self::Plain(socket) => Dial::Plain(socket.clone()),
-            Self::Matching {
-                socket,
-                expected,
-                starter,
-            } => Dial::Matching {
-                socket: socket.clone(),
-                expected: expected.clone(),
-                starter: Arc::clone(starter),
-            },
-        };
-        thread::Builder::new()
-            .name("files-rpc".into())
-            .spawn(move || worker(&how, limits, inbox, &ready))
-            .map_err(|e| BackendError::Unavailable(e.to_string()))?;
-        started
-            .recv()
-            .map_err(|e| BackendError::Unavailable(e.to_string()))??;
-        Ok(jobs)
-    }
-
-    async fn connect(&self) -> Result<Connection<files::Client>, BackendError> {
-        match self {
-            Self::Plain(socket) => connect::<files::Client>(socket).await.map_err(|e| {
-                BackendError::Unavailable(format!(
-                    "no files server on {}: {e}; start it with `fs-files serve`",
-                    socket.display()
-                ))
-            }),
-            Self::Matching {
-                socket,
-                expected,
-                starter,
-            } => connect_matching::<files::Client>(socket, expected, starter.as_ref())
-                .await
-                .map_err(|e| BackendError::Handshake(e.to_string())),
-        }
-    }
-}
-
 fn gone() -> BackendError {
     BackendError::Unavailable("the files server went away".into())
-}
-
-fn worker(
-    dial: &Dial,
-    limits: Limits,
-    mut inbox: tokio::sync::mpsc::UnboundedReceiver<Job>,
-    ready: &mpsc::Sender<Result<(), BackendError>>,
-) {
-    let runtime = match tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-    {
-        Ok(r) => r,
-        Err(e) => {
-            let _ = ready.send(Err(BackendError::Unavailable(e.to_string())));
-            return;
-        }
-    };
-    tokio::task::LocalSet::new().block_on(&runtime, async move {
-        let connection = match dial.connect().await {
-            Ok(c) => c,
-            Err(e) => {
-                let _ = ready.send(Err(e));
-                return;
-            }
-        };
-        // The first questions have a limit too: a server that passed the handshake and then says nothing must not keep the
-        // window from opening.
-        let clients = match call_limited(SERVER, limits.start, open(&connection.client)).await {
-            Ok(Ok(c)) => Rc::new(c),
-            Ok(Err(e)) => {
-                let _ = ready.send(Err(BackendError::Unavailable(e.to_string())));
-                return;
-            }
-            Err(fault) => {
-                let _ = ready.send(Err(timed_out(&fault)));
-                return;
-            }
-        };
-        let _ = ready.send(Ok(()));
-        while let Some(job) = inbox.recv().await {
-            tokio::task::spawn_local(job(Rc::clone(&clients)));
-        }
-    });
-}
-
-async fn open(root: &files::Client) -> capnp::Result<Clients> {
-    let folders = root
-        .folders_request()
-        .send()
-        .promise
-        .await?
-        .get()?
-        .get_folders()?;
-    let search = root
-        .search_request()
-        .send()
-        .promise
-        .await?
-        .get()?
-        .get_search()?;
-    let transfer = root
-        .transfer_request()
-        .send()
-        .promise
-        .await?
-        .get()?
-        .get_transfer()?;
-    let backends = root
-        .backends_request()
-        .send()
-        .promise
-        .await?
-        .get()?
-        .get_backends()?;
-    Ok(Clients {
-        files: root.clone(),
-        folders,
-        search,
-        transfer,
-        backends,
-    })
 }
 
 /// The refusal for a command the core does not have; the frontend shows its control locked and never sends it.

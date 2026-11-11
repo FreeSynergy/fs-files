@@ -4,6 +4,9 @@
 //! then keeps silent, once on the first questions after the handshake, once on a call from the window. Own file: the
 //! servers are never stopped, they end with the process.
 
+// The trait of the generated server wants `async fn`, also where the answer needs no waiting.
+#![allow(clippy::unused_async)]
+
 use std::path::Path;
 use std::rc::Rc;
 use std::sync::Arc;
