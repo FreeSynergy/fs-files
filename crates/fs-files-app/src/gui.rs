@@ -147,7 +147,10 @@ pub fn run(words: &[String]) -> Result<(), String> {
 }
 
 /// The generated Admin frontend over `remote`.
-fn admin_app(remote: &Arc<FilesRemote>, facet: Option<&str>) -> Result<fs_components_app::AppWidget, String> {
+fn admin_app(
+    remote: &Arc<FilesRemote>,
+    facet: Option<&str>,
+) -> Result<fs_components_app::AppWidget, String> {
     // No server (a handshake that failed): the window still opens, with the descriptions this program has itself;
     // every list then says what is wrong and offers "Try again" (ADR 0065). Never a black window.
     let descriptions = remote

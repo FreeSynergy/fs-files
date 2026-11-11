@@ -2,6 +2,7 @@
 # `de` (Shift, AltGr: Ä ä ö ü ß @ € { } [ ] \ | ~ µ) are typed into the "Name" field of the search form, and the test checks
 # that each one arrives as that glyph and how long key-to-picture takes. On the GitHub runner (no GPU) the time is only
 # reported, not enforced (`enforce-ms` stays empty). The way to the field is `.github/typing-test/focus.sh`.
+# The window opens on the file view by default; this test needs the generated Admin frontend (its search form), hence `--admin`.
 name: typing-test
 on:
   push:
@@ -33,7 +34,7 @@ jobs:
       - uses: FreeSynergy/fs-release/actions/typing-test@main
         with:
           app-binary: target/release/fs-files
-          app-args: "--size 1000x640"
+          app-args: "--size 1000x640 --admin"
           scenario: .github/typing-test/focus.sh
           name: fs-files
           runs: 3

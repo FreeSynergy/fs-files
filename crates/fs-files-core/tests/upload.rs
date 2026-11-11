@@ -168,7 +168,9 @@ async fn the_media_type_is_detected_when_not_given() {
         "text that no magic bytes name reads as text"
     );
     assert_eq!(
-        upload(&e, None, "notes.md", "", b"# Notes").await.media_type,
+        upload(&e, None, "notes.md", "", b"# Notes")
+            .await
+            .media_type,
         "text/markdown",
         "the ending of the name tells what the bytes cannot"
     );

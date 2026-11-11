@@ -141,7 +141,11 @@ impl FileRepo {
         } else {
             at + items.len()
         };
-        let from = if items.is_empty() { at.saturating_sub(total) } else { 0 };
+        let from = if items.is_empty() {
+            at.saturating_sub(total)
+        } else {
+            0
+        };
         let room = self.page - items.len();
         let mut fq = ordered(q.with_index("kind", "file"), sort)?.limit(room + 1);
         fq.offset = from;

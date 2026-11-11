@@ -9,17 +9,17 @@ use fs_admin_frontend::view::{AboutInfo, AdminSurface};
 use fs_admin_frontend::window::{TypeView, admin_window};
 use fs_admin_frontend::{Backend, Session, SystemClock};
 use fs_components_app::{AppError, AppWidget, Element, Screen, Surface};
-use fs_components_workbenches::file_manager::{FileLabels, FileManagerWidget, FileView};
 use fs_components_fields::{Look, Say};
 use fs_components_styles::StyleId;
+use fs_components_workbenches::file_manager::{FileLabels, FileManagerWidget, FileView};
 use fs_types::TypeDescription;
 
-use crate::{FilesRemote, RemoteFileSource};
 use crate::backend_file::FileBackend;
 use crate::backend_folder::FolderBackend;
 use crate::backend_picture::{AlbumBackend, PictureBackend};
 use crate::backend_storage::StorageBackendBackend;
 use crate::words::English;
+use crate::{FilesRemote, RemoteFileSource};
 
 /// The title of the window.
 pub const TITLE: &str = "FreeSynergy Files";

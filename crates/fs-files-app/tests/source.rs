@@ -51,13 +51,13 @@ fn the_window_source_lists_changes_trashes_restores_and_downloads() {
     assert_eq!((file.kind, file.size), (EntryKind::File, 5));
     assert!(file.modified.is_some());
     assert_eq!(source.folder(&docs.key).unwrap().unwrap().name, "Docs");
-    assert_eq!(
-        source.subfolders(None, 10).unwrap().0[0].key,
-        docs.key
-    );
+    assert_eq!(source.subfolders(None, 10).unwrap().0[0].key, docs.key);
 
     // the search finds it everywhere; a sort by size answers too
-    assert_eq!(names(&source, &all(Scope::Everywhere, "note")), ["note.txt"]);
+    assert_eq!(
+        names(&source, &all(Scope::Everywhere, "note")),
+        ["note.txt"]
+    );
     let by_size = ListRequest::new(
         Scope::Folder(Some(docs.key.clone())),
         "",
@@ -103,9 +103,11 @@ fn the_window_source_lists_changes_trashes_restores_and_downloads() {
         .download(&file.key, out.to_str().unwrap(), false)
         .unwrap();
     assert_eq!(std::fs::read_to_string(&out).unwrap(), "hello");
-    assert!(source
-        .download(&file.key, out.to_str().unwrap(), false)
-        .is_err());
+    assert!(
+        source
+            .download(&file.key, out.to_str().unwrap(), false)
+            .is_err()
+    );
 
     // a file moves to the top and a folder goes when it is empty
     source

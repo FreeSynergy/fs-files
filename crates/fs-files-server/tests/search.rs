@@ -100,7 +100,8 @@ async fn sort_orders_ties_and_the_one_that_is_ascending_only() {
             "folders first; then image/png, text/plain twice (by name)"
         );
         let modified = sorted(SortBy::Modified, true).await.unwrap();
-        assert_eq!(modified[0], "cat.png", "the last one made, first");
+        assert_eq!(modified[0], "Photos", "folders first");
+        assert_eq!(modified[1], "cat.png", "then the last file made, first");
         let error = sorted(SortBy::MediaType, true).await.err().unwrap();
         is(&error, UNSUPPORTED_PROBLEM_TYPE, 501);
     })

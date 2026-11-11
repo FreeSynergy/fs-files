@@ -74,7 +74,7 @@ impl FileRepo {
         let head = walk.backend.get(at, 0, SNIFF).await?;
         let media_type = super::detect::media_type(&entry.name, &head);
         let r = FileRecord {
-            media_type: media_type.into(),
+            media_type,
             size: entry.size,
             checksum,
             folder,

@@ -142,9 +142,13 @@ async fn folders_first_keeps_folders_before_files_over_page_borders_in_both_dire
             }
         }
         let expected: Vec<&str> = if descending {
-            vec!["z-dir", "m-dir", "k-dir", "d-file", "c-file", "b-file", "a-file"]
+            vec![
+                "z-dir", "m-dir", "k-dir", "d-file", "c-file", "b-file", "a-file",
+            ]
         } else {
-            vec!["k-dir", "m-dir", "z-dir", "a-file", "b-file", "c-file", "d-file"]
+            vec![
+                "k-dir", "m-dir", "z-dir", "a-file", "b-file", "c-file", "d-file",
+            ]
         };
         assert_eq!(seen, expected, "descending: {descending}");
     }

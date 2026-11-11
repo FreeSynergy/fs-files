@@ -119,7 +119,10 @@ mod tests {
         assert_eq!(media_type("x.bin", b"\x89PNG\r\n\x1a\n"), "image/png");
         assert_eq!(media_type("notes.md", b"# Notes"), "text/markdown");
         assert_eq!(media_type("README", b"hello\n"), "text/plain");
-        assert_eq!(media_type("x.dat", &[0, 159, 146, 150]), "application/octet-stream");
+        assert_eq!(
+            media_type("x.dat", &[0, 159, 146, 150]),
+            "application/octet-stream"
+        );
         assert_eq!(media_type("empty.txt", b""), "text/plain");
     }
 
