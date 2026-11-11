@@ -9,7 +9,7 @@ use fs_admin_frontend::view::{AboutInfo, AdminSurface};
 use fs_admin_frontend::window::{TypeView, admin_window};
 use fs_admin_frontend::{Backend, Session, SystemClock};
 use fs_components_app::{AppError, AppWidget, Element, Screen, Surface};
-use fs_components_workbenches::file_manager::{FileLabels, FileManagerWidget};
+use fs_components_workbenches::file_manager::{FileLabels, FileManagerWidget, FileView};
 use fs_components_fields::{Look, Say};
 use fs_components_styles::StyleId;
 use fs_types::TypeDescription;
@@ -108,9 +108,10 @@ impl Surface for FilesScreen {
 ///
 /// # Errors
 /// [`AppError`] if the shell cannot be made.
-pub fn files_widget(remote: &Arc<FilesRemote>) -> Result<AppWidget, AppError> {
+pub fn files_widget(remote: &Arc<FilesRemote>, view: FileView) -> Result<AppWidget, AppError> {
     let source = Arc::new(RemoteFileSource(Arc::clone(remote)));
     let widget = FileManagerWidget::new(source, FileLabels::default());
+    widget.with_state(|s| s.set_view(view));
     let screen = Screen::new("files", TITLE, Arc::new(FilesScreen(widget)));
     AppWidget::new(TITLE, vec![screen])
 }

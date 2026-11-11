@@ -93,6 +93,9 @@ impl FileRepo {
     }
 
     async fn page_of(&self, q: Query, cursor: Option<Cursor>, sort: Sort) -> Result<Page> {
+        if sort.folders_first {
+            return self.page_folders_first(q, cursor, sort).await;
+        }
         let start = cursor.map_or(0, |c| c.0);
         let mut q = ordered(q, sort)?.limit(self.page + 1);
         q.offset = start;
@@ -100,6 +103,55 @@ impl FileRepo {
         let next = (rows.len() > self.page).then(|| Cursor(start + self.page));
         rows.truncate(self.page);
         let items = rows.iter().map(entry_of).collect::<Result<Vec<_>>>()?;
+        Ok(Page { items, next })
+    }
+
+    /// Folders, then files, each group in the order asked for; pages and cursors run over both, a cursor is the
+    /// place in the whole list like any other. The number of folders is asked of the store when the place is
+    /// already among the files.
+    async fn page_folders_first(
+        &self,
+        q: Query,
+        cursor: Option<Cursor>,
+        sort: Sort,
+    ) -> Result<Page> {
+        let at = cursor.map_or(0, |c| c.0);
+        let folders = ordered(q.clone().with_index("kind", "folder"), sort)?;
+        let mut fq = folders.clone().limit(self.page + 1);
+        fq.offset = at;
+        let mut rows = self.reads.query(&fq).await?;
+        if rows.len() > self.page {
+            rows.truncate(self.page);
+            let items = rows.iter().map(entry_of).collect::<Result<Vec<_>>>()?;
+            return Ok(Page {
+                items,
+                next: Some(Cursor(at + self.page)),
+            });
+        }
+        let mut items = rows.iter().map(entry_of).collect::<Result<Vec<_>>>()?;
+        // How many folders there are: only needed when the place is already among the files.
+        let total = if items.is_empty() {
+            if at == 0 {
+                0
+            } else {
+                let mut all = folders.limit(at);
+                all.offset = 0;
+                self.reads.query(&all).await?.len()
+            }
+        } else {
+            at + items.len()
+        };
+        let from = if items.is_empty() { at.saturating_sub(total) } else { 0 };
+        let room = self.page - items.len();
+        let mut fq = ordered(q.with_index("kind", "file"), sort)?.limit(room + 1);
+        fq.offset = from;
+        let mut rows = self.reads.query(&fq).await?;
+        let more = rows.len() > room;
+        rows.truncate(room);
+        for row in &rows {
+            items.push(entry_of(row)?);
+        }
+        let next = more.then(|| Cursor(total + from + room));
         Ok(Page { items, next })
     }
 }

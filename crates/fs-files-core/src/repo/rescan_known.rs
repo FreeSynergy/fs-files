@@ -72,7 +72,7 @@ impl FileRepo {
     ) -> Result<()> {
         let checksum = checksum_at(&*walk.backend, at, entry.size).await?;
         let head = walk.backend.get(at, 0, SNIFF).await?;
-        let media_type = infer::get(&head).map_or("application/octet-stream", |t| t.mime_type());
+        let media_type = super::detect::media_type(&entry.name, &head);
         let r = FileRecord {
             media_type: media_type.into(),
             size: entry.size,

@@ -168,9 +168,7 @@ impl FileRepo {
     ) -> Result<File> {
         let media_type = if s.media_type.is_empty() || s.media_type == "application/octet-stream" {
             let head = backend.get(key, 0, SNIFF).await?;
-            infer::get(&head)
-                .map_or("application/octet-stream", |t| t.mime_type())
-                .to_string()
+            super::detect::media_type(name, &head)
         } else {
             s.media_type.clone()
         };

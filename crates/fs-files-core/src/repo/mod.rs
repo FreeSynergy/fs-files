@@ -8,6 +8,7 @@ mod blob;
 mod build;
 mod consts;
 mod copy;
+mod detect;
 mod fileops;
 mod finish;
 mod folders;

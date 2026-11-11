@@ -164,6 +164,18 @@ async fn the_media_type_is_detected_when_not_given() {
         upload(&e, None, "q", "application/octet-stream", b"plain")
             .await
             .media_type,
+        "text/plain",
+        "text that no magic bytes name reads as text"
+    );
+    assert_eq!(
+        upload(&e, None, "notes.md", "", b"# Notes").await.media_type,
+        "text/markdown",
+        "the ending of the name tells what the bytes cannot"
+    );
+    assert_eq!(
+        upload(&e, None, "blob.dat", "", &[0, 159, 146, 150])
+            .await
+            .media_type,
         "application/octet-stream"
     );
     assert_eq!(

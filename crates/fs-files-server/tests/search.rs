@@ -16,7 +16,8 @@ async fn a_filter_is_the_and_of_its_members() {
         let all = |_: file_filter::Builder<'_>| {};
         assert_eq!(
             find(&c, all, None).await.unwrap(),
-            ["cat.png", "notes.txt", "Photos", "trip.txt"]
+            ["Photos", "cat.png", "notes.txt", "trip.txt"],
+            "folders first, each group by name"
         );
         let by_name = find(&c, |mut f| f.set_name("TXT"), None).await.unwrap();
         assert_eq!(
@@ -87,16 +88,16 @@ async fn sort_orders_ties_and_the_one_that_is_ascending_only() {
         );
         assert_eq!(
             sorted(SortBy::Size, true).await.unwrap(),
-            ["cat.png", "notes.txt", "trip.txt", "Photos"]
+            ["Photos", "cat.png", "notes.txt", "trip.txt"]
         );
         assert_eq!(
             sorted(SortBy::Name, true).await.unwrap(),
-            ["trip.txt", "Photos", "notes.txt", "cat.png"]
+            ["Photos", "trip.txt", "notes.txt", "cat.png"]
         );
         assert_eq!(
             sorted(SortBy::MediaType, false).await.unwrap(),
-            ["cat.png", "Photos", "notes.txt", "trip.txt"],
-            "image/png, inode/directory, text/plain twice (by name)"
+            ["Photos", "cat.png", "notes.txt", "trip.txt"],
+            "folders first; then image/png, text/plain twice (by name)"
         );
         let modified = sorted(SortBy::Modified, true).await.unwrap();
         assert_eq!(modified[0], "cat.png", "the last one made, first");

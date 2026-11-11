@@ -23,7 +23,7 @@ async fn listed(r: &impl Files, sort: Sort) -> Vec<String> {
 }
 
 fn by(by: SortBy, descending: bool) -> Sort {
-    Sort { by, descending }
+    Sort::new(by, descending)
 }
 
 #[tokio::test]
@@ -116,4 +116,36 @@ async fn sorted_pages_follow_the_order_and_search_sorts_too() {
     let names: Vec<_> = page.items.iter().map(name_of).collect();
     assert_eq!(names, ["a", "b"]);
     assert!(page.next.is_some());
+}
+
+#[tokio::test]
+async fn folders_first_keeps_folders_before_files_over_page_borders_in_both_directions() {
+    let e = env().await;
+    let r = e.repo.clone().with_page_size(2);
+    for n in ["b-file", "d-file", "a-file", "c-file"] {
+        upload(&r, None, n, "text/plain", b"x").await;
+    }
+    for n in ["z-dir", "m-dir", "k-dir"] {
+        r.create_folder(None, n).await.unwrap();
+    }
+    for descending in [false, true] {
+        let sort = by(SortBy::Name, descending).with_folders_first();
+        let mut seen = Vec::new();
+        let mut cursor = None;
+        loop {
+            let page = r.list_sorted(None, cursor, sort).await.unwrap();
+            assert!(page.items.len() <= 2);
+            seen.extend(page.items.iter().map(|e| name_of(e).to_string()));
+            match page.next {
+                Some(next) => cursor = Some(next),
+                None => break,
+            }
+        }
+        let expected: Vec<&str> = if descending {
+            vec!["z-dir", "m-dir", "k-dir", "d-file", "c-file", "b-file", "a-file"]
+        } else {
+            vec!["k-dir", "m-dir", "z-dir", "a-file", "b-file", "c-file", "d-file"]
+        };
+        assert_eq!(seen, expected, "descending: {descending}");
+    }
 }

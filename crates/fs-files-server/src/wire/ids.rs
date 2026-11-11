@@ -42,8 +42,6 @@ pub(crate) fn sort(r: files_capnp::sort::Reader<'_>) -> capnp::Result<Sort> {
         Ok(files_capnp::SortBy::MediaType) => SortBy::Type,
         Err(e) => return Err(invalid_request(format!("unknown sort key {}", e.0))),
     };
-    Ok(Sort {
-        by,
-        descending: r.get_descending(),
-    })
+    // The contract has no flag for it yet: a file manager wants the folders first, so the server always does.
+    Ok(Sort::new(by, r.get_descending()).with_folders_first())
 }

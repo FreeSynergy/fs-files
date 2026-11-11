@@ -23,4 +23,25 @@ pub struct Sort {
     pub by: SortBy,
     /// Largest, newest or last first.
     pub descending: bool,
+    /// Folders come before files, each group in this order (the order of a file manager). Off by default
+    /// in the core; the server turns it on, because the contract has no flag for it yet.
+    pub folders_first: bool,
+}
+
+impl Sort {
+    /// This key and direction, folders and files mixed.
+    pub fn new(by: SortBy, descending: bool) -> Self {
+        Self {
+            by,
+            descending,
+            folders_first: false,
+        }
+    }
+
+    /// The same order with the folders first.
+    #[must_use]
+    pub fn with_folders_first(mut self) -> Self {
+        self.folders_first = true;
+        self
+    }
 }
