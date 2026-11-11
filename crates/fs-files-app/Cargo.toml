@@ -10,10 +10,10 @@ rust-version.workspace = true
 fs-files-types = { path = "../fs-files-types" }
 fs-types = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.0.17" }
 fs-interfaces = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.0.17", features = ["rpc"] }
-fs-admin-frontend = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.0.5" }
-fs-components-app = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.0.5" }
-fs-components-fields = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.0.5" }
-fs-components-styles = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.0.5" }
+fs-admin-frontend = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.0.6" }
+fs-components-app = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.0.6" }
+fs-components-fields = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.0.6" }
+fs-components-styles = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.0.6" }
 capnp = "0.27"
 uuid = "1"
 chrono = { version = "0.4", default-features = false, features = ["std"] }
