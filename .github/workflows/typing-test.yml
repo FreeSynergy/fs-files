@@ -36,3 +36,4 @@ jobs:
           app-args: "--size 1000x640"
           scenario: .github/typing-test/focus.sh
           name: fs-files
+          runs: 3
