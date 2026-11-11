@@ -4,10 +4,9 @@
 
 mod support;
 
-use fs_admin_frontend::{Backend, BackendError, Values};
+use fs_admin_frontend::{Backend, Values};
 use fs_files_app::{FileBackend, FolderBackend};
-use fs_types::BasicRules;
-use support::{names, url, v, world};
+use support::{url, v, world};
 
 #[test]
 fn a_missing_field_leaves_a_change_unchanged_and_an_empty_one_clears() {
