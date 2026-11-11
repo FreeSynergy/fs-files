@@ -22,7 +22,7 @@ Version 0.0.7 (in progress). Latest tag: `v0.0.6`.
 
 ## What is not there yet
 
-- The window is the generated Admin window (`fs-files`, `fs-files --facet gallery` for pictures and albums); previews, a gallery grid and a music or video view are planned.
+- The window is the generated Admin window (`fs-files`, `fs-files --facet gallery` for pictures and albums); previews, a gallery grid and a music or video view are planned. Planned (decided 2026-11-11): the file view becomes a further frontend and later the default window; the Admin window stays reachable through the facet or a switch.
 - No sharing (the interface is an empty placeholder), no versions, no encryption of file contents, no sync, no WebDAV, no previews.
 - Replacing a file is not offered, only refuse or keep both.
 - The interface is a draft marked provisional, and nothing uses it yet.
