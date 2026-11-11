@@ -89,7 +89,8 @@ fn serve(socket: &Path, hang_start: bool) {
         let identity = ServerIdentity::new("fs-files", env!("CARGO_PKG_VERSION"));
         let _ = run_until_signal_as(&socket, identity, || async move {
             up.send(()).ok();
-            Ok(new_client(Root { hang_start }))
+            let root: files::Client = new_client(Root { hang_start });
+            Ok(root.client)
         });
     });
     started.recv().unwrap();
@@ -97,7 +98,11 @@ fn serve(socket: &Path, hang_start: bool) {
 
 fn remote(socket: &Path) -> Arc<FilesRemote> {
     let refuse = || -> std::io::Result<()> { Err(std::io::Error::other("must not be started")) };
-    Arc::new(FilesRemote::matching_with(socket, Arc::new(refuse), limits()))
+    Arc::new(FilesRemote::matching_with(
+        socket,
+        Arc::new(refuse),
+        limits(),
+    ))
 }
 
 /// The text of the error and how long it took; fails if the error is no visible one.
