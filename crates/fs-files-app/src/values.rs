@@ -112,6 +112,18 @@ pub(crate) fn text<'a>(input: &'a Values, name: &str) -> Option<&'a str> {
         .filter(|s| !s.is_empty())
 }
 
+/// The input of a command with the record it works on: the frontend hands the id of the record next to the input, the
+/// calls below read it under the name of the field (`file`, `folder`, ...). A value the input already has stays.
+pub(crate) fn with_record(input: &Values, key: &str, record: Option<&str>) -> Values {
+    let mut input = input.clone();
+    if let Some(record) = record {
+        input
+            .entry(key.to_owned())
+            .or_insert_with(|| vec![record.to_owned()]);
+    }
+    input
+}
+
 /// An id from the first value of a field.
 pub(crate) fn id_of(input: &Values, name: &str) -> Result<Option<Uuid>, BackendError> {
     text(input, name)

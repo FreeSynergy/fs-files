@@ -1,0 +1,2 @@
+# Blinc lives in one place only: fs-components (`fs_components::blinc`). See fs-release DESIGN.md, check_blinc.
+blinc = "components-only"

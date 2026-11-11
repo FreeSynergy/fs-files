@@ -9,7 +9,9 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use fs_files_core::{FileRepo, LocalFolder, RESERVED_NAME};
-use fs_interfaces::rpc::{ServerOptions, prepare_data_dir, run_until_signal, stop_self};
+use fs_interfaces::rpc::{
+    ServerIdentity, ServerOptions, prepare_data_dir, run_until_signal_as, stop_self,
+};
 use fs_objects::{Store, TursoStore};
 
 use crate::{FilesServer, check_places};
@@ -64,13 +66,20 @@ pub fn serve(args: impl IntoIterator<Item = OsString>) -> Result<(), ServeError>
         data,
         actor,
         instance,
-        facet: _, // files has one face only
+        facet,
     } = options;
+    // The server serves every type (files and gallery alike); the facet is the window's view. A name this program does
+    // not have is still refused, so a wrong link is found at the start.
+    if let Some(facet) = facet {
+        fs_files_types::check_facet(&facet).map_err(ServeError::Usage)?;
+    }
     if let Some(lease) = lease {
         // The window that started this server holds the lease; when none does, end as a signal would.
         crate::lease::watch(lease, stop_self);
     }
-    run_until_signal(&socket, || async move {
+    // Name and version go to `Control.version`: a window of another version replaces this server (fs-interfaces handshake).
+    let identity = ServerIdentity::new("fs-files", env!("CARGO_PKG_VERSION"));
+    run_until_signal_as(&socket, identity, || async move {
         let data = prepare_data_dir(&data)?;
         let root = root.unwrap_or_else(|| data.join("files"));
         check_places(&root, &data).map_err(std::io::Error::other)?;

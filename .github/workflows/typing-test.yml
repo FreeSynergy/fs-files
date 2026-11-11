@@ -1,0 +1,38 @@
+# The typing test of fs-release (actions/typing-test): the built window runs under a virtual KWin, the keys of the layout
+# `de` (Shift, AltGr: Ä ä ö ü ß @ € { } [ ] \ | ~ µ) are typed into the "Name" field of the search form, and the test checks
+# that each one arrives as that glyph and how long key-to-picture takes. On the GitHub runner (no GPU) the time is only
+# reported, not enforced (`enforce-ms` stays empty). The way to the field is `.github/typing-test/focus.sh`.
+name: typing-test
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  typing-test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends pkg-config libxkbcommon-dev libwayland-dev libfontconfig1-dev libssl-dev
+      - uses: FreeSynergy/fs-release/actions/setup-rust@main
+        with:
+          cache-key: typing-test
+      - name: Build the window (release)
+        run: cargo build --release --locked -p fs-files
+      - uses: FreeSynergy/fs-release/actions/typing-test@main
+        with:
+          app-binary: target/release/fs-files
+          app-args: "--size 1000x640"
+          scenario: .github/typing-test/focus.sh
+          name: fs-files

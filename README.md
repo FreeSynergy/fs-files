@@ -8,7 +8,7 @@ What is different here: with the default local backend your files lie in an ordi
 
 ## What it can do today
 
-Latest tag: `v0.0.1`.
+Version 0.0.6 (in progress). Latest tag: `v0.0.1`.
 
 - Folders, rename, move, copy, trash, restore, purge, and an empty-trash call.
 - Resumable uploads with a checksum computed while the bytes arrive.
@@ -22,7 +22,7 @@ Latest tag: `v0.0.1`.
 
 ## What is not there yet
 
-- No window. Gallery, video and music views are planned as separate frontends on top.
+- The window is the generated Admin window (`fs-files`, `fs-files --facet gallery` for pictures and albums); previews, a gallery grid and a music or video view are planned.
 - No sharing (the interface is an empty placeholder), no versions, no encryption of file contents, no sync, no WebDAV, no previews.
 - Replacing a file is not offered, only refuse or keep both.
 - The interface is a draft marked provisional, and nothing uses it yet.

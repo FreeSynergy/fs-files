@@ -1,12 +1,14 @@
 //! The start of `fs-files` (ADR 0063): wiring only.
 //!
-//! Pattern: Facade consumer — connect to the server (starting it if none answers on the user's own
-//! socket), build the file manager, open the window (`window.rs`) or draw one picture.
+//! Pattern: Facade consumer — connect to the server (the version handshake: a server of another version is
+//! replaced, none is started; a failure is shown in the window), build the file manager, open the window (`window.rs`) or
+//! draw one picture.
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use fs_components_app::{WindowOptions, launch, parse_size};
-use fs_interfaces::rpc::{companion_path, default_socket};
+use fs_interfaces::rpc::{CommandStarter, companion_path, default_socket, parse_facet};
 
 use crate::FilesRemote;
 use crate::window::app_widget;
@@ -15,11 +17,27 @@ use crate::window::app_widget;
 pub const HELP: &str = "fs-files: the files window (without arguments it opens)
 
   --socket <path>    the files server to talk to (default: $XDG_RUNTIME_DIR/freesynergy/files.sock);
-                     without it, a server is started if none answers; start it yourself with `fs-files serve`
+                     a server that is not there, or of another version, is replaced by one of this version
   --snapshot <png>   draw a picture instead of opening a window
+  --facet <name>     show one facet only: files (files, folders, storage backends) or gallery (pictures, albums)
   --size <WxH>       window or picture size (default 1200x800)";
 
+/// The descriptions the window shows: all, or the types of one facet.
+fn in_facet(
+    descriptions: Vec<fs_types::TypeDescription>,
+    facet: Option<&str>,
+) -> Vec<fs_types::TypeDescription> {
+    let Some(types) = facet.and_then(fs_files_types::facet_types) else {
+        return descriptions;
+    };
+    descriptions
+        .into_iter()
+        .filter(|d| types.contains(&d.name.as_str()))
+        .collect()
+}
+
 struct Args {
+    facet: Option<String>,
     socket: Option<PathBuf>,
     snapshot: Option<PathBuf>,
     size: (u32, u32),
@@ -28,6 +46,7 @@ struct Args {
 
 fn parse(words: &[String]) -> Result<Args, String> {
     let mut out = Args {
+        facet: None,
         socket: None,
         snapshot: None,
         size: (1200, 800),
@@ -43,6 +62,11 @@ fn parse(words: &[String]) -> Result<Args, String> {
         match word.as_str() {
             "--socket" => out.socket = Some(PathBuf::from(value("--socket")?)),
             "--snapshot" => out.snapshot = Some(PathBuf::from(value("--snapshot")?)),
+            "--facet" => {
+                let name = parse_facet(&value("--facet")?)?;
+                fs_files_types::check_facet(&name)?;
+                out.facet = Some(name);
+            }
             "--size" => out.size = parse_size(&value("--size")?)?,
             "-h" | "--help" => out.help = true,
             other => return Err(format!("unknown option {other}")),
@@ -66,9 +90,20 @@ pub fn run(words: &[String]) -> Result<(), String> {
         .clone()
         .or_else(|| default_socket("files"))
         .ok_or("no socket: give --socket (no default socket on this system)")?;
-    let remote = connect_or_start(&socket, args.socket.is_none())?;
-    let descriptions = remote.describe()?;
-    let app = app_widget(&std::sync::Arc::new(remote), descriptions).map_err(|e| e.to_string())?;
+    // This window is a user of the server for as long as it lives: the shared lock on the lease is let go by the
+    // system when the process ends. A server this window starts ends itself when no window holds the lease any more.
+    hold_lease(&companion_path(&socket, "lease"));
+    let remote = Arc::new(FilesRemote::matching(
+        &socket,
+        Arc::new(starter(&socket, args.socket.is_some())?),
+    ));
+    // No server (a handshake that failed): the window still opens, with the descriptions this program has itself;
+    // every list then says what is wrong and offers "Try again" (ADR 0065). Never a black window.
+    let descriptions = remote
+        .describe()
+        .unwrap_or_else(|_| fs_files_types::registry().iter().cloned().collect());
+    let descriptions = in_facet(descriptions, args.facet.as_deref());
+    let app = app_widget(&remote, descriptions).map_err(|e| e.to_string())?;
     let (width, height) = args.size;
     if let Some(file) = &args.snapshot {
         app.picture(width, height, file)
@@ -82,58 +117,21 @@ pub fn run(words: &[String]) -> Result<(), String> {
     launch(options, app).map_err(|e| e.to_string())
 }
 
-/// Connect; if none answers on the user's own socket, start `fs-files serve` (detached, so other
-/// windows use it too) and wait for it. A socket given with `--socket` is never answered by starting
-/// anything.
-fn connect_or_start(socket: &Path, may_start: bool) -> Result<FilesRemote, String> {
-    // This window is a user of the server for as long as it lives: the shared lock on the lease is
-    // let go by the system when the process ends. A server this window starts ends itself when no
-    // window holds the lease any more (a server started by hand has none).
-    let lease = companion_path(socket, "lease");
-    if may_start {
-        hold_lease(&lease);
-    }
-    let first = FilesRemote::connect(socket);
-    if first.is_ok() || !may_start {
-        return first;
-    }
+/// How this window starts the server when none fits: `fs-files serve --lease <lease>` (detached by `CommandStarter`, so
+/// other windows use it too), on the socket this window talks to. The server ends itself when no window holds the lease
+/// any more; one started by hand has none. What it says when it cannot start (a bad folder, a data folder others can
+/// read) it says on its own stderr, which a detached server has not: the person sees the handshake error instead.
+fn starter(socket: &Path, own_socket: bool) -> Result<CommandStarter, String> {
     let me = std::env::current_exe().map_err(|e| e.to_string())?;
-    // What the server says when it cannot start (a bad folder, a data folder others can read) goes to a
-    // file next to the socket, so the window can tell the person instead of only waiting.
-    let log = companion_path(socket, "log");
-    let log_file = std::fs::File::create(&log).ok();
-    let mut server = std::process::Command::new(me);
-    server
-        .arg("serve")
-        .arg("--lease")
-        .arg(&lease)
-        .stdin(std::process::Stdio::null())
-        .stdout(std::process::Stdio::null())
-        .stderr(log_file.map_or_else(std::process::Stdio::null, std::process::Stdio::from));
-    crate::detach::current().apply(&mut server);
-    let mut child = server
-        .spawn()
-        .map_err(|e| format!("could not start the files server: {e}"))?;
-    for _ in 0..50 {
-        std::thread::sleep(std::time::Duration::from_millis(100));
-        if let Ok(remote) = FilesRemote::connect(socket) {
-            let _ = std::fs::remove_file(&log);
-            return Ok(remote);
-        }
-        if let Ok(Some(status)) = child.try_wait() {
-            let said = std::fs::read_to_string(&log).unwrap_or_default();
-            let _ = std::fs::remove_file(&log);
-            return Err(format!(
-                "the files server stopped at once ({status}): {}",
-                said.trim()
-            ));
-        }
+    let mut words: Vec<std::ffi::OsString> = vec!["serve".into()];
+    if own_socket {
+        words.extend(["--socket".into(), socket.as_os_str().to_owned()]);
     }
-    // Still waiting: the child lives on (it may just be slow); reap it if it ends later.
-    std::thread::spawn(move || {
-        let _ = child.wait();
-    });
-    first
+    words.extend([
+        "--lease".into(),
+        companion_path(socket, "lease").into_os_string(),
+    ]);
+    Ok(CommandStarter::new(me, words))
 }
 
 /// Hold the shared lock on `path` until this process ends.

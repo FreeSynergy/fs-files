@@ -1,6 +1,6 @@
 //! The descriptions on the wire of `files.capnp` (`Files.types`).
 //!
-//! Pattern: Adapter between the plain structs of `fs-types` (v0.0.2, the version `fs-admin-frontend` uses) and the
+//! Pattern: Adapter between the plain structs of `fs-types` (the version `fs-admin-frontend` uses) and the
 //! generated types of the contract tag this program builds on. The two generated copies of `types_capnp` are different
 //! Rust types of the same wire layout, so the kinds are converted by their number. Unknown kinds read as `unknown`.
 
@@ -19,6 +19,7 @@ fn write_field(f: &t::FieldDescription, mut b: w::field_description::Builder<'_>
     b.set_multiple(f.multiple);
     b.set_label(&f.label);
     b.set_target(&f.target);
+    b.set_read_only(f.read_only);
     let mut list = b.init_choices(len(f.choices.len()));
     for (i, c) in (0..).zip(&f.choices) {
         list.set(i, c.as_str());
@@ -52,6 +53,7 @@ pub fn write_catalog(
             cb.set_name(&c.name);
             cb.set_kind(w::CommandKind::try_from(c.kind as u16).unwrap_or(w::CommandKind::Unknown));
             cb.set_label(&c.label);
+            cb.set_supported(c.supported);
             write_fields(&c.input, cb.reborrow().init_input(len(c.input.len())));
             write_fields(&c.result, cb.init_result(len(c.result.len())));
         }
@@ -72,6 +74,7 @@ fn read_field(r: w::field_description::Reader<'_>) -> capnp::Result<t::FieldDesc
         label: r.get_label()?.to_string()?,
         target: r.get_target()?.to_string()?,
         choices,
+        read_only: r.get_read_only(),
     })
 }
 
@@ -99,6 +102,7 @@ pub fn read_catalog(
                 label: c.get_label()?.to_string()?,
                 input: read_fields(c.get_input()?)?,
                 result: read_fields(c.get_result()?)?,
+                supported: c.get_supported(),
             });
         }
         out.push(t::TypeDescription {

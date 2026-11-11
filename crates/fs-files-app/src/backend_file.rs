@@ -10,12 +10,13 @@ use fs_admin_frontend::{Backend, BackendError, Outcome, Record, Values};
 use fs_files_types::is_supported;
 use fs_interfaces::files_capnp::folders;
 use fs_interfaces::rpc::write_uuid;
+use fs_types::Edit;
 
 use crate::listing::{FIND_KEYS, find_all, only_find_inputs};
 use crate::remote::{FilesRemote, problem, unsupported};
 use crate::transfer::{download, upload};
 use crate::uploads::{abort, pending};
-use crate::values::{Found, as_iri, file_record, id_of, need_id, on_conflict, text};
+use crate::values::{Found, as_iri, file_record, id_of, need_id, on_conflict, text, with_record};
 
 /// The files.
 pub struct FileBackend(pub Arc<FilesRemote>);
@@ -43,11 +44,30 @@ impl Backend for FileBackend {
         })
     }
 
-    fn run(&self, name: &str, input: &Values) -> Result<Outcome, BackendError> {
+    fn reconnect(&self) -> Result<(), BackendError> {
+        self.0.reconnect()
+    }
+
+    fn supported(&self, command: &str) -> bool {
+        is_supported("File", command)
+    }
+
+    fn change(&self, _record: &str, _edit: &Edit) -> Result<Outcome, BackendError> {
+        // The description has no `change` command: renaming, moving and the rest are commands with their own inputs.
+        Err(unsupported("change"))
+    }
+
+    fn run(
+        &self,
+        name: &str,
+        record: Option<&str>,
+        input: &Values,
+    ) -> Result<Outcome, BackendError> {
+        let input = with_record(input, "file", record);
         if !is_supported("File", name) {
             return Err(unsupported(name));
         }
-        let (name, input) = (name.to_owned(), input.clone());
+        let name = name.to_owned();
         self.0.run(move |c| async move {
             let f = &c.folders;
             match name.as_str() {

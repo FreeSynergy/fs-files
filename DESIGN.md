@@ -7,7 +7,7 @@ see a path or a backend. Contract: `files.capnp` in `fs-interfaces` (tag v0.0.5,
 
 ## State
 
-Version 0.0.5 (0.0.4 was tagged but its release failed: `--version` was missing; window rebuilt on the generated Admin frontend; earlier: 0.6.0 tagged v0.6.0, header corrected 2026-11-08; 0.5.0 was: stage 1: local folder, stage 2: S3, stage 3: real names, stage 4: the server, 0.5.0: store identity, typed problem extensions, uploads paged in the store). Built on fs-objects 0.4.0 and fs-interfaces 0.44.0 (git tags). Interface status: draft, provisional, consumers 0 of 2.
+Version 0.0.6 (Q0 migration: one Blinc place, version handshake, `--facet`, typing test; 0.0.5 was tagged but its release was red, left as it is; 0.0.4 was tagged but its release failed: `--version` was missing; window rebuilt on the generated Admin frontend; earlier: 0.6.0 tagged v0.6.0, header corrected 2026-11-08; 0.5.0 was: stage 1: local folder, stage 2: S3, stage 3: real names, stage 4: the server, 0.5.0: store identity, typed problem extensions, uploads paged in the store). Built on fs-objects 0.4.0 and fs-interfaces 0.44.0 (git tags). Interface status: draft, provisional, consumers 0 of 2.
 
 | Area | State |
 |---|---|
@@ -263,7 +263,7 @@ file and a folder IS its real name (not derived). In the core `Error::problem()`
 
 ## Type descriptions and the window (ADR 0066, Thread R, 2026-11-10)
 
-Types (crate `fs-files-types`, `DescribesType` of `fs-types` **v0.0.2**, the version `fs-admin-frontend` @4688cee uses; reported by `Files.types @7` of `files.capnp`, interfaces tag v0.0.5):
+Types (crate `fs-files-types`, `DescribesType` of `fs-types` from `fs-interfaces` **v0.0.17**, the one `fs-admin-frontend` v0.0.5 (`fs-components`) uses; reported by `Files.types @7` of `files.capnp`):
 
 | Type | Standard | Why |
 |---|---|---|
@@ -273,11 +273,11 @@ Types (crate `fs-files-types`, `DescribesType` of `fs-types` **v0.0.2**, the ver
 | `Picture` (gallery facet) | AS2 `Image` | refers to its `File`; the core has no metadata object yet |
 | `Album` (gallery facet) | AS2 `Collection` | order is a view parameter (`album.sort`); items by reference |
 
-Every command of the core and **every capability id of both `requirements.md`** is in a description (`requirements.rs` maps id to command; a test checks that none is missing). The list of a type is its `find` (empty = all, `Backend::list`; pages are read until the end, at most 5000 records). The app is the standard window shell with `fs-admin-frontend` (git, `rev = "4688cee"`) over one `Backend` per type (`crates/fs-files-app/src/backend_*.rs`); the old workbench window (`source/`) is gone, its code is in git history. The file list and gallery grid components are in `fs-components` (branch `r2-files-components`, crates `fs-components-file-list`, `fs-components-gallery-grid`; **tag pending**), not used by the admin window yet: the generated frontend has no hook for a component of its own.
+Every command of the core and **every capability id of both `requirements.md`** is in a description (`requirements.rs` maps id to command; a test checks that none is missing). The list of a type is its `find` (empty = all, `Backend::list`; pages are read until the end, at most 5000 records). The app is the standard window shell with `fs-admin-frontend` (`fs-components` tag v0.0.5) over one `Backend` per type (`crates/fs-files-app/src/backend_*.rs`); the old workbench window (`source/`) is gone, its code is in git history. The file list and gallery grid components are in `fs-components` (branch `r2-files-components`, crates `fs-components-file-list`, `fs-components-gallery-grid`; **tag pending**), not used by the admin window yet: the generated frontend has no hook for a component of its own.
 
 ### Unsupported (named, not faked)
 
-`types.capnp` v0.0.5 has no `supported` field in `CommandDescription` (Thread T adds it). Until then **`fs-files-types/src/support.rs` (`SUPPORTED`) is the one table**; a command not in it is unsupported, and `Backend::run` answers `BackendError::Unavailable("unsupported:<name>")` for it. The frontend is never changed to switch a control on; one row is added when the core gets the command. Not answered today (`cargo run -p fs-files-types --example unsupported`):
+`CommandDescription.supported` exists since fs-interfaces v0.0.11. **`fs-files-types/src/support.rs` (`SUPPORTED`) is the one table** and fills it (`registry.rs`, `described`); `Backend::supported` answers from the same table, so the frontend shows the rest locked ("Soon"). A command not in it is unsupported, and `Backend::run` answers `BackendError::Unavailable("unsupported:<name>")` for it. The frontend is never changed to switch a control on; one row is added when the core gets the command. Not answered today (`cargo run -p fs-files-types --example unsupported`):
 
 ```text
 Album: find create edit delete add remove nest query suggest sort           (no album object in the core; the list is empty)
@@ -302,9 +302,10 @@ Answered for `Picture`: `find` (= `media.list`, `media.search`: the image files)
 * `upload` and `download` take a `file:` link (`BasicType::Link`) for the local path: the form has no file chooser (a component, the frontend's). A download never replaces an existing file.
 * `Folder.create` / `move` and `Album` `parent` have a `reference` **without** a target, because a reference to the own type makes the frontend take the selected record for it (the rule for commands on a record) and the top level could not be chosen.
 * `change` is partial in the backend (missing = unchanged, empty = cleared) for `classify`; `rename`/`move` send the fields they change.
-* The generated frontend @4688cee shows a locked "coming soon" control for an unsupported command **not yet** (it knows no `supported`): the controls of `Album` and the unsupported commands are shown as normal buttons and answer `unsupported:<name>`. Finding for Thread A.
+* The generated frontend (v0.0.5) shows a locked "Soon" control for an unsupported command (checked in a picture of the window).
 * The generated frontend has no paging and no tile or grid view for lists: a list is a table.
-* Two `fs-types` versions in one build are separate types: moving to `fs-types` v0.0.11 (field `supported`, `Edit`) needs `fs-admin-frontend` on v0.0.11 too. Blocker for Thread A / the coordinator; this repo stays on v0.0.2.
+* Two `fs-types` versions in one build are separate types: this repo, `fs-admin-frontend` and `fs-interfaces` all use the one of v0.0.17.
+* `CommandKind::Change` is the `Edit` of the type's own fields and has no input (`ChangeWithInput`). rename, move, classify and the like ask for input, so they go on the wire as `Other` (`registry.rs`); `Backend::change` answers `unsupported:change` and the window has no `change` form yet (open: map `Edit` to rename / move / classify). `Backend::run` gets the record's id next to the input (`with_record`).
 
 ## After the sprint (strategy list, 2026-11-07)
 
@@ -314,9 +315,9 @@ Answered for `Picture`: `find` (= `media.list`, `media.search`: the image files)
 
 ## One binary `fs-files` and its window (ADR 0063, 2026-11-08)
 
-`crates/fs-files` is the only binary: `fs-files` without arguments opens the window, `fs-files serve` runs the server (`fs_files_server::serve`; the folder the files live in is `FS_FILES_ROOT`), feature `gui` (default) builds the window. `fs-files-server` and `fs-files-app` are libraries. The window (`crates/fs-files-app`) is the file manager workbench of `fs-components` over `files.capnp`: `FilesRemote` (a worker thread owns the Cap'n Proto connection) implements the workbench's `FileSource` (Adapter): folders, list and search (sort, size filter), create, rename, move, copy, trash, restore, restore to, purge, empty trash and rescan, with the server's problems as the workbench's kinds (name taken, invalid name, changed outside, not found). If no server answers on the user's own socket the window starts `fs-files serve` detached. Tests: `crates/fs-files-app/tests/remote.rs` (real server, repository and folder), `crates/fs-files/tests/binary*.rs` (the real binary).
+`crates/fs-files` is the only binary: `fs-files` without arguments opens the window, `fs-files serve` runs the server (`fs_files_server::serve`; the folder the files live in is `FS_FILES_ROOT`), feature `gui` (default) builds the window. `fs-files-server` and `fs-files-app` are libraries. The window (`crates/fs-files-app`) is the file manager workbench of `fs-components` over `files.capnp`: `FilesRemote` (a worker thread owns the Cap'n Proto connection) implements the workbench's `FileSource` (Adapter): folders, list and search (sort, size filter), create, rename, move, copy, trash, restore, restore to, purge, empty trash and rescan, with the server's problems as the workbench's kinds (name taken, invalid name, changed outside, not found). The window connects with the version handshake of `fs-interfaces` v0.0.17 (see below). Tests: `crates/fs-files-app/tests/remote.rs` (real server, repository and folder), `crates/fs-files/tests/binary*.rs` (the real binary).
 
-Not in the window yet (capabilities say so, nothing pretends): previews, upload, download, date filters, descending type sort; a file's sensitive marking (ADR 0029) is not read, so no entry shows one and the trash count says none is marked; classification, backends and sharing have no screen. No timeout waiting for the server. The Gallery facet is not built.
+Not in the window yet (capabilities say so, nothing pretends): previews, upload, download, date filters, descending type sort; a file's sensitive marking (ADR 0029) is not read, so no entry shows one and the trash count says none is marked; classification, backends and sharing have no screen. No timeout waiting for the server. The Gallery facet is not built as a view of its own: `--facet gallery` shows the types Picture and Album only.
 
 
 ## Windows port (2026-11-10, sprint decision C: a real port, no cross-build, no exception)
@@ -336,3 +337,11 @@ Tests that depend on Unix modes (`0o700`, unreadable files) run on Unix only and
 Windows and the tests say that. Until `fs-interfaces` is tagged with the transport, the crates point at its branch `win-port`.
 **Open on Windows:** no path longer than the 4095 bytes counted by the repository is meant to be used (Windows takes more with the
 `\\?\` form, which Explorer cannot open); UNC links (`file://server/share`, `file:////server/share`) and links whose decoded text holds a backslash (`%5C`) are refused, because the files of the app are local; the store's UAC/setup flow for fs-files itself is the one of `fs-store`.
+
+## Q0 migration (0.0.6, 2026-11-11)
+
+* **Blinc in one place.** No `blinc*` dependency, no `[patch]`/`[replace]`; the program hangs on `fs-components` tag v0.0.5 only (Blinc arrives through it; `fs_components::blinc` re-exports it, this code names no `blinc_*`). `.fs-rules.toml` has `blinc = "components-only"`; `check_blinc` of fs-release checks it. `fs-components-map` is not needed by this program.
+* **Version handshake** (fs-interfaces DESIGN, "Version handshake"). The server answers `Control.version` (`run_until_signal_as`, `ServerIdentity::new("fs-files", version)`). The window connects with `FilesRemote::matching(socket, CommandStarter(current_exe, serve [--socket S] --lease L))`, which calls `connect_matching`: a server of this version is used, none is started, one of another version is stopped and replaced. A `HandshakeError` is kept as `BackendError::Handshake(text)`; the window opens anyway (descriptions from `fs-files-types` when the server cannot say them), every list shows the text and "Try again" calls `Backend::reconnect` = `FilesRemote::reconnect`. Never a black window. `FilesRemote::connect` (plain, no check, no start) stays for the tests. The server started by a window still ends when no window holds the lease. The log file of a server that stops at once is gone (a detached server has no stderr); the handshake error says it could not start. Tests: `crates/fs-files-app/tests/handshake*.rs`.
+* **`--facet NAME`** is read by the one parser of fs-interfaces (`rpc::parse_facet`) in the window and in the server (`ServerOptions`); a name this program does not have is refused (`fs-files-types` `FACETS`: `files` = File, Folder, StorageBackend; `gallery` = Picture, Album). The server serves every type whatever the facet; the facet is the window's view.
+* **`--version`** prints `fs-files <version>` (release smoke test).
+* **Typing test** (`.github/workflows/typing-test.yml`, fs-release `actions/typing-test`): the release window runs under a virtual KWin with `--size 1000x640`; `.github/typing-test/focus.sh` clicks "Find" and then the "Name" field of the search form (positions from the window's corner); the 16 characters of the layout `de` are typed and checked. On GitHub the time is reported only. Locally: `scripts/typing-test.sh target/release/fs-files --size 1000x640` of fs-release with `TT_SCENARIO=.github/typing-test/focus.sh`.

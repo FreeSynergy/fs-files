@@ -20,7 +20,6 @@ mod backend_folder;
 mod backend_picture;
 mod backend_storage;
 mod catalog;
-mod detach;
 pub mod gui;
 mod link;
 mod listing;

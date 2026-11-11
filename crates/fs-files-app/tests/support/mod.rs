@@ -10,7 +10,7 @@ use fs_admin_frontend::{Backend, Values};
 use fs_files_app::FilesRemote;
 use fs_files_core::{FileRepo, LocalFolder};
 use fs_files_server::FilesServer;
-use fs_interfaces::rpc::{bind_socket, serve};
+use fs_interfaces::rpc::{ServerIdentity, bind_socket, run_until_signal_as, serve};
 use fs_objects::{Store, TursoStore};
 
 const ME: &str = "https://local.invalid/users/owner";
@@ -80,4 +80,34 @@ pub fn names(b: &dyn Backend, query: &Values) -> Vec<String> {
         .collect();
     n.sort();
     n
+}
+
+/// A real server on its own thread that says it is `fs-files` of `version` (`Control.version`), the way `fs-files serve`
+/// does; it ends with the process. Returns when it listens.
+pub fn serve_as(socket: &Path, root: &Path, version: &str) {
+    let (socket, root, version) = (socket.to_path_buf(), root.to_path_buf(), version.to_owned());
+    let (up, started) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let _ = run_until_signal_as(
+            &socket,
+            ServerIdentity::new("fs-files", version),
+            || async move {
+                let store: Arc<dyn Store> = Arc::new(
+                    TursoStore::open_in_memory()
+                        .await
+                        .map_err(std::io::Error::other)?,
+                );
+                let backend = Arc::new(
+                    LocalFolder::open(&root)
+                        .await
+                        .map_err(std::io::Error::other)?,
+                );
+                let repo = Arc::new(FileRepo::new(store, ME, "main", backend));
+                let server = FilesServer::new(repo.clone(), repo.clone(), repo.clone(), repo);
+                up.send(()).ok();
+                Ok(server.into_client().client)
+            },
+        );
+    });
+    started.recv().expect("the server started");
 }

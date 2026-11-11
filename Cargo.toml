@@ -5,13 +5,7 @@ members = ["crates/fs-files-core", "crates/fs-files-types", "crates/fs-files-ser
 [workspace.package]
 authors = ["FreeSynergy <support@freesynergy.net>"]
 repository = "https://github.com/FreeSynergy/fs-files"
-version = "0.0.5"
+version = "0.0.6"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 rust-version = "1.89"
-
-# Window resize crash (wgpu validation error when the window is enlarged) and the incremental restyle: blinc-app-fix
-# and blinc-layout-fix, pinned to commits (coding.md section 8). Same pins as fs-tasks and fs-calendar.
-[patch.crates-io]
-blinc_app = { git = "https://github.com/FreeSynergy/blinc-app-fix", rev = "5180d4eae80034d851d98464861f098d69eceaf0" }
-blinc_layout = { git = "https://github.com/FreeSynergy/blinc-layout-fix", rev = "cb17db8111f2037473e6e02b6784628ca0dca151" }

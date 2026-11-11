@@ -8,6 +8,7 @@
 
 mod album;
 mod common;
+mod facet;
 mod file;
 mod file_later;
 mod folder;
@@ -20,6 +21,7 @@ mod support;
 mod wire;
 
 pub use album::Album;
+pub use facet::{FACETS, check_facet, facet_types};
 pub use file::File;
 pub use folder::Folder;
 pub use picture::Picture;

@@ -10,12 +10,13 @@ use fs_files_types::is_supported;
 use fs_interfaces::common_capnp;
 use fs_interfaces::files_capnp::folders;
 use fs_interfaces::rpc::write_uuid;
+use fs_types::Edit;
 use uuid::Uuid;
 
 use crate::listing::MAX_RECORDS;
 use crate::remote::{FilesRemote, problem, unsupported};
 use crate::values::{
-    Found, as_iri, entry_record, folder_record, id_of, need_id, on_conflict, text,
+    Found, as_iri, entry_record, folder_record, id_of, need_id, on_conflict, text, with_record,
 };
 
 /// The folders.
@@ -85,11 +86,30 @@ impl Backend for FolderBackend {
             .run(move |c| async move { walk(&c.folders, name).await })
     }
 
-    fn run(&self, name: &str, input: &Values) -> Result<Outcome, BackendError> {
+    fn reconnect(&self) -> Result<(), BackendError> {
+        self.0.reconnect()
+    }
+
+    fn supported(&self, command: &str) -> bool {
+        is_supported("Folder", command)
+    }
+
+    fn change(&self, _record: &str, _edit: &Edit) -> Result<Outcome, BackendError> {
+        // The description has no `change` command: renaming, moving and the rest are commands with their own inputs.
+        Err(unsupported("change"))
+    }
+
+    fn run(
+        &self,
+        name: &str,
+        record: Option<&str>,
+        input: &Values,
+    ) -> Result<Outcome, BackendError> {
+        let input = with_record(input, "folder", record);
         if !is_supported("Folder", name) {
             return Err(unsupported(name));
         }
-        let (name, input) = (name.to_owned(), input.clone());
+        let name = name.to_owned();
         self.0.run(move |c| async move {
             let f = &c.folders;
             match name.as_str() {

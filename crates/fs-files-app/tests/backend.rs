@@ -27,6 +27,8 @@ fn the_server_describes_all_five_types() {
 }
 
 #[test]
+// One story of one file from upload to download: split, it would lose the thread.
+#[allow(clippy::too_many_lines)]
 fn files_are_uploaded_listed_changed_trashed_restored_and_downloaded() {
     let w = world();
     let (files, folders) = (
@@ -36,13 +38,16 @@ fn files_are_uploaded_listed_changed_trashed_restored_and_downloaded() {
     let local = w.dir.join("note.txt");
     std::fs::write(&local, "hello").unwrap();
 
-    let docs = folders.run("create", &v(&[("name", "Docs")])).unwrap();
+    let docs = folders
+        .run("create", None, &v(&[("name", "Docs")]))
+        .unwrap();
     let docs_id = docs.id.unwrap();
     assert_eq!(names(&folders, &Values::new()), ["Docs"]);
 
     let up = files
         .run(
             "upload",
+            None,
             &v(&[("source", &url(&local)), ("folder", &docs_id)]),
         )
         .unwrap();
@@ -56,20 +61,24 @@ fn files_are_uploaded_listed_changed_trashed_restored_and_downloaded() {
     // the same name again is refused as a finding on the field `name`, and keep-both gives it another name
     let again = v(&[("source", &url(&local)), ("folder", &docs_id)]);
     assert!(
-        matches!(files.run("upload", &again), Err(BackendError::Rejected(f)) if f[0].field == "name")
+        matches!(files.run("upload", None, &again), Err(BackendError::Rejected(f)) if f[0].field == "name")
     );
     let mut both = again.clone();
     both.insert("onConflict".into(), vec!["keep-both".into()]);
-    files.run("upload", &both).unwrap();
+    files.run("upload", None, &both).unwrap();
     assert_eq!(names(&files, &Values::new()), ["note (2).txt", "note.txt"]);
 
     files
-        .run("rename", &v(&[("file", &id), ("name", "renamed.txt")]))
+        .run(
+            "rename",
+            None,
+            &v(&[("file", &id), ("name", "renamed.txt")]),
+        )
         .unwrap();
     assert_eq!(names(&files, &v(&[("name", "renamed")])), ["renamed.txt"]);
     let mut top = v(&[("file", &id)]);
     top.insert("folder".into(), Vec::new());
-    files.run("move", &top).unwrap();
+    files.run("move", None, &top).unwrap();
     assert!(
         files
             .list(&Values::new())
@@ -78,7 +87,11 @@ fn files_are_uploaded_listed_changed_trashed_restored_and_downloaded() {
             .any(|r| r.id == id && !r.values.contains_key("folder"))
     );
     let copy = files
-        .run("copy", &v(&[("file", &id), ("onConflict", "keep-both")]))
+        .run(
+            "copy",
+            None,
+            &v(&[("file", &id), ("onConflict", "keep-both")]),
+        )
         .unwrap();
     assert_eq!(
         names(&files, &v(&[("name", "renamed (copy)")])),
@@ -88,6 +101,7 @@ fn files_are_uploaded_listed_changed_trashed_restored_and_downloaded() {
     files
         .run(
             "classify",
+            None,
             &v(&[("file", &id), ("sensitive", "dpv:Health")]),
         )
         .unwrap();
@@ -96,36 +110,44 @@ fn files_are_uploaded_listed_changed_trashed_restored_and_downloaded() {
 
     let target = w.dir.join("out.txt");
     files
-        .run("download", &v(&[("file", &id), ("target", &url(&target))]))
+        .run(
+            "download",
+            None,
+            &v(&[("file", &id), ("target", &url(&target))]),
+        )
         .unwrap();
     assert_eq!(std::fs::read(&target).unwrap(), b"hello");
     assert!(
         files
-            .run("download", &v(&[("file", &id), ("target", &url(&target))]))
+            .run(
+                "download",
+                None,
+                &v(&[("file", &id), ("target", &url(&target))])
+            )
             .is_err()
     );
 
-    files.run("delete", &v(&[("file", &id)])).unwrap();
+    files.run("delete", None, &v(&[("file", &id)])).unwrap();
     assert_eq!(
         names(&files, &v(&[("name", "renamed.txt")])),
         Vec::<String>::new()
     );
     assert_eq!(names(&files, &v(&[("state", "trashed")])), ["renamed.txt"]);
-    files.run("restore", &v(&[("file", &id)])).unwrap();
+    files.run("restore", None, &v(&[("file", &id)])).unwrap();
     assert_eq!(
         names(&files, &v(&[("name", "renamed.txt")])),
         ["renamed.txt"]
     );
-    files.run("delete", &v(&[("file", &id)])).unwrap();
-    files.run("purge", &v(&[("file", &id)])).unwrap();
+    files.run("delete", None, &v(&[("file", &id)])).unwrap();
+    files.run("purge", None, &v(&[("file", &id)])).unwrap();
     assert_eq!(
         names(&files, &v(&[("state", "trashed")])),
         Vec::<String>::new()
     );
-    let empty = files.run("emptyTrash", &Values::new()).unwrap();
+    let empty = files.run("emptyTrash", None, &Values::new()).unwrap();
     assert_eq!(empty.values["purged"], ["0"]);
     assert!(matches!(
-        files.run("resolve", &v(&[("file", &id)])),
+        files.run("resolve", None, &v(&[("file", &id)])),
         Err(BackendError::NotFound)
     ));
 }
@@ -135,40 +157,40 @@ fn folders_are_created_renamed_moved_deleted_and_rescanned() {
     let w = world();
     let folders = FolderBackend(w.remote.clone());
     let a = folders
-        .run("create", &v(&[("name", "A")]))
+        .run("create", None, &v(&[("name", "A")]))
         .unwrap()
         .id
         .unwrap();
     let b = folders
-        .run("create", &v(&[("name", "B"), ("parent", &a)]))
+        .run("create", None, &v(&[("name", "B"), ("parent", &a)]))
         .unwrap()
         .id
         .unwrap();
     assert_eq!(names(&folders, &Values::new()), ["A", "B"]);
     assert_eq!(names(&folders, &v(&[("name", "b")])), ["B"]);
     assert!(matches!(
-        folders.run("create", &v(&[("name", "A")])),
+        folders.run("create", None, &v(&[("name", "A")])),
         Err(BackendError::Rejected(f)) if f[0].field == "name"
     ));
     assert!(matches!(
-        folders.run("create", &v(&[("name", "a/b")])),
+        folders.run("create", None, &v(&[("name", "a/b")])),
         Err(BackendError::Rejected(_))
     ));
     folders
-        .run("rename", &v(&[("folder", &b), ("name", "C")]))
+        .run("rename", None, &v(&[("folder", &b), ("name", "C")]))
         .unwrap();
     let mut top = v(&[("folder", &b)]);
     top.insert("parent".into(), Vec::new());
-    folders.run("move", &top).unwrap();
+    folders.run("move", None, &top).unwrap();
     let rows = folders.list(&Values::new()).unwrap();
     let moved = rows.iter().find(|r| r.id == b).unwrap();
     assert!(!moved.values.contains_key("parent"));
-    folders.run("resolve", &v(&[("folder", &b)])).unwrap();
+    folders.run("resolve", None, &v(&[("folder", &b)])).unwrap();
 
     std::fs::write(w.dir.join("files").join("A").join("found.txt"), "x").unwrap();
-    let scan = folders.run("rescan", &v(&[("folder", &a)])).unwrap();
+    let scan = folders.run("rescan", None, &v(&[("folder", &a)])).unwrap();
     assert_eq!(scan.values["added"], ["found.txt"]);
-    folders.run("delete", &v(&[("folder", &b)])).unwrap();
+    folders.run("delete", None, &v(&[("folder", &b)])).unwrap();
     assert_eq!(names(&folders, &Values::new()), ["A"]);
 }
 
@@ -180,7 +202,7 @@ fn ids_and_references_are_absolute_iris_that_the_basic_type_accepts() {
         FolderBackend(w.remote.clone()),
     );
     let dir = folders
-        .run("create", &v(&[("name", "D")]))
+        .run("create", None, &v(&[("name", "D")]))
         .unwrap()
         .id
         .unwrap();
@@ -190,7 +212,11 @@ fn ids_and_references_are_absolute_iris_that_the_basic_type_accepts() {
     // a path with a space typed as a link: the percent code is decoded
     let encoded = url(&local).replace(' ', "%20");
     let id = files
-        .run("upload", &v(&[("source", &encoded), ("folder", &dir)]))
+        .run(
+            "upload",
+            None,
+            &v(&[("source", &encoded), ("folder", &dir)]),
+        )
         .unwrap()
         .id
         .unwrap();
@@ -207,8 +233,8 @@ fn ids_and_references_are_absolute_iris_that_the_basic_type_accepts() {
         }
     }
     // restoreTo: trash it, restore into the top level
-    files.run("delete", &v(&[("file", &id)])).unwrap();
-    files.run("restoreTo", &v(&[("file", &id)])).unwrap();
+    files.run("delete", None, &v(&[("file", &id)])).unwrap();
+    files.run("restoreTo", None, &v(&[("file", &id)])).unwrap();
     let restored = files.list(&Values::new()).unwrap();
     assert!(!restored[0].values.contains_key("folder"));
 }
@@ -221,33 +247,38 @@ fn a_missing_field_leaves_a_change_unchanged_and_an_empty_one_clears() {
         FolderBackend(w.remote.clone()),
     );
     let dir = folders
-        .run("create", &v(&[("name", "D")]))
+        .run("create", None, &v(&[("name", "D")]))
         .unwrap()
         .id
         .unwrap();
     let local = w.dir.join("n.txt");
     std::fs::write(&local, "x").unwrap();
     let id = files
-        .run("upload", &v(&[("source", &url(&local)), ("folder", &dir)]))
+        .run(
+            "upload",
+            None,
+            &v(&[("source", &url(&local)), ("folder", &dir)]),
+        )
         .unwrap()
         .id
         .unwrap();
     files
         .run(
             "classify",
+            None,
             &v(&[("file", &id), ("sensitive", "dpv:Health")]),
         )
         .unwrap();
     // move without the field: unchanged; classify without the field: the marking stays
-    files.run("move", &v(&[("file", &id)])).unwrap();
-    files.run("classify", &v(&[("file", &id)])).unwrap();
+    files.run("move", None, &v(&[("file", &id)])).unwrap();
+    files.run("classify", None, &v(&[("file", &id)])).unwrap();
     let row = &files.list(&Values::new()).unwrap()[0];
     assert_eq!(row.values["folder"], std::slice::from_ref(&dir));
     assert_eq!(row.values["sensitive"], ["dpv:Health"]);
     // an empty list clears
     let mut cleared = v(&[("file", &id)]);
     cleared.insert("sensitive".into(), Vec::new());
-    files.run("classify", &cleared).unwrap();
+    files.run("classify", None, &cleared).unwrap();
     assert!(
         !files.list(&Values::new()).unwrap()[0]
             .values
@@ -255,7 +286,7 @@ fn a_missing_field_leaves_a_change_unchanged_and_an_empty_one_clears() {
     );
     let mut top = v(&[("file", &id)]);
     top.insert("folder".into(), Vec::new());
-    files.run("move", &top).unwrap();
+    files.run("move", None, &top).unwrap();
     assert!(
         !files.list(&Values::new()).unwrap()[0]
             .values
@@ -263,11 +294,13 @@ fn a_missing_field_leaves_a_change_unchanged_and_an_empty_one_clears() {
     );
     // folders: the same rule for `parent`
     let child = folders
-        .run("create", &v(&[("name", "C"), ("parent", &dir)]))
+        .run("create", None, &v(&[("name", "C"), ("parent", &dir)]))
         .unwrap()
         .id
         .unwrap();
-    folders.run("move", &v(&[("folder", &child)])).unwrap();
+    folders
+        .run("move", None, &v(&[("folder", &child)]))
+        .unwrap();
     let rows = folders.list(&Values::new()).unwrap();
     assert_eq!(
         rows.iter().find(|r| r.id == child).unwrap().values["parent"],

@@ -23,12 +23,15 @@ fn pictures_are_the_image_files_and_albums_do_not_exist_yet() {
     let id = files
         .run(
             "upload",
+            None,
             &v(&[("source", &url(&photo)), ("mediaType", "image/png")]),
         )
         .unwrap()
         .id
         .unwrap();
-    files.run("upload", &v(&[("source", &url(&text))])).unwrap();
+    files
+        .run("upload", None, &v(&[("source", &url(&text))]))
+        .unwrap();
     let rows = pictures.list(&Values::new()).unwrap();
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].values["file"], std::slice::from_ref(&id));
@@ -36,6 +39,7 @@ fn pictures_are_the_image_files_and_albums_do_not_exist_yet() {
     pictures
         .run(
             "sensitiveMark",
+            None,
             &v(&[("picture", &id), ("sensitive", "dpv:Health")]),
         )
         .unwrap();
@@ -47,6 +51,7 @@ fn pictures_are_the_image_files_and_albums_do_not_exist_yet() {
     pictures
         .run(
             "download",
+            None,
             &v(&[("picture", &id), ("target", &url(&target))]),
         )
         .unwrap();
@@ -63,26 +68,26 @@ fn what_the_core_lacks_is_refused_with_the_name_and_never_faked() {
         other => panic!("{name}: {other:?}"),
     };
     unsupported(
-        FileBackend(w.remote.clone()).run("preview", &Values::new()),
+        FileBackend(w.remote.clone()).run("preview", None, &Values::new()),
         "preview",
     );
     unsupported(
-        FileBackend(w.remote.clone()).run("shareCreate", &Values::new()),
+        FileBackend(w.remote.clone()).run("shareCreate", None, &Values::new()),
         "shareCreate",
     );
     unsupported(
-        FolderBackend(w.remote.clone()).run("archive", &Values::new()),
+        FolderBackend(w.remote.clone()).run("archive", None, &Values::new()),
         "archive",
     );
     unsupported(
-        PictureBackend(w.remote.clone()).run("tagAdd", &Values::new()),
+        PictureBackend(w.remote.clone()).run("tagAdd", None, &Values::new()),
         "tagAdd",
     );
     unsupported(
-        StorageBackendBackend(w.remote.clone()).run("quota", &Values::new()),
+        StorageBackendBackend(w.remote.clone()).run("quota", None, &Values::new()),
         "quota",
     );
-    unsupported(AlbumBackend.run("create", &Values::new()), "create");
+    unsupported(AlbumBackend.run("create", None, &Values::new()), "create");
 }
 
 #[test]
@@ -95,13 +100,17 @@ fn storage_backends_are_listed_and_a_bad_configuration_is_refused() {
     assert_eq!(rows[0].values["state"], ["active"]);
     assert!(
         storage
-            .run("create", &v(&[("config", "{\"kind\":\"nope\"}")]))
+            .run("create", None, &v(&[("config", "{\"kind\":\"nope\"}")]))
             .is_err()
     );
     let second = serde_json_config("second");
-    storage.run("create", &v(&[("config", &second)])).unwrap();
+    storage
+        .run("create", None, &v(&[("config", &second)]))
+        .unwrap();
     assert_eq!(storage.list(&Values::new()).unwrap().len(), 2);
-    storage.run("delete", &v(&[("storage", "second")])).unwrap();
+    storage
+        .run("delete", None, &v(&[("storage", "second")]))
+        .unwrap();
     assert_eq!(storage.list(&Values::new()).unwrap().len(), 1);
 }
 
@@ -113,11 +122,11 @@ fn serde_json_config(id: &str) -> String {
 fn unfinished_uploads_are_listed_and_can_be_aborted() {
     let w = world();
     let files = FileBackend(w.remote.clone());
-    let none = files.run("uploadList", &Values::new()).unwrap();
+    let none = files.run("uploadList", None, &Values::new()).unwrap();
     assert!(none.values.is_empty());
     assert!(
         files
-            .run("uploadAbort", &v(&[("uploadId", "nothing")]))
+            .run("uploadAbort", None, &v(&[("uploadId", "nothing")]))
             .is_err()
     );
 }

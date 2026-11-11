@@ -7,9 +7,10 @@ use std::sync::Arc;
 
 use fs_admin_frontend::{Backend, BackendError, Outcome, Record, Values};
 use fs_files_types::is_supported;
+use fs_types::Edit;
 
 use crate::remote::{FilesRemote, problem, unsupported};
-use crate::values::{storage_record, text};
+use crate::values::{storage_record, text, with_record};
 
 /// The storage backends.
 pub struct StorageBackendBackend(pub Arc<FilesRemote>);
@@ -36,11 +37,30 @@ impl Backend for StorageBackendBackend {
         })
     }
 
-    fn run(&self, name: &str, input: &Values) -> Result<Outcome, BackendError> {
+    fn reconnect(&self) -> Result<(), BackendError> {
+        self.0.reconnect()
+    }
+
+    fn supported(&self, command: &str) -> bool {
+        is_supported("StorageBackend", command)
+    }
+
+    fn change(&self, _record: &str, _edit: &Edit) -> Result<Outcome, BackendError> {
+        // The description has no `change` command: renaming, moving and the rest are commands with their own inputs.
+        Err(unsupported("change"))
+    }
+
+    fn run(
+        &self,
+        name: &str,
+        record: Option<&str>,
+        input: &Values,
+    ) -> Result<Outcome, BackendError> {
+        let input = with_record(input, "storage", record);
         if !is_supported("StorageBackend", name) {
             return Err(unsupported(name));
         }
-        let (name, input) = (name.to_owned(), input.clone());
+        let name = name.to_owned();
         self.0.run(move |c| async move {
             match name.as_str() {
                 "create" => {

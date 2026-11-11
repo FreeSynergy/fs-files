@@ -9,12 +9,13 @@ use std::sync::Arc;
 
 use fs_admin_frontend::{Backend, BackendError, Outcome, Record, Values};
 use fs_files_types::is_supported;
+use fs_types::Edit;
 
 use crate::backend_file::FileBackend;
 use crate::listing::{FIND_KEYS, find_all, only_find_inputs};
 use crate::remote::{FilesRemote, unsupported};
 use crate::transfer::download;
-use crate::values::{Found, need_id, text};
+use crate::values::{Found, need_id, text, with_record};
 
 /// The pictures.
 pub struct PictureBackend(pub Arc<FilesRemote>);
@@ -37,11 +38,30 @@ impl Backend for PictureBackend {
         })
     }
 
-    fn run(&self, name: &str, input: &Values) -> Result<Outcome, BackendError> {
+    fn reconnect(&self) -> Result<(), BackendError> {
+        self.0.reconnect()
+    }
+
+    fn supported(&self, command: &str) -> bool {
+        is_supported("Picture", command)
+    }
+
+    fn change(&self, _record: &str, _edit: &Edit) -> Result<Outcome, BackendError> {
+        // The description has no `change` command: renaming, moving and the rest are commands with their own inputs.
+        Err(unsupported("change"))
+    }
+
+    fn run(
+        &self,
+        name: &str,
+        record: Option<&str>,
+        input: &Values,
+    ) -> Result<Outcome, BackendError> {
+        let input = with_record(input, "picture", record);
         if !is_supported("Picture", name) {
             return Err(unsupported(name));
         }
-        let (name, input) = (name.to_owned(), input.clone());
+        let name = name.to_owned();
         match name.as_str() {
             "download" => self.0.run(move |c| async move {
                 download(&c.transfer, need_id(&input, "picture")?, &input).await
@@ -52,7 +72,7 @@ impl Backend for PictureBackend {
                 if let Some(id) = text(&input, "picture") {
                     as_file.insert("file".into(), vec![id.to_owned()]);
                 }
-                FileBackend(Arc::clone(&self.0)).run("classify", &as_file)
+                FileBackend(Arc::clone(&self.0)).run("classify", None, &as_file)
             }
             _ => Err(unsupported(&name)),
         }
@@ -78,7 +98,11 @@ impl Backend for AlbumBackend {
         Ok(Vec::new())
     }
 
-    fn run(&self, name: &str, _: &Values) -> Result<Outcome, BackendError> {
+    fn change(&self, _record: &str, _edit: &Edit) -> Result<Outcome, BackendError> {
+        Err(unsupported("change"))
+    }
+
+    fn run(&self, name: &str, _: Option<&str>, _: &Values) -> Result<Outcome, BackendError> {
         Err(unsupported(name))
     }
 }
