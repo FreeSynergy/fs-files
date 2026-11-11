@@ -29,7 +29,11 @@ fn a_server_of_this_version_is_used_as_it_is() {
     serve_as(&socket, &root, VERSION);
     let refuse = || -> io::Result<()> { Err(io::Error::other("must not be started")) };
     let remote = Arc::new(FilesRemote::matching(&socket, Arc::new(refuse)));
-    assert!(FileBackend(remote).list(&Values::new()).unwrap().is_empty());
+    assert!(
+        FileBackend(remote)
+            .list(&Values::new())
+            .is_ok_and(|l| l.is_empty())
+    );
 }
 
 #[test]
@@ -55,5 +59,5 @@ fn no_server_and_no_start_is_a_handshake_error_that_a_second_try_can_end() {
     // The person fixes it (here: the server is there now) and presses "Try again".
     serve_as(&socket, &root, VERSION);
     backend.reconnect().unwrap();
-    assert!(backend.list(&Values::new()).unwrap().is_empty());
+    assert!(backend.list(&Values::new()).is_ok_and(|l| l.is_empty()));
 }
