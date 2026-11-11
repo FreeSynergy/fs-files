@@ -10,11 +10,60 @@ use std::pin::Pin;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex, PoisonError, mpsc};
 use std::thread;
+use std::time::Duration;
 
 use fs_admin_frontend::BackendError;
 use fs_interfaces::files_capnp::{backends, files, folders, search, transfer};
+use fs_interfaces::rpc::client::{CALL_TIMEOUT, Fault, call_limited};
 use fs_interfaces::rpc::{Connection, Expected, Problem, ServerStarter, connect, connect_matching};
 use fs_types::{RecordIssue, RecordProblem, TypeProblem};
+
+/// The name of the server in the words of a timeout.
+const SERVER: &str = "files";
+
+/// What the caller waits on top of a limit for a worker that cannot run the job.
+const GRACE: Duration = Duration::from_secs(2);
+
+/// Commands that move bytes or walk a whole tree: they get [`Limits::long`], every other call [`Limits::call`].
+const LONG_COMMANDS: &[&str] = &[
+    "upload",
+    "download",
+    "copy",
+    "move",
+    "restore",
+    "restoreTo",
+    "purge",
+    "emptyTrash",
+    "rescan",
+];
+
+/// How long the window waits for the server before it says so (no call waits for ever; a window never freezes).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Limits {
+    /// The questions asked right after the handshake and the type descriptions: the window is not open yet, so short.
+    pub start: Duration,
+    /// Every other call: the default of fs-interfaces (`CALL_TIMEOUT`, 30 s).
+    pub call: Duration,
+    /// Transfer, copy, move, restore, purge, empty trash and rescan: they read or write file bytes or a whole folder
+    /// tree (a large file over S3, a move between backends is a copy), so a quarter of an hour.
+    pub long: Duration,
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self {
+            start: Duration::from_secs(10),
+            call: CALL_TIMEOUT,
+            long: Duration::from_secs(15 * 60),
+        }
+    }
+}
+
+/// A call that ran out of time, as the person sees it. `BackendError::Handshake` is the one variant that carries a text
+/// for the person and a "Try again" (which connects anew), and a server that does not answer needs exactly that.
+fn timed_out(fault: &Fault) -> BackendError {
+    BackendError::Handshake(fault.to_string())
+}
 
 /// The clients a job works with.
 pub(crate) struct Clients {
@@ -46,6 +95,7 @@ enum Link {
 /// The files server behind a socket.
 pub struct FilesRemote {
     dial: Dial,
+    limits: Limits,
     link: Mutex<Link>,
 }
 
@@ -55,10 +105,19 @@ impl FilesRemote {
     /// # Errors
     /// The text for the person when nothing answers.
     pub fn connect(socket: &Path) -> Result<Self, String> {
+        Self::connect_with(socket, Limits::default())
+    }
+
+    /// [`FilesRemote::connect`] with other [`Limits`].
+    ///
+    /// # Errors
+    /// The text for the person when nothing answers.
+    pub fn connect_with(socket: &Path, limits: Limits) -> Result<Self, String> {
         let dial = Dial::Plain(socket.to_path_buf());
-        match dial.open() {
+        match dial.open(limits) {
             Ok(jobs) => Ok(Self {
                 dial,
+                limits,
                 link: Mutex::new(Link::Up(jobs)),
             }),
             Err(BackendError::Handshake(text) | BackendError::Unavailable(text)) => Err(text),
@@ -71,17 +130,28 @@ impl FilesRemote {
     /// reached, the remote keeps the reason, every call answers [`BackendError::Handshake`] with it, and
     /// [`FilesRemote::reconnect`] (the "Try again" of the window) asks again. The window opens in any case.
     pub fn matching(socket: &Path, starter: Arc<dyn ServerStarter + Send + Sync>) -> Self {
+        Self::matching_with(socket, starter, Limits::default())
+    }
+
+    /// [`FilesRemote::matching`] with other [`Limits`]. A server that passes the handshake and then does not answer
+    /// the first questions is reported like a failed handshake after [`Limits::start`], not waited for.
+    pub fn matching_with(
+        socket: &Path,
+        starter: Arc<dyn ServerStarter + Send + Sync>,
+        limits: Limits,
+    ) -> Self {
         let dial = Dial::Matching {
             socket: socket.to_path_buf(),
             expected: Expected::new(env!("CARGO_PKG_VERSION")),
             starter,
         };
-        let link = match dial.open() {
+        let link = match dial.open(limits) {
             Ok(jobs) => Link::Up(jobs),
             Err(e) => Link::Down(e),
         };
         Self {
             dial,
+            limits,
             link: Mutex::new(link),
         }
     }
@@ -91,7 +161,7 @@ impl FilesRemote {
     /// # Errors
     /// [`BackendError::Handshake`] (again) or [`BackendError::Unavailable`].
     pub fn reconnect(&self) -> Result<(), BackendError> {
-        let opened = self.dial.open();
+        let opened = self.dial.open(self.limits);
         let mut link = self.link.lock().unwrap_or_else(PoisonError::into_inner);
         match opened {
             Ok(jobs) => {
@@ -105,7 +175,33 @@ impl FilesRemote {
         }
     }
 
+    /// A call with the default limit ([`Limits::call`]).
     pub(crate) fn run<T, F, Fut>(&self, make: F) -> Result<T, BackendError>
+    where
+        T: Send + 'static,
+        F: FnOnce(Rc<Clients>) -> Fut + Send + 'static,
+        Fut: Future<Output = Result<T, BackendError>> + 'static,
+    {
+        self.run_within(self.limits.call, make)
+    }
+
+    /// The limit of the command `name`: [`Limits::long`] for a transfer or a walk, else [`Limits::call`].
+    pub(crate) fn limit_of(&self, name: &str) -> Duration {
+        if LONG_COMMANDS.contains(&name) {
+            self.limits.long
+        } else {
+            self.limits.call
+        }
+    }
+
+    /// The limit of the questions of the start ([`Limits::start`]).
+    pub(crate) fn start_limit(&self) -> Duration {
+        self.limits.start
+    }
+
+    /// A call that is given up after `limit`: the server did not answer, the caller gets a visible error and the
+    /// connection stays usable (the late answer is dropped). A write may still have happened on the server.
+    pub(crate) fn run_within<T, F, Fut>(&self, limit: Duration, make: F) -> Result<T, BackendError>
     where
         T: Send + 'static,
         F: FnOnce(Rc<Clients>) -> Fut + Send + 'static,
@@ -118,17 +214,31 @@ impl FilesRemote {
         let (reply, answer) = mpsc::channel();
         let job: Job = Box::new(move |clients| {
             Box::pin(async move {
-                let _ = reply.send(make(clients).await);
+                let done = call_limited(SERVER, limit, make(clients))
+                    .await
+                    .unwrap_or_else(|fault| Err(timed_out(&fault)));
+                let _ = reply.send(done);
             })
         });
         jobs.send(job).map_err(|_| gone())?;
-        answer.recv().map_err(|_| gone())?
+        // The job ends itself at `limit`; this is the belt for a worker that does not run it at all.
+        match answer.recv_timeout(limit + GRACE) {
+            Ok(done) => done,
+            Err(mpsc::RecvTimeoutError::Timeout) => Err(timed_out(&Fault::TimedOut {
+                server: SERVER,
+                limit,
+            })),
+            Err(mpsc::RecvTimeoutError::Disconnected) => Err(gone()),
+        }
     }
 }
 
 impl Dial {
     /// Start a worker thread that connects and then answers the jobs; wait until it is connected.
-    fn open(&self) -> Result<tokio::sync::mpsc::UnboundedSender<Job>, BackendError> {
+    fn open(
+        &self,
+        limits: Limits,
+    ) -> Result<tokio::sync::mpsc::UnboundedSender<Job>, BackendError> {
         let (jobs, inbox) = tokio::sync::mpsc::unbounded_channel();
         let (ready, started) = mpsc::channel();
         let how = match self {
@@ -145,7 +255,7 @@ impl Dial {
         };
         thread::Builder::new()
             .name("files-rpc".into())
-            .spawn(move || worker(&how, inbox, &ready))
+            .spawn(move || worker(&how, limits, inbox, &ready))
             .map_err(|e| BackendError::Unavailable(e.to_string()))?;
         started
             .recv()
@@ -178,6 +288,7 @@ fn gone() -> BackendError {
 
 fn worker(
     dial: &Dial,
+    limits: Limits,
     mut inbox: tokio::sync::mpsc::UnboundedReceiver<Job>,
     ready: &mpsc::Sender<Result<(), BackendError>>,
 ) {
@@ -199,10 +310,16 @@ fn worker(
                 return;
             }
         };
-        let clients = match open(&connection.client).await {
-            Ok(c) => Rc::new(c),
-            Err(e) => {
+        // The first questions have a limit too: a server that passed the handshake and then says nothing must not keep the
+        // window from opening.
+        let clients = match call_limited(SERVER, limits.start, open(&connection.client)).await {
+            Ok(Ok(c)) => Rc::new(c),
+            Ok(Err(e)) => {
                 let _ = ready.send(Err(BackendError::Unavailable(e.to_string())));
+                return;
+            }
+            Err(fault) => {
+                let _ = ready.send(Err(timed_out(&fault)));
                 return;
             }
         };

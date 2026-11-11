@@ -68,25 +68,26 @@ impl Backend for FileBackend {
             return Err(unsupported(name));
         }
         let name = name.to_owned();
-        self.0.run(move |c| async move {
-            let f = &c.folders;
-            match name.as_str() {
-                "rename" => rename(f, &input).await,
-                "move" => relocate(f, &input, false).await,
-                "copy" => relocate(f, &input, true).await,
-                "restoreTo" => restore(f, &input, true).await,
-                "restore" => restore(f, &input, false).await,
-                "classify" => classify(f, &input).await,
-                "delete" | "purge" => remove(f, &input, name == "purge").await,
-                "resolve" => resolve(f, &input).await,
-                "emptyTrash" => empty_trash(f).await,
-                "upload" => upload(&c.transfer, &input).await,
-                "download" => download(&c.transfer, need_id(&input, "file")?, &input).await,
-                "uploadList" => pending(&c.transfer).await,
-                "uploadAbort" => abort(&c.transfer, &input).await,
-                _ => Err(unsupported(&name)),
-            }
-        })
+        self.0
+            .run_within(self.0.limit_of(&name), move |c| async move {
+                let f = &c.folders;
+                match name.as_str() {
+                    "rename" => rename(f, &input).await,
+                    "move" => relocate(f, &input, false).await,
+                    "copy" => relocate(f, &input, true).await,
+                    "restoreTo" => restore(f, &input, true).await,
+                    "restore" => restore(f, &input, false).await,
+                    "classify" => classify(f, &input).await,
+                    "delete" | "purge" => remove(f, &input, name == "purge").await,
+                    "resolve" => resolve(f, &input).await,
+                    "emptyTrash" => empty_trash(f).await,
+                    "upload" => upload(&c.transfer, &input).await,
+                    "download" => download(&c.transfer, need_id(&input, "file")?, &input).await,
+                    "uploadList" => pending(&c.transfer).await,
+                    "uploadAbort" => abort(&c.transfer, &input).await,
+                    _ => Err(unsupported(&name)),
+                }
+            })
     }
 }
 

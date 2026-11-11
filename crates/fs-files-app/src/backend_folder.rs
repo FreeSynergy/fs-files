@@ -110,18 +110,19 @@ impl Backend for FolderBackend {
             return Err(unsupported(name));
         }
         let name = name.to_owned();
-        self.0.run(move |c| async move {
-            let f = &c.folders;
-            match name.as_str() {
-                "create" => create(f, &input).await,
-                "rename" => rename(f, &input).await,
-                "move" => relocate(f, &input).await,
-                "delete" => delete(f, &input).await,
-                "resolve" => resolve(f, &input).await,
-                "rescan" => rescan(f, &input).await,
-                _ => Err(unsupported(&name)),
-            }
-        })
+        self.0
+            .run_within(self.0.limit_of(&name), move |c| async move {
+                let f = &c.folders;
+                match name.as_str() {
+                    "create" => create(f, &input).await,
+                    "rename" => rename(f, &input).await,
+                    "move" => relocate(f, &input).await,
+                    "delete" => delete(f, &input).await,
+                    "resolve" => resolve(f, &input).await,
+                    "rescan" => rescan(f, &input).await,
+                    _ => Err(unsupported(&name)),
+                }
+            })
     }
 }
 

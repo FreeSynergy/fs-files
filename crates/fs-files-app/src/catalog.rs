@@ -13,7 +13,7 @@ impl FilesRemote {
     /// # Errors
     /// The text for the person when the server cannot answer.
     pub fn describe(&self) -> Result<Vec<TypeDescription>, String> {
-        self.run(|c| async move {
+        self.run_within(self.start_limit(), |c| async move {
             let answer = c
                 .files
                 .types_request()

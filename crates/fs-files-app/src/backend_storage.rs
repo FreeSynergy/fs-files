@@ -61,34 +61,35 @@ impl Backend for StorageBackendBackend {
             return Err(unsupported(name));
         }
         let name = name.to_owned();
-        self.0.run(move |c| async move {
-            match name.as_str() {
-                "create" => {
-                    let mut call = c.backends.add_request();
-                    call.get()
-                        .set_config(text(&input, "config").unwrap_or_default());
-                    let answer = call.send().promise.await.map_err(|e| problem(&e))?;
-                    let info = answer
-                        .get()
-                        .and_then(|r| r.get_info())
-                        .map_err(|e| problem(&e))?;
-                    Ok(Outcome {
-                        id: Some(storage_record(info).map_err(|e| problem(&e))?.id),
-                        values: Values::new(),
-                    })
+        self.0
+            .run_within(self.0.limit_of(&name), move |c| async move {
+                match name.as_str() {
+                    "create" => {
+                        let mut call = c.backends.add_request();
+                        call.get()
+                            .set_config(text(&input, "config").unwrap_or_default());
+                        let answer = call.send().promise.await.map_err(|e| problem(&e))?;
+                        let info = answer
+                            .get()
+                            .and_then(|r| r.get_info())
+                            .map_err(|e| problem(&e))?;
+                        Ok(Outcome {
+                            id: Some(storage_record(info).map_err(|e| problem(&e))?.id),
+                            values: Values::new(),
+                        })
+                    }
+                    "delete" => {
+                        let id = text(&input, "storage").ok_or(BackendError::NotFound)?;
+                        let mut call = c.backends.remove_request();
+                        call.get().set_id(id);
+                        call.send().promise.await.map_err(|e| problem(&e))?;
+                        Ok(Outcome {
+                            id: Some(id.to_owned()),
+                            values: Values::new(),
+                        })
+                    }
+                    _ => Err(unsupported(&name)),
                 }
-                "delete" => {
-                    let id = text(&input, "storage").ok_or(BackendError::NotFound)?;
-                    let mut call = c.backends.remove_request();
-                    call.get().set_id(id);
-                    call.send().promise.await.map_err(|e| problem(&e))?;
-                    Ok(Outcome {
-                        id: Some(id.to_owned()),
-                        values: Values::new(),
-                    })
-                }
-                _ => Err(unsupported(&name)),
-            }
-        })
+            })
     }
 }

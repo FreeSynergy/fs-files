@@ -7,6 +7,6 @@ license.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-fs-types = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.0.17" }
-fs-interfaces = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.0.17" }
+fs-types = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.0.18" }
+fs-interfaces = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.0.18" }
 capnp = "0.27"

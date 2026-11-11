@@ -63,9 +63,11 @@ impl Backend for PictureBackend {
         }
         let name = name.to_owned();
         match name.as_str() {
-            "download" => self.0.run(move |c| async move {
-                download(&c.transfer, need_id(&input, "picture")?, &input).await
-            }),
+            "download" => self
+                .0
+                .run_within(self.0.limit_of(&name), move |c| async move {
+                    download(&c.transfer, need_id(&input, "picture")?, &input).await
+                }),
             "sensitiveMark" => {
                 // The marking belongs to the file: the same call as `File.classify`.
                 let mut as_file = input.clone();

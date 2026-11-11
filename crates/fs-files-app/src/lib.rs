@@ -34,4 +34,4 @@ pub use backend_file::FileBackend;
 pub use backend_folder::FolderBackend;
 pub use backend_picture::{AlbumBackend, PictureBackend};
 pub use backend_storage::StorageBackendBackend;
-pub use remote::FilesRemote;
+pub use remote::{FilesRemote, Limits};
