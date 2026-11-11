@@ -4,9 +4,7 @@
 //! then keeps silent, once on the first questions after the handshake, once on a call from the window. Own file: the
 //! servers are never stopped, they end with the process.
 
-// The trait of the generated server wants `async fn`, also where the answer needs no waiting.
-#![allow(clippy::unused_async)]
-
+use std::future::Future;
 use std::path::Path;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -59,29 +57,29 @@ impl files::Server for Root {
         r.get().set_folders(new_client(Quiet));
         Ok(())
     }
-    async fn search(
+    fn search(
         self: Rc<Self>,
         _: files::SearchParams,
         mut r: files::SearchResults,
-    ) -> Result<(), capnp::Error> {
+    ) -> impl Future<Output = Result<(), capnp::Error>> {
         r.get().set_search(new_client(Quiet));
-        Ok(())
+        std::future::ready(Ok(()))
     }
-    async fn transfer(
+    fn transfer(
         self: Rc<Self>,
         _: files::TransferParams,
         mut r: files::TransferResults,
-    ) -> Result<(), capnp::Error> {
+    ) -> impl Future<Output = Result<(), capnp::Error>> {
         r.get().set_transfer(new_client(Quiet));
-        Ok(())
+        std::future::ready(Ok(()))
     }
-    async fn backends(
+    fn backends(
         self: Rc<Self>,
         _: files::BackendsParams,
         mut r: files::BackendsResults,
-    ) -> Result<(), capnp::Error> {
+    ) -> impl Future<Output = Result<(), capnp::Error>> {
         r.get().set_backends(new_client(Quiet));
-        Ok(())
+        std::future::ready(Ok(()))
     }
 }
 
