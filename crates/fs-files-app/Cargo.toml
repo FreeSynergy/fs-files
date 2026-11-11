@@ -20,6 +20,7 @@ chrono = { version = "0.4", default-features = false, features = ["std"] }
 tokio = { version = "1", features = ["rt", "sync", "time", "macros"] }
 
 [dev-dependencies]
+capnp-rpc = "0.27"
 fs-files-core = { path = "../fs-files-core" }
 fs-files-server = { path = "../fs-files-server" }
 fs-objects = { git = "https://github.com/FreeSynergy/fs-objects", tag = "v0.0.1" }

@@ -8,7 +8,7 @@ What is different here: with the default local backend your files lie in an ordi
 
 ## What it can do today
 
-Version 0.0.6 (in progress). Latest tag: `v0.0.1`.
+Version 0.0.7 (in progress). Latest tag: `v0.0.6`.
 
 - Folders, rename, move, copy, trash, restore, purge, and an empty-trash call.
 - Resumable uploads with a checksum computed while the bytes arrive.
