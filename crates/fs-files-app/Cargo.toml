@@ -12,6 +12,7 @@ fs-types = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.0.1
 fs-interfaces = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.0.18", features = ["rpc"] }
 fs-admin-frontend = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.0.8" }
 fs-components-app = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.0.8" }
+fs-components-workbenches = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.0.8" }
 fs-components-fields = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.0.8" }
 fs-components-styles = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.0.8" }
 capnp = "0.27"

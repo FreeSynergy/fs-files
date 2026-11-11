@@ -8,12 +8,13 @@ use std::sync::Arc;
 use fs_admin_frontend::view::{AboutInfo, AdminSurface};
 use fs_admin_frontend::window::{TypeView, admin_window};
 use fs_admin_frontend::{Backend, Session, SystemClock};
-use fs_components_app::{AppError, AppWidget};
+use fs_components_app::{AppError, AppWidget, Element, Screen, Surface};
+use fs_components_workbenches::file_manager::{FileLabels, FileManagerWidget};
 use fs_components_fields::{Look, Say};
 use fs_components_styles::StyleId;
 use fs_types::TypeDescription;
 
-use crate::FilesRemote;
+use crate::{FilesRemote, RemoteFileSource};
 use crate::backend_file::FileBackend;
 use crate::backend_folder::FolderBackend;
 use crate::backend_picture::{AlbumBackend, PictureBackend};
@@ -87,4 +88,29 @@ pub fn app_widget(
         })
         .collect();
     admin_window(TITLE, &say, views, about(), HELP_URL.into())
+}
+
+/// The file workbench (ADR 0066) as the screen of the shell.
+struct FilesScreen(FileManagerWidget);
+
+impl Surface for FilesScreen {
+    fn build(&self, width: f32, height: f32) -> Box<dyn Element> {
+        Box::new(self.0.build(width, height))
+    }
+
+    fn styles(&self) -> String {
+        self.0.styles()
+    }
+}
+
+/// The standard window: the file workbench over the server in the standard shell. The generated Admin frontend
+/// ([`app_widget`]) stays behind `--facet admin`.
+///
+/// # Errors
+/// [`AppError`] if the shell cannot be made.
+pub fn files_widget(remote: &Arc<FilesRemote>) -> Result<AppWidget, AppError> {
+    let source = Arc::new(RemoteFileSource(Arc::clone(remote)));
+    let widget = FileManagerWidget::new(source, FileLabels::default());
+    let screen = Screen::new("files", TITLE, Arc::new(FilesScreen(widget)));
+    AppWidget::new(TITLE, vec![screen])
 }

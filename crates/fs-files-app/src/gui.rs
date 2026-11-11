@@ -11,7 +11,7 @@ use fs_components_app::{WindowOptions, launch, parse_size};
 use fs_interfaces::rpc::{CommandStarter, companion_path, default_socket, parse_facet};
 
 use crate::FilesRemote;
-use crate::window::app_widget;
+use crate::window::{app_widget, files_widget};
 
 /// The help text.
 pub const HELP: &str = "fs-files: the files window (without arguments it opens)
@@ -19,7 +19,10 @@ pub const HELP: &str = "fs-files: the files window (without arguments it opens)
   --socket <path>    the files server to talk to (default: $XDG_RUNTIME_DIR/freesynergy/files.sock);
                      a server that is not there, or of another version, is replaced by one of this version
   --snapshot <png>   draw a picture instead of opening a window
-  --facet <name>     show one facet only: files (files, folders, storage backends) or gallery (pictures, albums)
+  --rescan           first take over what lies on the disk of the files folder (what Rescan does)
+  --admin            the generated Admin frontend instead of the file window (the same as --facet admin)
+  --facet <name>     admin (all types), or one facet of the Admin frontend: files (files, folders, storage backends)
+                     or gallery (pictures, albums); without --facet and --admin the file window opens
   --size <WxH>       window or picture size (default 1200x800)";
 
 /// The descriptions the window shows: all, or the types of one facet.
@@ -37,6 +40,8 @@ fn in_facet(
 }
 
 struct Args {
+    admin: bool,
+    rescan: bool,
     facet: Option<String>,
     socket: Option<PathBuf>,
     snapshot: Option<PathBuf>,
@@ -46,6 +51,8 @@ struct Args {
 
 fn parse(words: &[String]) -> Result<Args, String> {
     let mut out = Args {
+        admin: false,
+        rescan: false,
         facet: None,
         socket: None,
         snapshot: None,
@@ -62,10 +69,17 @@ fn parse(words: &[String]) -> Result<Args, String> {
         match word.as_str() {
             "--socket" => out.socket = Some(PathBuf::from(value("--socket")?)),
             "--snapshot" => out.snapshot = Some(PathBuf::from(value("--snapshot")?)),
+            "--admin" => out.admin = true,
+            "--rescan" => out.rescan = true,
             "--facet" => {
                 let name = parse_facet(&value("--facet")?)?;
-                fs_files_types::check_facet(&name)?;
-                out.facet = Some(name);
+                if name == "admin" {
+                    out.admin = true;
+                } else {
+                    fs_files_types::check_facet(&name)?;
+                    out.admin = true;
+                    out.facet = Some(name);
+                }
             }
             "--size" => out.size = parse_size(&value("--size")?)?,
             "-h" | "--help" => out.help = true,
@@ -97,13 +111,17 @@ pub fn run(words: &[String]) -> Result<(), String> {
         &socket,
         Arc::new(starter(&socket, args.socket.is_some())?),
     ));
-    // No server (a handshake that failed): the window still opens, with the descriptions this program has itself;
-    // every list then says what is wrong and offers "Try again" (ADR 0065). Never a black window.
-    let descriptions = remote
-        .describe()
-        .unwrap_or_else(|_| fs_files_types::registry().iter().cloned().collect());
-    let descriptions = in_facet(descriptions, args.facet.as_deref());
-    let app = app_widget(&remote, descriptions).map_err(|e| e.to_string())?;
+    if args.rescan {
+        use fs_components_workbenches::file_manager::FileSource;
+        crate::RemoteFileSource(Arc::clone(&remote))
+            .rescan(None)
+            .map_err(|e| e.to_string())?;
+    }
+    let app = if args.admin {
+        admin_app(&remote, args.facet.as_deref())?
+    } else {
+        files_widget(&remote).map_err(|e| e.to_string())?
+    };
     let (width, height) = args.size;
     if let Some(file) = &args.snapshot {
         app.picture(width, height, file)
@@ -115,6 +133,17 @@ pub fn run(words: &[String]) -> Result<(), String> {
     options.width = width;
     options.height = height;
     launch(options, app).map_err(|e| e.to_string())
+}
+
+/// The generated Admin frontend over `remote`.
+fn admin_app(remote: &Arc<FilesRemote>, facet: Option<&str>) -> Result<fs_components_app::AppWidget, String> {
+    // No server (a handshake that failed): the window still opens, with the descriptions this program has itself;
+    // every list then says what is wrong and offers "Try again" (ADR 0065). Never a black window.
+    let descriptions = remote
+        .describe()
+        .unwrap_or_else(|_| fs_files_types::registry().iter().cloned().collect());
+    let descriptions = in_facet(descriptions, facet);
+    app_widget(remote, descriptions).map_err(|e| e.to_string())
 }
 
 /// How this window starts the server when none fits: `fs-files serve --lease <lease>` (detached by `CommandStarter`, so

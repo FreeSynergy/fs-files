@@ -934,7 +934,7 @@ checksum = "fe6d2e5af09e8c8ad56c969f2157a3d4238cebc7c55f0a517728c38f7b200f81"
 dependencies = [
  "serde",
  "termcolor",
- "unicode-width 0.1.14",
+ "unicode-width 0.2.3",
 ]
 
 [[package]]
@@ -1547,6 +1547,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "fs-components-workbenches"
+version = "0.0.8"
+source = "git+https://github.com/FreeSynergy/fs-components?tag=v0.0.8#be06cf094a008781505b9113b740f0033ed4a312"
+dependencies = [
+ "blinc_app",
+ "blinc_cn",
+ "blinc_core",
+ "blinc_layout",
+ "blinc_theme",
+ "fs-components-primitives",
+ "fs-components-render",
+ "fs-components-widgets",
+]
+
+[[package]]
 name = "fs-files"
 version = "0.0.7"
 dependencies = [
@@ -1577,6 +1592,7 @@ dependencies = [
  "fs-components-app",
  "fs-components-fields",
  "fs-components-styles",
+ "fs-components-workbenches",
  "fs-files-core",
  "fs-files-server",
  "fs-files-types",
@@ -2712,18 +2728,18 @@ dependencies = [
 
 [[package]]
 name = "linkme"
-version = "0.3.38"
+version = "0.3.37"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "10a4e12fd3f6b22d5bc28beccac0f53bb35db4a897c6ddb709c4a0161f72eb6e"
+checksum = "3045e122bd98aef8ec3ad58ce84f0791f64e70163d1a02710af4aa11a4d54cc5"
 dependencies = [
  "linkme-impl",
 ]
 
 [[package]]
 name = "linkme-impl"
-version = "0.3.38"
+version = "0.3.37"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "22cd04c256b1cd686a45898c8fd150c79b801d96a3eb7bae1075f9eb3b4b85c1"
+checksum = "77060ebe535362c3da75682cd17b0431017b6e7c5661e714fc69a7ad017d1301"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2771,9 +2787,9 @@ checksum = "5d15f86d12da44cd8d4ec3c73984537eb7f4cadcb9776a575a0a8a05ca11005c"
 
 [[package]]
 name = "loom"
-version = "0.7.3"
+version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f1611ddbf89dc6ae42cfbd51fc207836140130257646eab8d6d2fb16577db2d2"
+checksum = "419e0dc8046cb947daa77eb95ae174acfbddb7673b4151f56d1eed8e93fbfaca"
 dependencies = [
  "cfg-if",
  "generator",
