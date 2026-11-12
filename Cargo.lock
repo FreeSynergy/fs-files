@@ -1592,6 +1592,7 @@ dependencies = [
  "fs-components-app",
  "fs-components-fields",
  "fs-components-styles",
+ "fs-components-widgets",
  "fs-components-workbenches",
  "fs-files-core",
  "fs-files-server",

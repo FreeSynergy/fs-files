@@ -101,6 +101,11 @@ impl Surface for FilesScreen {
     fn styles(&self) -> String {
         self.0.styles()
     }
+
+    /// The file window has a status bar of its own (how many things, what is selected): no empty strip under it.
+    fn status_line(&self) -> bool {
+        false
+    }
 }
 
 /// The standard window: the file workbench over the server in the standard shell. The generated Admin frontend
@@ -112,6 +117,7 @@ pub fn files_widget(remote: &Arc<FilesRemote>, view: FileView) -> Result<AppWidg
     let source = Arc::new(RemoteFileSource(Arc::clone(remote)));
     let widget = FileManagerWidget::new(source, FileLabels::default());
     widget.with_state(|s| s.set_view(view));
+    widget.pin_by_names(crate::xdg::user_folder_names());
     let screen = Screen::new("files", TITLE, Arc::new(FilesScreen(widget)));
     AppWidget::new(TITLE, vec![screen])
 }
