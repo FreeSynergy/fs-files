@@ -390,7 +390,7 @@ dependencies = [
 [[package]]
 name = "blinc_animation"
 version = "0.6.0"
-source = "git+https://github.com/FreeSynergy/Blinc?tag=fs-blinc-3#8a0251b2105a070626ad8390cd14d7ef7483c0f5"
+source = "git+https://github.com/FreeSynergy/Blinc?tag=fs-blinc-3.1#cf925af1230dafdb06598d8c33c4b1c9f00b13a9"
 dependencies = [
  "blinc_core",
  "slotmap",
@@ -404,7 +404,7 @@ dependencies = [
 [[package]]
 name = "blinc_app"
 version = "0.6.0"
-source = "git+https://github.com/FreeSynergy/Blinc?tag=fs-blinc-3#8a0251b2105a070626ad8390cd14d7ef7483c0f5"
+source = "git+https://github.com/FreeSynergy/Blinc?tag=fs-blinc-3.1#cf925af1230dafdb06598d8c33c4b1c9f00b13a9"
 dependencies = [
  "anyhow",
  "blinc_animation",
@@ -436,7 +436,7 @@ dependencies = [
 [[package]]
 name = "blinc_cn"
 version = "0.6.0"
-source = "git+https://github.com/FreeSynergy/Blinc?tag=fs-blinc-3#8a0251b2105a070626ad8390cd14d7ef7483c0f5"
+source = "git+https://github.com/FreeSynergy/Blinc?tag=fs-blinc-3.1#cf925af1230dafdb06598d8c33c4b1c9f00b13a9"
 dependencies = [
  "blinc_animation",
  "blinc_core",
@@ -455,7 +455,7 @@ dependencies = [
 [[package]]
 name = "blinc_core"
 version = "0.6.0"
-source = "git+https://github.com/FreeSynergy/Blinc?tag=fs-blinc-3#8a0251b2105a070626ad8390cd14d7ef7483c0f5"
+source = "git+https://github.com/FreeSynergy/Blinc?tag=fs-blinc-3.1#cf925af1230dafdb06598d8c33c4b1c9f00b13a9"
 dependencies = [
  "rustc-hash 2.1.3",
  "serde",
@@ -468,7 +468,7 @@ dependencies = [
 [[package]]
 name = "blinc_css"
 version = "0.6.0"
-source = "git+https://github.com/FreeSynergy/Blinc?tag=fs-blinc-3#8a0251b2105a070626ad8390cd14d7ef7483c0f5"
+source = "git+https://github.com/FreeSynergy/Blinc?tag=fs-blinc-3.1#cf925af1230dafdb06598d8c33c4b1c9f00b13a9"
 dependencies = [
  "blinc_animation",
  "blinc_core",
@@ -481,7 +481,7 @@ dependencies = [
 [[package]]
 name = "blinc_flow"
 version = "0.6.0"
-source = "git+https://github.com/FreeSynergy/Blinc?tag=fs-blinc-3#8a0251b2105a070626ad8390cd14d7ef7483c0f5"
+source = "git+https://github.com/FreeSynergy/Blinc?tag=fs-blinc-3.1#cf925af1230dafdb06598d8c33c4b1c9f00b13a9"
 dependencies = [
  "blinc_core",
  "nom",
@@ -490,7 +490,7 @@ dependencies = [
 [[package]]
 name = "blinc_gpu"
 version = "0.6.0"
-source = "git+https://github.com/FreeSynergy/Blinc?tag=fs-blinc-3#8a0251b2105a070626ad8390cd14d7ef7483c0f5"
+source = "git+https://github.com/FreeSynergy/Blinc?tag=fs-blinc-3.1#cf925af1230dafdb06598d8c33c4b1c9f00b13a9"
 dependencies = [
  "blinc_core",
  "blinc_flow",
@@ -519,7 +519,7 @@ dependencies = [
 [[package]]
 name = "blinc_icons"
 version = "0.6.0"
-source = "git+https://github.com/FreeSynergy/Blinc?tag=fs-blinc-3#8a0251b2105a070626ad8390cd14d7ef7483c0f5"
+source = "git+https://github.com/FreeSynergy/Blinc?tag=fs-blinc-3.1#cf925af1230dafdb06598d8c33c4b1c9f00b13a9"
 dependencies = [
  "roxmltree",
  "walkdir",
@@ -528,7 +528,7 @@ dependencies = [
 [[package]]
 name = "blinc_image"
 version = "0.6.0"
-source = "git+https://github.com/FreeSynergy/Blinc?tag=fs-blinc-3#8a0251b2105a070626ad8390cd14d7ef7483c0f5"
+source = "git+https://github.com/FreeSynergy/Blinc?tag=fs-blinc-3.1#cf925af1230dafdb06598d8c33c4b1c9f00b13a9"
 dependencies = [
  "base64 0.22.1",
  "blinc_platform",
@@ -541,7 +541,7 @@ dependencies = [
 [[package]]
 name = "blinc_layout"
 version = "0.6.0"
-source = "git+https://github.com/FreeSynergy/Blinc?tag=fs-blinc-3#8a0251b2105a070626ad8390cd14d7ef7483c0f5"
+source = "git+https://github.com/FreeSynergy/Blinc?tag=fs-blinc-3.1#cf925af1230dafdb06598d8c33c4b1c9f00b13a9"
 dependencies = [
  "arboard",
  "blinc_animation",
@@ -568,7 +568,7 @@ dependencies = [
 [[package]]
 name = "blinc_macros"
 version = "0.6.0"
-source = "git+https://github.com/FreeSynergy/Blinc?tag=fs-blinc-3#8a0251b2105a070626ad8390cd14d7ef7483c0f5"
+source = "git+https://github.com/FreeSynergy/Blinc?tag=fs-blinc-3.1#cf925af1230dafdb06598d8c33c4b1c9f00b13a9"
 dependencies = [
  "blinc_core",
  "blinc_flow",
@@ -581,7 +581,7 @@ dependencies = [
 [[package]]
 name = "blinc_noto_emoji"
 version = "0.6.0"
-source = "git+https://github.com/FreeSynergy/Blinc?tag=fs-blinc-3#8a0251b2105a070626ad8390cd14d7ef7483c0f5"
+source = "git+https://github.com/FreeSynergy/Blinc?tag=fs-blinc-3.1#cf925af1230dafdb06598d8c33c4b1c9f00b13a9"
 dependencies = [
  "blinc_text",
  "tracing",
@@ -590,7 +590,7 @@ dependencies = [
 [[package]]
 name = "blinc_paint"
 version = "0.6.0"
-source = "git+https://github.com/FreeSynergy/Blinc?tag=fs-blinc-3#8a0251b2105a070626ad8390cd14d7ef7483c0f5"
+source = "git+https://github.com/FreeSynergy/Blinc?tag=fs-blinc-3.1#cf925af1230dafdb06598d8c33c4b1c9f00b13a9"
 dependencies = [
  "blinc_core",
  "bytemuck",
@@ -601,7 +601,7 @@ dependencies = [
 [[package]]
 name = "blinc_platform"
 version = "0.6.0"
-source = "git+https://github.com/FreeSynergy/Blinc?tag=fs-blinc-3#8a0251b2105a070626ad8390cd14d7ef7483c0f5"
+source = "git+https://github.com/FreeSynergy/Blinc?tag=fs-blinc-3.1#cf925af1230dafdb06598d8c33c4b1c9f00b13a9"
 dependencies = [
  "thiserror 2.0.21",
 ]
@@ -609,7 +609,7 @@ dependencies = [
 [[package]]
 name = "blinc_platform_desktop"
 version = "0.6.0"
-source = "git+https://github.com/FreeSynergy/Blinc?tag=fs-blinc-3#8a0251b2105a070626ad8390cd14d7ef7483c0f5"
+source = "git+https://github.com/FreeSynergy/Blinc?tag=fs-blinc-3.1#cf925af1230dafdb06598d8c33c4b1c9f00b13a9"
 dependencies = [
  "blinc_platform",
  "raw-window-handle",
@@ -621,7 +621,7 @@ dependencies = [
 [[package]]
 name = "blinc_router"
 version = "0.6.0"
-source = "git+https://github.com/FreeSynergy/Blinc?tag=fs-blinc-3#8a0251b2105a070626ad8390cd14d7ef7483c0f5"
+source = "git+https://github.com/FreeSynergy/Blinc?tag=fs-blinc-3.1#cf925af1230dafdb06598d8c33c4b1c9f00b13a9"
 dependencies = [
  "blinc_animation",
  "blinc_core",
@@ -634,7 +634,7 @@ dependencies = [
 [[package]]
 name = "blinc_svg"
 version = "0.6.0"
-source = "git+https://github.com/FreeSynergy/Blinc?tag=fs-blinc-3#8a0251b2105a070626ad8390cd14d7ef7483c0f5"
+source = "git+https://github.com/FreeSynergy/Blinc?tag=fs-blinc-3.1#cf925af1230dafdb06598d8c33c4b1c9f00b13a9"
 dependencies = [
  "blinc_core",
  "resvg",
@@ -646,7 +646,7 @@ dependencies = [
 [[package]]
 name = "blinc_text"
 version = "0.6.0"
-source = "git+https://github.com/FreeSynergy/Blinc?tag=fs-blinc-3#8a0251b2105a070626ad8390cd14d7ef7483c0f5"
+source = "git+https://github.com/FreeSynergy/Blinc?tag=fs-blinc-3.1#cf925af1230dafdb06598d8c33c4b1c9f00b13a9"
 dependencies = [
  "blinc_core",
  "fontdb",
@@ -667,7 +667,7 @@ dependencies = [
 [[package]]
 name = "blinc_theme"
 version = "0.6.0"
-source = "git+https://github.com/FreeSynergy/Blinc?tag=fs-blinc-3#8a0251b2105a070626ad8390cd14d7ef7483c0f5"
+source = "git+https://github.com/FreeSynergy/Blinc?tag=fs-blinc-3.1#cf925af1230dafdb06598d8c33c4b1c9f00b13a9"
 dependencies = [
  "blinc_animation",
  "blinc_core",
@@ -1456,8 +1456,8 @@ dependencies = [
 
 [[package]]
 name = "fs-admin-frontend"
-version = "0.0.8"
-source = "git+https://github.com/FreeSynergy/fs-components?tag=v0.0.8#be06cf094a008781505b9113b740f0033ed4a312"
+version = "0.0.11"
+source = "git+https://github.com/FreeSynergy/fs-components?tag=v0.0.11#0960ad832b211ad987bed19c39908e4117b3bd1e"
 dependencies = [
  "blinc_cn",
  "blinc_core",
@@ -1473,8 +1473,8 @@ dependencies = [
 
 [[package]]
 name = "fs-components-app"
-version = "0.0.8"
-source = "git+https://github.com/FreeSynergy/fs-components?tag=v0.0.8#be06cf094a008781505b9113b740f0033ed4a312"
+version = "0.0.11"
+source = "git+https://github.com/FreeSynergy/fs-components?tag=v0.0.11#0960ad832b211ad987bed19c39908e4117b3bd1e"
 dependencies = [
  "blinc_app",
  "blinc_cn",
@@ -1487,8 +1487,8 @@ dependencies = [
 
 [[package]]
 name = "fs-components-fields"
-version = "0.0.8"
-source = "git+https://github.com/FreeSynergy/fs-components?tag=v0.0.8#be06cf094a008781505b9113b740f0033ed4a312"
+version = "0.0.11"
+source = "git+https://github.com/FreeSynergy/fs-components?tag=v0.0.11#0960ad832b211ad987bed19c39908e4117b3bd1e"
 dependencies = [
  "blinc_core",
  "blinc_layout",
@@ -1500,20 +1500,21 @@ dependencies = [
 
 [[package]]
 name = "fs-components-primitives"
-version = "0.0.8"
-source = "git+https://github.com/FreeSynergy/fs-components?tag=v0.0.8#be06cf094a008781505b9113b740f0033ed4a312"
+version = "0.0.11"
+source = "git+https://github.com/FreeSynergy/fs-components?tag=v0.0.11#0960ad832b211ad987bed19c39908e4117b3bd1e"
 dependencies = [
  "blinc_cn",
  "blinc_core",
  "blinc_layout",
  "blinc_theme",
  "fs-interfaces",
+ "libc",
 ]
 
 [[package]]
 name = "fs-components-render"
-version = "0.0.8"
-source = "git+https://github.com/FreeSynergy/fs-components?tag=v0.0.8#be06cf094a008781505b9113b740f0033ed4a312"
+version = "0.0.11"
+source = "git+https://github.com/FreeSynergy/fs-components?tag=v0.0.11#0960ad832b211ad987bed19c39908e4117b3bd1e"
 dependencies = [
  "blinc_app",
  "blinc_cn",
@@ -1521,19 +1522,20 @@ dependencies = [
  "blinc_layout",
  "blinc_noto_emoji",
  "blinc_theme",
+ "fs-components-styles",
  "image",
  "wgpu",
 ]
 
 [[package]]
 name = "fs-components-styles"
-version = "0.0.8"
-source = "git+https://github.com/FreeSynergy/fs-components?tag=v0.0.8#be06cf094a008781505b9113b740f0033ed4a312"
+version = "0.0.11"
+source = "git+https://github.com/FreeSynergy/fs-components?tag=v0.0.11#0960ad832b211ad987bed19c39908e4117b3bd1e"
 
 [[package]]
 name = "fs-components-widgets"
-version = "0.0.8"
-source = "git+https://github.com/FreeSynergy/fs-components?tag=v0.0.8#be06cf094a008781505b9113b740f0033ed4a312"
+version = "0.0.11"
+source = "git+https://github.com/FreeSynergy/fs-components?tag=v0.0.11#0960ad832b211ad987bed19c39908e4117b3bd1e"
 dependencies = [
  "blinc_cn",
  "blinc_core",
@@ -1542,14 +1544,15 @@ dependencies = [
  "blinc_theme",
  "fontdb",
  "fs-components-primitives",
+ "fs-components-styles",
  "image",
  "ttf-parser 0.24.1",
 ]
 
 [[package]]
 name = "fs-components-workbenches"
-version = "0.0.8"
-source = "git+https://github.com/FreeSynergy/fs-components?tag=v0.0.8#be06cf094a008781505b9113b740f0033ed4a312"
+version = "0.0.11"
+source = "git+https://github.com/FreeSynergy/fs-components?tag=v0.0.11#0960ad832b211ad987bed19c39908e4117b3bd1e"
 dependencies = [
  "blinc_app",
  "blinc_cn",
@@ -1563,7 +1566,7 @@ dependencies = [
 
 [[package]]
 name = "fs-files"
-version = "0.0.7"
+version = "0.0.8"
 dependencies = [
  "async-trait",
  "blake3",
@@ -1583,7 +1586,7 @@ dependencies = [
 
 [[package]]
 name = "fs-files-app"
-version = "0.0.7"
+version = "0.0.8"
 dependencies = [
  "capnp",
  "capnp-rpc",
@@ -1607,7 +1610,7 @@ dependencies = [
 
 [[package]]
 name = "fs-files-core"
-version = "0.0.7"
+version = "0.0.8"
 dependencies = [
  "async-trait",
  "blake3",
@@ -1628,7 +1631,7 @@ dependencies = [
 
 [[package]]
 name = "fs-files-server"
-version = "0.0.7"
+version = "0.0.8"
 dependencies = [
  "async-trait",
  "blake3",
@@ -1648,7 +1651,7 @@ dependencies = [
 
 [[package]]
 name = "fs-files-types"
-version = "0.0.7"
+version = "0.0.8"
 dependencies = [
  "capnp",
  "fs-interfaces",
@@ -1658,7 +1661,7 @@ dependencies = [
 [[package]]
 name = "fs-interfaces"
 version = "0.0.1"
-source = "git+https://github.com/FreeSynergy/fs-interfaces?tag=v0.0.18#5fa4a8f012c1e2532dc9ca78273705d1e2bae8c5"
+source = "git+https://github.com/FreeSynergy/fs-interfaces?tag=v0.0.19#90e62c30ad3af06beaa4edabce14e1448fdce9f3"
 dependencies = [
  "capnp",
  "capnp-rpc",
@@ -1694,7 +1697,7 @@ dependencies = [
 [[package]]
 name = "fs-types"
 version = "0.0.1"
-source = "git+https://github.com/FreeSynergy/fs-interfaces?tag=v0.0.18#5fa4a8f012c1e2532dc9ca78273705d1e2bae8c5"
+source = "git+https://github.com/FreeSynergy/fs-interfaces?tag=v0.0.19#90e62c30ad3af06beaa4edabce14e1448fdce9f3"
 dependencies = [
  "capnp",
  "chrono",

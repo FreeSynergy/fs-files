@@ -16,6 +16,9 @@ path = "src/main.rs"
 default = ["gui"]
 # The window (Blinc). Without it the binary has the server only: `cargo build --no-default-features`.
 gui = ["dep:fs-files-app"]
+# Only for the typing test, in a debug build (see fs-files-app): the window writes the text of its fields to
+# FS_TEST_ACCESS_FILE. Never in a release.
+test-access = ["gui", "fs-files-app/test-access"]
 
 [dependencies]
 fs-files-server = { path = "../fs-files-server" }
@@ -27,7 +30,7 @@ junction = "1"
 
 [dev-dependencies]
 fs-files-core = { path = "../fs-files-core" }
-fs-interfaces = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.0.18", features = ["rpc"] }
+fs-interfaces = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.0.19", features = ["rpc"] }
 fs-objects = { git = "https://github.com/FreeSynergy/fs-objects", tag = "v0.0.1" }
 capnp = "0.27"
 tempfile = "3"

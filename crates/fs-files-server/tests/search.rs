@@ -3,7 +3,7 @@
 
 mod common;
 
-use common::search::{fill, find};
+use common::search::{fill, find, find_with};
 use common::{caps, is, set_id, with_server};
 use fs_interfaces::UNSUPPORTED_PROBLEM_TYPE;
 use fs_interfaces::files_capnp::{SortBy, file_filter};
@@ -104,6 +104,35 @@ async fn sort_orders_ties_and_the_one_that_is_ascending_only() {
         assert_eq!(modified[1], "cat.png", "then the last file made, first");
         let error = sorted(SortBy::MediaType, true).await.err().unwrap();
         is(&error, UNSUPPORTED_PROBLEM_TYPE, 501);
+    })
+    .await;
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn folders_first_is_the_wish_of_the_client_and_on_when_it_says_nothing() {
+    with_server(|root, _| async move {
+        let c = caps(&root).await;
+        fill(&c).await;
+        let all = |_: file_filter::Builder<'_>| {};
+        // a client that never writes the field (old client): folders first
+        assert_eq!(
+            find(&c, all, None).await.unwrap(),
+            ["Photos", "cat.png", "notes.txt", "trip.txt"]
+        );
+        // asked for in so many words: folders first
+        assert_eq!(
+            find_with(&c, all, Some((SortBy::Name, false)), true)
+                .await
+                .unwrap(),
+            ["Photos", "cat.png", "notes.txt", "trip.txt"]
+        );
+        // counter test: `false` is kept on the wire and gives the mixed order by name
+        assert_eq!(
+            find_with(&c, all, Some((SortBy::Name, false)), false)
+                .await
+                .unwrap(),
+            ["cat.png", "notes.txt", "Photos", "trip.txt"]
+        );
     })
     .await;
 }

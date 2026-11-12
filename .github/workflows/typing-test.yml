@@ -30,13 +30,13 @@ jobs:
       - uses: FreeSynergy/fs-release/actions/setup-rust@main
         with:
           cache-key: typing-test
-      - name: Build the window (release)
-        run: cargo build --release --locked -p fs-files
+      - name: Build the window (debug, with the read-only text access of the test: the feature is refused in a release build)
+        run: cargo build --locked -p fs-files --features test-access
       - name: Typing test of the file window (the standard window)
         id: files
         uses: FreeSynergy/fs-release/actions/typing-test@main
         with:
-          app-binary: target/release/fs-files
+          app-binary: target/debug/fs-files
           app-args: "--size 1000x640"
           scenario: .github/typing-test/focus-files.sh
           name: fs-files
@@ -44,7 +44,7 @@ jobs:
       - name: Typing test of the Admin frontend (--admin)
         uses: FreeSynergy/fs-release/actions/typing-test@main
         with:
-          app-binary: target/release/fs-files
+          app-binary: target/debug/fs-files
           app-args: "--size 1000x640 --admin"
           scenario: .github/typing-test/focus.sh
           name: fs-files-admin

@@ -42,6 +42,12 @@ pub(crate) fn sort(r: files_capnp::sort::Reader<'_>) -> capnp::Result<Sort> {
         Ok(files_capnp::SortBy::MediaType) => SortBy::Type,
         Err(e) => return Err(invalid_request(format!("unknown sort key {}", e.0))),
     };
-    // The contract has no flag for it yet: a file manager wants the folders first, so the server always does.
-    Ok(Sort::new(by, r.get_descending()).with_folders_first())
+    // `foldersFirst` (fs-interfaces v0.0.19, default true: a client that never writes it reads as true) is the client's
+    // wish: a file manager wants the folders first, a plain listing may ask for the mixed order.
+    let sort = Sort::new(by, r.get_descending());
+    Ok(if r.get_folders_first() {
+        sort.with_folders_first()
+    } else {
+        sort
+    })
 }

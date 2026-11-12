@@ -10,6 +10,16 @@ pub async fn find(
     filter: impl Fn(file_filter::Builder<'_>),
     sort: Option<(SortBy, bool)>,
 ) -> capnp::Result<Vec<String>> {
+    find_with(c, filter, sort, true).await
+}
+
+/// [`find`] with the wish of the client about the folders: `false` asks for folders and files mixed.
+pub async fn find_with(
+    c: &Caps,
+    filter: impl Fn(file_filter::Builder<'_>),
+    sort: Option<(SortBy, bool)>,
+    folders_first: bool,
+) -> capnp::Result<Vec<String>> {
     let (mut out, mut cursor) = (vec![], vec![]);
     loop {
         let mut call = c.search.find_request();
@@ -19,6 +29,7 @@ pub async fn find(
             let mut order = call.get().init_sort();
             order.set_by(by);
             order.set_descending(descending);
+            order.set_folders_first(folders_first);
         }
         let answer = call.send().promise.await?;
         let page = answer.get()?.get_page()?;

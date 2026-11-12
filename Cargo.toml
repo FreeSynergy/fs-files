@@ -5,7 +5,7 @@ members = ["crates/fs-files-core", "crates/fs-files-types", "crates/fs-files-ser
 [workspace.package]
 authors = ["FreeSynergy <support@freesynergy.net>"]
 repository = "https://github.com/FreeSynergy/fs-files"
-version = "0.0.7"
+version = "0.0.8"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 rust-version = "1.89"

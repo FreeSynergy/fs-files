@@ -6,16 +6,22 @@ edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 
+[features]
+# The window writes what is typed into its fields to `FS_TEST_ACCESS_FILE` (fs-components `test-access`). ONLY for the
+# typing test, in a debug build: fs-components refuses the feature in a release build (compile_error), and no release
+# manifest of ours turns it on.
+test-access = ["fs-components-app/test-access"]
+
 [dependencies]
 fs-files-types = { path = "../fs-files-types" }
-fs-types = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.0.18" }
-fs-interfaces = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.0.18", features = ["rpc"] }
-fs-admin-frontend = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.0.8" }
-fs-components-app = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.0.8" }
-fs-components-workbenches = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.0.8" }
-fs-components-widgets = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.0.8" }
-fs-components-fields = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.0.8" }
-fs-components-styles = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.0.8" }
+fs-types = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.0.19" }
+fs-interfaces = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.0.19", features = ["rpc"] }
+fs-admin-frontend = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.0.11" }
+fs-components-app = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.0.11" }
+fs-components-workbenches = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.0.11" }
+fs-components-widgets = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.0.11" }
+fs-components-fields = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.0.11" }
+fs-components-styles = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.0.11" }
 capnp = "0.27"
 uuid = "1"
 chrono = { version = "0.4", default-features = false, features = ["std"] }

@@ -8,8 +8,10 @@ What is different here: with the default local backend your files lie in an ordi
 
 ## What it can do today
 
-Version 0.0.7 (in progress). Latest tag: `v0.0.6`.
+Version 0.0.8 (in progress). Latest tag: `v0.0.7`. What changed: [CHANGELOG.md](CHANGELOG.md) (English and German).
 
+- A file window (the standard window): list with columns you can hide, move and widen, or a grid with big icons, tabs, a path bar with search, a command bar, a sidebar with your pinned user folders, the storage and the trash, and a status bar. The generated Admin frontend stays behind `--admin`.
+- Folders come first in every listing (a deliberate change: before, folders and files were mixed by name), and the type of a file is read from its first bytes, then its ending, then whether it reads as text.
 - Folders, rename, move, copy, trash, restore, purge, and an empty-trash call.
 - Resumable uploads with a checksum computed while the bytes arrive.
 - A local-folder backend with real names, and an S3 backend (tested once against a real RustFS server, not part of the automatic tests).

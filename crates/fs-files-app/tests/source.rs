@@ -2,6 +2,8 @@
 //!
 //! Pattern: Integration test — the same server as in `backend.rs`; the source is the one the window uses.
 
+#![allow(clippy::assert_is_empty)] // tests: plain `is_empty()` asserts read clearer
+
 mod support;
 
 use fs_components_workbenches::file_manager::{
