@@ -157,7 +157,22 @@ pub(super) fn sort_by(key: SortKey) -> SortBy {
 
 /// The `file:` link of a path, as the transfer commands read it.
 pub(super) fn link_of(path: &str) -> String {
+    link_text(path, cfg!(windows))
+}
+
+/// The link of `path`; with `windows` the separators become `/` and the drive letter follows the first slash
+/// (`C:\Users\me` is `file:///C%3A/Users/me`), the form `link::current().path_of` reads back.
+fn link_text(path: &str, windows: bool) -> String {
+    let slashed;
+    let mut path = path;
+    if windows {
+        slashed = path.replace('\\', "/");
+        path = &slashed;
+    }
     let mut out = String::from("file://");
+    if windows && !path.starts_with('/') {
+        out.push('/');
+    }
     for b in path.bytes() {
         if b.is_ascii_alphanumeric() || b"/-_.~".contains(&b) {
             out.push(char::from(b));
@@ -182,4 +197,22 @@ pub(super) fn new_name(
 
 pub(super) fn text_name(entry: &FileEntry) -> String {
     entry.name.clone()
+}
+
+#[cfg(test)]
+mod link_tests {
+    use super::link_text;
+
+    #[test]
+    fn a_unix_path_keeps_its_slashes_and_encodes_the_rest() {
+        assert_eq!(link_text("/tmp/a b.txt", false), "file:///tmp/a%20b.txt");
+    }
+
+    #[test]
+    fn a_windows_path_has_slashes_and_the_drive_after_the_first_one() {
+        assert_eq!(
+            link_text(r"C:\Users\me\a b.txt", true),
+            "file:///C%3A/Users/me/a%20b.txt"
+        );
+    }
 }
