@@ -6,13 +6,13 @@
 
 - **The long calls no longer freeze the file window.** Rescan, upload, download (and going on with an unfinished upload) run on a worker of the file workbench (fs-components v0.0.12, after `Session::submit`): the window answers while they run, shows "Running...", a transfer row says "running" until the server has answered, and a second start meanwhile is refused with a note (not queued, so nothing is written twice). What was typed is kept; a failed call gives the input back. There is no abort and no progress: the server's contract has neither.
 - **Limit that remains:** lists, the folder tree, rename, move, copy, trash and the preview are still called on the interface thread, each with its time limit (30 s; move, copy, restore and purge 15 min). The server answers them while a transfer runs (the connection serves calls side by side), but a server that does not answer holds the window for that time.
-- Built on fs-components v0.0.12.
+- Built on fs-components v0.0.13 (lift; it keeps typed input when a call starts).
 
 ### Deutsch
 
 - **Die langen Aufrufe frieren das Dateifenster nicht mehr ein.** Rescan, Hochladen, Herunterladen (und das Fortsetzen eines unfertigen Hochladens) laufen auf einem Arbeiter der Dateiansicht (fs-components v0.0.12, nach `Session::submit`): das Fenster antwortet währenddessen, zeigt „Läuft...“, eine Übertragungszeile steht auf „läuft“, bis der Server geantwortet hat, und ein zweiter Start in der Zeit wird mit Hinweis abgelehnt (nicht eingereiht, damit nichts doppelt geschrieben wird). Getipptes bleibt; ein fehlgeschlagener Aufruf gibt die Eingabe zurück. Es gibt keinen Abbruch und keinen Fortschritt: der Vertrag des Servers hat keines von beiden.
 - **Grenze, die bleibt:** Listen, der Ordnerbaum, Umbenennen, Verschieben, Kopieren, Papierkorb und die Vorschau werden weiter im Oberflächen-Thread aufgerufen, jeweils mit Zeitgrenze (30 s; Verschieben, Kopieren, Wiederherstellen und Endgültig löschen 15 min). Der Server beantwortet sie, während eine Übertragung läuft (die Verbindung bedient Aufrufe nebeneinander), aber ein Server, der nicht antwortet, hält das Fenster so lange fest.
-- Gebaut auf fs-components v0.0.12.
+- Gebaut auf fs-components v0.0.13 (Anhebung; sie behält Getipptes, wenn ein Aufruf startet).
 
 ## 0.0.8
 

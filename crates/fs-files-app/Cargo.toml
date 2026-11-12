@@ -16,12 +16,12 @@ test-access = ["fs-components-app/test-access"]
 fs-files-types = { path = "../fs-files-types" }
 fs-types = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.0.19" }
 fs-interfaces = { git = "https://github.com/FreeSynergy/fs-interfaces", tag = "v0.0.19", features = ["rpc"] }
-fs-admin-frontend = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.0.12" }
-fs-components-app = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.0.12" }
-fs-components-workbenches = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.0.12" }
-fs-components-widgets = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.0.12" }
-fs-components-fields = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.0.12" }
-fs-components-styles = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.0.12" }
+fs-admin-frontend = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.0.13" }
+fs-components-app = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.0.13" }
+fs-components-workbenches = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.0.13" }
+fs-components-widgets = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.0.13" }
+fs-components-fields = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.0.13" }
+fs-components-styles = { git = "https://github.com/FreeSynergy/fs-components", tag = "v0.0.13" }
 capnp = "0.27"
 uuid = "1"
 chrono = { version = "0.4", default-features = false, features = ["std"] }
