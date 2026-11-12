@@ -3,8 +3,8 @@
 //! Pattern: Adapter — `files.capnp` behind the `FileSource` trait of `fs-components-workbenches`; the keys the
 //! workbench holds are the bare ids of the records. Every call is a job of the worker of [`FilesRemote`] with a
 //! limit, so a server that does not answer ends in a visible error, never in a window that waits for ever. The trait
-//! is synchronous for now (the workbench runs it on the interface thread); the non-blocking `Session::submit` of
-//! fs-components v0.0.10 replaces that, the adapter stays.
+//! is synchronous: the workbench (fs-components v0.0.12) calls the long ones (rescan, upload, download) from a worker
+//! and the short ones on the interface thread, each with its limit.
 
 use std::sync::Arc;
 

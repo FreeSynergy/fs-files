@@ -8,7 +8,7 @@ What is different here: with the default local backend your files lie in an ordi
 
 ## What it can do today
 
-Version 0.0.8 (in progress). Latest tag: `v0.0.7`. What changed: [CHANGELOG.md](CHANGELOG.md) (English and German).
+Version 0.0.9 (in progress). Latest tag: `v0.0.8`. What changed: [CHANGELOG.md](CHANGELOG.md) (English and German).
 
 - A file window (the standard window): list with columns you can hide, move and widen, or a grid with big icons, tabs, a path bar with search, a command bar, a sidebar with your pinned user folders, the storage and the trash, and a status bar. The generated Admin frontend stays behind `--admin`.
 - Folders come first in every listing (a deliberate change: before, folders and files were mixed by name), and the type of a file is read from its first bytes, then its ending, then whether it reads as text.
@@ -20,12 +20,12 @@ Version 0.0.8 (in progress). Latest tag: `v0.0.7`. What changed: [CHANGELOG.md](
 - Disk and database are kept in step: if one step fails, the other is undone.
 - Files with sensitive categories are marked, and the store refuses them unencrypted.
 - A small server that offers all of this over a local socket.
-- Tests: `cargo test --workspace` (254 at version 0.0.8; two live S3 tests are ignored).
+- Tests: `cargo test --workspace` (255 at version 0.0.9; two live S3 tests are ignored).
 
 ## What is not there yet
 
 - The standard window is the file window (list or grid, tabs, path bar, command bar, sidebar with Home, Pinned user folders, Storage, Network and the trash). The generated Admin window is behind `--admin` (and `--facet admin`; `--facet files` and `--facet gallery` show only the types of one facet). Planned and not there: previews and thumbnails, a gallery grid, a music or video view, cut, copy and paste, more than one tab, sorting by more than one column.
-- **Known limit (0.0.8): the window calls the server on the interface thread.** A call has a time limit (30 s; upload, download, copy, move, restore, purge and rescan 15 min), but while it runs the window does not answer, so a long operation freezes it. The non-blocking path (`Session::submit` of fs-components v0.0.10) is not built into the file window yet; it is the next round (0.0.9).
+- **Long calls do not freeze the window (0.0.9).** Rescan, upload and download run on a worker (fs-components v0.0.12): the window answers, shows "Running...", a second start is refused, a failed call gives the input back; no abort or progress (the server has none). **Limit:** lists, tree, rename, move, copy, trash and preview are still called on the interface thread, each with a time limit (30 s; move, copy, restore and purge 15 min).
 - No sharing (the interface is an empty placeholder), no versions, no encryption of file contents, no sync, no WebDAV, no previews, no second storage in the sidebar (only the own storage; `LocalFolder` of the home folder or a USB stick is planned).
 - Replacing a file is not offered, only refuse or keep both.
 - The interface is a draft marked provisional, and nothing uses it yet.
