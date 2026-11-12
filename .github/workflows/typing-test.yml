@@ -2,7 +2,8 @@
 # `de` (Shift, AltGr: Ä ä ö ü ß @ € { } [ ] \ | ~ µ) are typed into the "Name" field of the search form, and the test checks
 # that each one arrives as that glyph and how long key-to-picture takes. On the GitHub runner (no GPU) the time is only
 # reported, not enforced (`enforce-ms` stays empty). The way to the field is `.github/typing-test/focus.sh`.
-# The window opens on the file view by default; this test needs the generated Admin frontend (its search form), hence `--admin`.
+# Two runs: the file window (the standard window, search field of the bar of the way: `focus-files.sh`) and the generated
+# Admin frontend (`--admin`, the search form: `focus.sh`).
 name: typing-test
 on:
   push:
@@ -31,10 +32,20 @@ jobs:
           cache-key: typing-test
       - name: Build the window (release)
         run: cargo build --release --locked -p fs-files
-      - uses: FreeSynergy/fs-release/actions/typing-test@main
+      - name: Typing test of the file window (the standard window)
+        id: files
+        uses: FreeSynergy/fs-release/actions/typing-test@main
+        with:
+          app-binary: target/release/fs-files
+          app-args: "--size 1000x640"
+          scenario: .github/typing-test/focus-files.sh
+          name: fs-files
+          runs: 3
+      - name: Typing test of the Admin frontend (--admin)
+        uses: FreeSynergy/fs-release/actions/typing-test@main
         with:
           app-binary: target/release/fs-files
           app-args: "--size 1000x640 --admin"
           scenario: .github/typing-test/focus.sh
-          name: fs-files
+          name: fs-files-admin
           runs: 3
