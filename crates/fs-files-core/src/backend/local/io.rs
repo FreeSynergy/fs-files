@@ -47,9 +47,33 @@ pub(super) fn modified_ns(m: &std::fs::Metadata) -> i64 {
         .map_or(0, |d| i64::try_from(d.as_nanos()).unwrap_or(i64::MAX))
 }
 
+/// Open a regular file for reading, and look at what was opened, not at what the path was a moment ago: the open does
+/// not wait (`O_NONBLOCK`: a FIFO put in the place of the file does not hold a thread for ever) and does not follow a
+/// link in the last place (`O_NOFOLLOW`); then the type of the opened thing is checked, and anything but a regular
+/// file is refused.
+fn open_regular(path: &Path) -> std::io::Result<std::fs::File> {
+    let mut options = std::fs::OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        let flags = rustix::fs::OFlags::NONBLOCK | rustix::fs::OFlags::NOFOLLOW;
+        options.custom_flags(i32::try_from(flags.bits()).unwrap_or(0));
+    }
+    let file = options.open(path)?;
+    if file.metadata()?.is_file() {
+        Ok(file)
+    } else {
+        Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "not a regular file",
+        ))
+    }
+}
+
 /// Read up to `length` bytes at `offset`.
 pub(super) async fn read_range(path: &Path, offset: u64, length: u32) -> Result<Vec<u8>> {
-    let mut file = tokio::fs::File::open(path).await?;
+    let mut file = tokio::fs::File::from_std(open_regular(path)?);
     file.seek(std::io::SeekFrom::Start(offset)).await?;
     let mut out = Vec::new();
     file.take(u64::from(length)).read_to_end(&mut out).await?;
@@ -149,4 +173,41 @@ pub(super) async fn make_all(dir: &Path) -> Result<()> {
     tokio::fs::create_dir_all(dir)
         .await
         .map_err(|e| named(e, "create folder"))
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn a_fifo_put_in_the_place_of_a_file_is_refused_and_holds_nothing() {
+        let dir = tempfile::tempdir().unwrap();
+        let fifo = dir.path().join("a.bin");
+        rustix::fs::mknodat(
+            rustix::fs::CWD,
+            &fifo,
+            rustix::fs::FileType::Fifo,
+            rustix::fs::Mode::RUSR | rustix::fs::Mode::WUSR,
+            0,
+        )
+        .unwrap();
+        // Without the check this waits for a writer for ever: the timeout makes the old behaviour a red test.
+        let read =
+            tokio::time::timeout(std::time::Duration::from_secs(3), read_range(&fifo, 0, 16)).await;
+        assert!(read.expect("the read of a FIFO must not wait").is_err());
+    }
+
+    #[tokio::test]
+    async fn a_regular_file_is_read_and_a_link_in_its_place_is_refused() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("f.txt");
+        std::fs::write(&file, b"hello world").unwrap();
+        assert_eq!(read_range(&file, 6, 5).await.unwrap(), b"world");
+        let link = dir.path().join("l.txt");
+        std::os::unix::fs::symlink(&file, &link).unwrap();
+        assert!(
+            read_range(&link, 0, 5).await.is_err(),
+            "a link is not followed"
+        );
+    }
 }

@@ -26,18 +26,19 @@ jobs:
           components: rustfmt,clippy
           cache-key: windows
       - run: cargo fmt --check
-      - run: cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic
+      # The default features (window and S3), not --all-features: test-access is a debug-only feature of the typing test.
+      - run: cargo clippy --workspace --all-targets -- -D warnings -W clippy::pedantic
       # One step per crate with a time limit, so a test that waits for ever on Windows shows which crate it is in.
-      - run: cargo test -p fs-files-types -p fs-files-app --all-features --no-fail-fast
+      - run: cargo test -p fs-files-types -p fs-files-app --no-fail-fast
         timeout-minutes: 15
         if: ${{ !cancelled() }}
-      - run: cargo test -p fs-files-core --all-features --no-fail-fast
+      - run: cargo test -p fs-files-core --no-fail-fast
         timeout-minutes: 20
         if: ${{ !cancelled() }}
-      - run: cargo test -p fs-files-server --all-features --no-fail-fast
+      - run: cargo test -p fs-files-server --no-fail-fast
         timeout-minutes: 20
         if: ${{ !cancelled() }}
-      - run: cargo test -p fs-files --all-features --no-fail-fast
+      - run: cargo test -p fs-files --no-fail-fast
         timeout-minutes: 15
         if: ${{ !cancelled() }}
       - uses: FreeSynergy/fs-release/actions/rust-rules@main

@@ -24,7 +24,7 @@ pub struct Sort {
     /// Largest, newest or last first.
     pub descending: bool,
     /// Folders come before files, each group in this order (the order of a file manager). Off by default
-    /// in the core; the server turns it on, because the contract has no flag for it yet.
+    /// in the core; the server sets it from `Sort.foldersFirst` of the contract (fs-interfaces v0.0.19, default true).
     pub folders_first: bool,
 }
 
