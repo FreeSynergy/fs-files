@@ -20,7 +20,7 @@ Version 0.0.9 (in progress). Latest tag: `v0.0.8`. What changed: [CHANGELOG.md](
 - Disk and database are kept in step: if one step fails, the other is undone.
 - Files with sensitive categories are marked, and the store refuses them unencrypted.
 - A small server that offers all of this over a local socket.
-- Tests: `cargo test --workspace` (255 at version 0.0.9; two live S3 tests are ignored).
+- Tests: `cargo test --workspace` (257 at version 0.0.9; two live S3 tests are ignored).
 
 ## What is not there yet
 

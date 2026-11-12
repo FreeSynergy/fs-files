@@ -22,6 +22,16 @@ fn it_prints_its_version() {
 }
 
 #[test]
+fn the_short_flag_prints_the_same_version() {
+    let out = fs_files(&["-V"]);
+    assert!(out.status.success());
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout).trim(),
+        concat!("fs-files ", env!("CARGO_PKG_VERSION"))
+    );
+}
+
+#[test]
 fn the_server_refuses_a_facet_this_program_does_not_have() {
     let out = fs_files(&["serve", "--facet", "calendar"]);
     assert_eq!(out.status.code(), Some(2));
