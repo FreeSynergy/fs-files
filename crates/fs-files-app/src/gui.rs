@@ -11,6 +11,7 @@ use fs_components_app::{WindowOptions, launch, parse_size};
 use fs_interfaces::rpc::{CommandStarter, companion_path, default_socket, parse_facet};
 
 use crate::FilesRemote;
+use crate::settings;
 use crate::window::{app_widget, files_widget};
 use fs_components_workbenches::file_manager::FileView;
 
@@ -20,7 +21,7 @@ pub const HELP: &str = "fs-files: the files window (without arguments it opens)
   --socket <path>    the files server to talk to (default: $XDG_RUNTIME_DIR/freesynergy/files.sock);
                      a server that is not there, or of another version, is replaced by one of this version
   --snapshot <png>   draw a picture instead of opening a window
-  --view <list|grid> how the file window starts (default list)
+  --view <list|grid> how the file window starts (default: the face chosen last in the View menu, else list)
   --rescan           first take over what lies on the disk of the files folder (what Rescan does)
   --admin            the generated Admin frontend instead of the file window (the same as --facet admin)
   --facet <name>     admin (all types), or one facet of the Admin frontend: files (files, folders, storage backends)
@@ -42,7 +43,8 @@ fn in_facet(
 }
 
 struct Args {
-    view: FileView,
+    /// `--view`: it beats what was kept.
+    view: Option<FileView>,
     admin: bool,
     rescan: bool,
     facet: Option<String>,
@@ -54,7 +56,7 @@ struct Args {
 
 fn parse(words: &[String]) -> Result<Args, String> {
     let mut out = Args {
-        view: FileView::List,
+        view: None,
         admin: false,
         rescan: false,
         facet: None,
@@ -76,11 +78,11 @@ fn parse(words: &[String]) -> Result<Args, String> {
             "--admin" => out.admin = true,
             "--rescan" => out.rescan = true,
             "--view" => {
-                out.view = match value("--view")?.as_str() {
+                out.view = Some(match value("--view")?.as_str() {
                     "list" => FileView::List,
                     "grid" => FileView::Grid,
                     other => return Err(format!("--view wants list or grid, not {other}")),
-                };
+                });
             }
             "--facet" => {
                 let name = parse_facet(&value("--facet")?)?;
@@ -135,7 +137,12 @@ pub fn run(words: &[String]) -> Result<(), String> {
     let app = if args.admin {
         admin_app(&remote, args.facet.as_deref())?
     } else {
-        files_widget(&remote, args.view).map_err(|e| e.to_string())?
+        // The view: the argument, else what the person chose last time (View menu, Face), else the list.
+        let kept = settings::default_path();
+        let view = args
+            .view
+            .unwrap_or_else(|| kept.as_deref().map_or(FileView::List, settings::load));
+        files_widget(&remote, view, kept).map_err(|e| e.to_string())?
     };
     let (width, height) = args.size;
     if let Some(file) = &args.snapshot {

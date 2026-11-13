@@ -3,6 +3,7 @@
 //! Pattern: Facade — one call turns the descriptions the server reports and the `Backend` of each type into the
 //! window. No look and no render code here; the program only gives data and wiring (ADR 0066, rule of 2026-11-10).
 
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use fs_admin_frontend::view::{AboutInfo, AdminSurface};
@@ -109,15 +110,23 @@ impl Surface for FilesScreen {
 }
 
 /// The standard window: the file workbench over the server in the standard shell. The generated Admin frontend
-/// ([`app_widget`]) stays behind `--facet admin`.
+/// ([`app_widget`]) stays behind `--facet admin`. It starts with `view`; the face the person chooses in the View menu is
+/// shown at once and kept in the file `settings` (none: not kept).
 ///
 /// # Errors
 /// [`AppError`] if the shell cannot be made.
-pub fn files_widget(remote: &Arc<FilesRemote>, view: FileView) -> Result<AppWidget, AppError> {
+pub fn files_widget(
+    remote: &Arc<FilesRemote>,
+    view: FileView,
+    settings: Option<PathBuf>,
+) -> Result<AppWidget, AppError> {
     let source = Arc::new(RemoteFileSource(Arc::clone(remote)));
     let widget = FileManagerWidget::new(source, FileLabels::default());
     widget.with_state(|s| s.set_view(view));
     widget.pin_by_names(crate::xdg::user_folder_names());
-    let screen = Screen::new("files", TITLE, Arc::new(FilesScreen(widget)));
-    AppWidget::new(TITLE, vec![screen])
+    let screen = Screen::new("files", TITLE, Arc::new(FilesScreen(widget.clone())));
+    let app = AppWidget::new(TITLE, vec![screen])?;
+    let say: Arc<dyn Say> = Arc::new(English);
+    crate::faces::install(&app, &widget, &say, view, settings)?;
+    Ok(app)
 }

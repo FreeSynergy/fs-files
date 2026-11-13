@@ -8,9 +8,10 @@ What is different here: with the default local backend your files lie in an ordi
 
 ## What it can do today
 
-Version 0.0.9 (in progress). Latest tag: `v0.0.8`. What changed: [CHANGELOG.md](CHANGELOG.md) (English and German).
+Version 0.0.10 (in progress). Latest tag: `v0.0.9`. What changed: [CHANGELOG.md](CHANGELOG.md) (English and German).
 
 - A file window (the standard window): list with columns you can hide, move and widen, or a grid with big icons, tabs, a path bar with search, a command bar, a sidebar with your pinned user folders, the storage and the trash, and a status bar. The generated Admin frontend stays behind `--admin`.
+- **The face is chosen in the window (0.0.10).** Menu View: `Face: List` or `Face: Grid`; the choice is kept in `files-window.conf` in the data folder (a damaged file is the list). `--view` overrides it for one start. **Honest limit:** there is one face with two ways to show a folder; a second face does not exist yet.
 - Folders come first in every listing (a deliberate change: before, folders and files were mixed by name), and the type of a file is read from its first bytes, then its ending, then whether it reads as text.
 - Folders, rename, move, copy, trash, restore, purge, and an empty-trash call.
 - Resumable uploads with a checksum computed while the bytes arrive.
@@ -20,7 +21,7 @@ Version 0.0.9 (in progress). Latest tag: `v0.0.8`. What changed: [CHANGELOG.md](
 - Disk and database are kept in step: if one step fails, the other is undone.
 - Files with sensitive categories are marked, and the store refuses them unencrypted.
 - A small server that offers all of this over a local socket.
-- Tests: `cargo test --workspace` (257 at version 0.0.9; two live S3 tests are ignored).
+- Tests: `cargo test --workspace` (263 at version 0.0.10; two live S3 tests are ignored).
 
 ## What is not there yet
 

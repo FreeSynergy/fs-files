@@ -7,7 +7,7 @@ see a path or a backend. Contract: `files.capnp` in `fs-interfaces` (tag v0.0.19
 
 ## State
 
-Version 0.0.9 (long calls of the file window run on a worker; fs-components v0.0.13); 0.0.8 was (the file window is the standard window; fs-components v0.0.11, fs-interfaces v0.0.19; folders first; types by bytes, ending and text; see "Lift to fs-components v0.0.11"); 0.0.7 was: timeouts: no call to the server waits for ever; 0.0.6 was the Q0 migration: one Blinc place, version handshake, `--facet`, typing test; 0.0.5 was tagged but its release was red, left as it is; 0.0.4 was tagged but its release failed: `--version` was missing; window rebuilt on the generated Admin frontend; earlier: 0.6.0 tagged v0.6.0, header corrected 2026-11-08; 0.5.0 was: stage 1: local folder, stage 2: S3, stage 3: real names, stage 4: the server, 0.5.0: store identity, typed problem extensions, uploads paged in the store). Built on fs-objects v0.0.1, fs-interfaces v0.0.19 and fs-components v0.0.13 (git tags). Interface status: draft, provisional, consumers 0 of 2.
+Version 0.0.10 (the face of the file window is chosen in the View menu and kept; fs-components v0.0.13); 0.0.9 was: long calls of the file window run on a worker; 0.0.8 was (the file window is the standard window; fs-components v0.0.11, fs-interfaces v0.0.19; folders first; types by bytes, ending and text; see "Lift to fs-components v0.0.11"); 0.0.7 was: timeouts: no call to the server waits for ever; 0.0.6 was the Q0 migration: one Blinc place, version handshake, `--facet`, typing test; 0.0.5 was tagged but its release was red, left as it is; 0.0.4 was tagged but its release failed: `--version` was missing; window rebuilt on the generated Admin frontend; earlier: 0.6.0 tagged v0.6.0, header corrected 2026-11-08; 0.5.0 was: stage 1: local folder, stage 2: S3, stage 3: real names, stage 4: the server, 0.5.0: store identity, typed problem extensions, uploads paged in the store). Built on fs-objects v0.0.1, fs-interfaces v0.0.19 and fs-components v0.0.13 (git tags). Interface status: draft, provisional, consumers 0 of 2.
 
 | Area | State |
 |---|---|
@@ -40,7 +40,7 @@ Version 0.0.9 (long calls of the file window run on a worker; fs-components v0.0
 | `File` and `Folder` carry the envelope as stored; every write answers the object as stored (the store sets the times), so an answer equals what `get` says afterwards | done |
 | Server `fs-files-server`: every method of `Files`, `Folders`, `Transfer`, `Upload`, `Blob` (common), `Search`, `Backends` and `BlobBackend` (provider side), `subscribe` with `ended`, `supportReport`; errors as typed problems; binary with `--socket --data --actor --instance` and `FS_FILES_ROOT` | done, draft |
 | `sharing` (empty placeholder interface): `Unsupported` (`share.create`); versions, encryption, sync, WebDAV, previews: not built | as agreed |
-| Tests | 257 run by default at 0.0.9 (254 at 0.0.8; all crates; at 0.0.7: 213, core 142, server 71); 2 ignored live tests. The server tests run over a real socket against a real `FileRepo`, compare values, and run the real binary across a restart |
+| Tests | 263 run by default at 0.0.10 (257 at 0.0.9, 254 at 0.0.8; all crates; at 0.0.7: 213, core 142, server 71); 2 ignored live tests. The server tests run over a real socket against a real `FileRepo`, compare values, and run the real binary across a restart |
 
 ## Structure and pattern map (ADR 0043)
 
@@ -365,3 +365,12 @@ Windows and the tests say that. Until `fs-interfaces` is tagged with the transpo
 * `test-access` is a debug-only feature (fs-components refuses it with `compile_error!` in a build without debug assertions). Here it is optional in `fs-files-app` and `fs-files`, off in every manifest of a release, and only the typing test (`.github/workflows/typing-test.yml`, a debug build) turns it on.
 * The server reads `Sort.foldersFirst` (fs-interfaces v0.0.19): the client's value is respected, the default is on (an old client reads as true). Tested in `crates/fs-files-server/tests/search.rs`.
 * `read_range` of the local backend opens with `O_NONBLOCK | O_NOFOLLOW` and checks the type of what was opened (a regular file), instead of trusting the path: a FIFO put in the place of a file no longer holds a thread for ever, and a link is not followed. Tested (`backend/local/io.rs`: the FIFO test is red without the change, by its timeout).
+
+## The face of the file window (0.0.10, 2026-11-13)
+
+* **There is one face.** `FileView` of fs-components has `List` and `Grid`; no second face (compact, tiles with previews) exists, so the View menu offers exactly these two as `Face: List` / `Face: Grid` (`faces.rs`; the current one is shown and disabled; a flat menu, because `Menu` of fs-components-app has no sub-menu).
+* **Kept in `files-window.conf`** (`settings.rs`) in `$XDG_DATA_HOME/freesynergy` (else `~/.local/share/freesynergy`, on Windows `%LOCALAPPDATA%\freesynergy`): `view=list|grid`, written to `<file>.<pid>.part` and renamed over the old one. Missing, unreadable or damaged is the standard (list), never an error. A write that fails is said on stderr; the face still changes for the run. The file name is fixed and the path is only joined by the system (`PathBuf::join`), never written into a link or a name (lesson of 0.0.9).
+* **Order of the start view:** `--view` (one start, not written), else the kept choice, else the list.
+* **Tests:** `settings.rs` (save, load, replace, no part file left, missing, damaged, not text, unwritable folder), `faces.rs` unit (labels, disabled, ids), `tests/faces.rs` (the real window over a real server: menus as reported by the shell, `choose` as a press, kept, damaged, repaired, unknown entry).
+* **Side bar (checked, not changed here):** pinned folders by the XDG names are tested in fs-components (`files_chrome.rs`) and in `xdg.rs`; Network says `Nothing connected yet` by a label default of fs-components (no test of ours or theirs pins that text).
+* **Not yet:** filled MIME and folder icons and preview pictures (0.0.11), dragging with the mouse, a switch for the side bar, a window in another language (the words are English only).

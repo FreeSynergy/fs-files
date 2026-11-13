@@ -1,6 +1,22 @@
 # Changelog
 
-## 0.0.9 (in progress)
+## 0.0.10 (in progress)
+
+### English
+
+- **The face of the file window is chosen in the window and kept.** The new menus are Program (Quit) and View; View has the entries `Face: List` and `Face: Grid`, the one that is shown says `(current)` and cannot be chosen again. The choice is shown at once and kept in `files-window.conf` (`view=list|grid`) in the data folder (`$XDG_DATA_HOME/freesynergy`, else `~/.local/share/freesynergy`, on Windows the local application data folder); written to a part file and renamed over the old one, so a crash leaves the old or the new file. A missing or damaged file is the standard (the list), never an error; a place that cannot be written is said on stderr and the face still changes for this run. `--view list|grid` stays the override for one start (it is not written).
+- **Honest limit: there is one face.** The file window has one face with two ways to show a folder (list, grid; `FileView` of fs-components has no other). A second face (for example a compact or a tile face with big previews) does not exist; the menu offers only what exists. Not in this version: filled MIME and folder icons and preview pictures (planned for 0.0.11), dragging with the mouse, a switch for the side bar.
+- The side bar of 0.0.9 holds: pinned folders by the names of the XDG user folders (coloured), Network says `Nothing connected yet` (nothing is built there), no empty strip under the status bar.
+- Built on fs-components v0.0.13 (one source, `c97eca0`).
+
+### Deutsch
+
+- **Das Gesicht des Dateifensters wird im Fenster gewählt und gemerkt.** Neu sind die Menüs Program (Quit) und View; View hat die Einträge `Face: List` und `Face: Grid` (die Oberfläche spricht noch Englisch), der gezeigte sagt `(current)` und lässt sich nicht erneut wählen. Die Wahl wirkt sofort und wird in `files-window.conf` (`view=list|grid`) im Datenordner gemerkt (`$XDG_DATA_HOME/freesynergy`, sonst `~/.local/share/freesynergy`, unter Windows der lokale Anwendungsdatenordner); in eine Teildatei geschrieben und über die alte umbenannt, ein Absturz hinterlässt also die alte oder die neue Datei. Eine fehlende oder kaputte Datei ist der Standard (die Liste), nie ein Fehler; ein Ort, der sich nicht beschreiben lässt, wird auf stderr gesagt, und das Gesicht ändert sich für diesen Lauf trotzdem. `--view list|grid` bleibt die Überschreibung für einen Start (wird nicht geschrieben).
+- **Ehrliche Grenze: es gibt ein Gesicht.** Das Dateifenster hat ein Gesicht mit zwei Arten, einen Ordner zu zeigen (Liste, Raster; `FileView` von fs-components kennt keine weitere). Ein zweites Gesicht (etwa ein kompaktes oder eine Kachelansicht mit großen Vorschauen) gibt es nicht; das Menü bietet nur, was es gibt. Nicht in dieser Version: gefüllte MIME- und Ordner-Symbole und Vorschaubilder (geplant für 0.0.11), Ziehen mit der Maus, ein Schalter für die Seitenleiste.
+- Die Seitenleiste aus 0.0.9 gilt: angeheftete Ordner nach den Namen der XDG-Benutzerordner (farbig), Network sagt `Nothing connected yet` (dort ist nichts gebaut), kein leerer Streifen unter der Statusleiste.
+- Gebaut auf fs-components v0.0.13 (eine Quelle, `c97eca0`).
+
+## 0.0.9
 
 ### English
 
