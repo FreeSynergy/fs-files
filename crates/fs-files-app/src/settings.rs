@@ -45,13 +45,12 @@ fn word(view: FileView) -> &'static str {
 
 /// The view the text names; anything else (empty, damaged, an unknown word) is `None`.
 fn parse(text: &str) -> Option<FileView> {
-    text.lines().find_map(|line| {
-        match line.trim().strip_prefix("view=")?.trim() {
+    text.lines()
+        .find_map(|line| match line.trim().strip_prefix("view=")?.trim() {
             "list" => Some(FileView::List),
             "grid" => Some(FileView::Grid),
             _ => None,
-        }
-    })
+        })
 }
 
 /// The kept view; none kept, or a file that cannot be read or understood, gives the standard (the list).

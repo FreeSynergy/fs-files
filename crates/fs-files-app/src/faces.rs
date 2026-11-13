@@ -34,7 +34,11 @@ pub(crate) fn menus(say: &dyn Say, current: FileView) -> Vec<Menu> {
             label = format!("{label} ({})", say.say("face.current"));
         }
         let entry = MenuEntry::new(id, label);
-        if view == current { entry.disabled() } else { entry }
+        if view == current {
+            entry.disabled()
+        } else {
+            entry
+        }
     };
     vec![
         Menu::new(
@@ -92,7 +96,11 @@ mod tests {
     fn the_menus_offer_the_two_ways_and_the_one_shown_cannot_be_chosen() {
         let m = menus(&English, FileView::List);
         assert_eq!(m.len(), 2);
-        let ids: Vec<_> = m[1].entries.iter().map(|e| (e.id.as_str(), e.disabled)).collect();
+        let ids: Vec<_> = m[1]
+            .entries
+            .iter()
+            .map(|e| (e.id.as_str(), e.disabled))
+            .collect();
         assert_eq!(ids, [(LIST, true), (GRID, false)]);
         assert_eq!(m[1].entries[0].label, "Face: List (current)");
         assert_eq!(m[1].entries[1].label, "Face: Grid");

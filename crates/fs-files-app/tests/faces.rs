@@ -13,7 +13,11 @@ fn entries(app: &fs_components_app::AppWidget) -> Vec<(String, String, bool)> {
     app.with_shell(|s| {
         s.menus()
             .iter()
-            .flat_map(|m| m.entries.iter().map(|e| (e.id.clone(), e.label.clone(), e.disabled)))
+            .flat_map(|m| {
+                m.entries
+                    .iter()
+                    .map(|e| (e.id.clone(), e.label.clone(), e.disabled))
+            })
             .collect()
     })
 }
@@ -36,7 +40,10 @@ fn the_menus_name_the_faces_and_a_chosen_one_is_kept() {
     assert!(app.choose("face-grid"));
     assert_eq!(settings::load(&path), FileView::Grid);
     let now = entries(&app);
-    assert!(!now[1].2 && now[2].2, "the shown face is the one that cannot be chosen: {now:?}");
+    assert!(
+        !now[1].2 && now[2].2,
+        "the shown face is the one that cannot be chosen: {now:?}"
+    );
     assert_eq!(now[2].1, "Face: Grid (current)");
 
     // the next start: what was kept shows, then the person goes back
